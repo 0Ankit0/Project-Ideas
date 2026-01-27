@@ -18,7 +18,10 @@ Slot Booking System/
 │   ├── use-case-descriptions.md
 │   ├── system-context-diagram.md
 │   ├── activity-diagram.md
-│   └── bpmn-swimlane-diagram.md
+│   ├── bpmn-swimlane-diagram.md
+│   ├── data-dictionary.md
+│   ├── business-rules.md
+│   └── event-catalog.md
 ├── high-level-design/         # Phase 3: System architecture
 │   ├── system-sequence-diagram.md
 │   ├── domain-model.md
@@ -37,6 +40,15 @@ Slot Booking System/
 │   ├── deployment-diagram.md
 │   ├── network-infrastructure.md
 │   └── cloud-architecture.md
+├── edge-cases/                # Cross-cutting
+│   ├── README.md
+│   ├── slot-availability.md
+│   ├── booking-and-payments.md
+│   ├── cancellations-and-refunds.md
+│   ├── notifications.md
+│   ├── api-and-ui.md
+│   ├── security-and-compliance.md
+│   └── operations.md
 └── implementation/            # Phase 6: Code guidelines
     ├── code-guidelines.md
     └── c4-code-diagram.md
@@ -128,7 +140,7 @@ Slot Booking System/
 
 ## 📝 Documentation Stats
 
-- **24 files** across **6 phases**
+- **36 files** across **7 sections**
 - **25+ Mermaid diagrams**
 - Platform-independent design
 - Technology-agnostic

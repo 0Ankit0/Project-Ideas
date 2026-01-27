@@ -216,9 +216,51 @@ A generic, extensible slot booking system that enables users to discover, book, 
 | Maps API (Google, Mapbox) | External | Low |
 | Authentication Provider (OAuth) | External | Low |
 
----
 
-## 7. Glossary
+## 7. Stakeholders & Personas
+
+| Role | Goals | Primary Needs |
+|------|-------|---------------|
+| Customer | Book quickly and reliably | Accurate availability, fast checkout |
+| Provider | Maximize utilization | Calendar tools, payout visibility |
+| Admin | Platform governance | Analytics, approvals, policy controls |
+| Support Agent | Resolve issues fast | Full booking history and audit trail |
+
+## 8. Observability & Auditability
+
+| Signal | Scope | Examples |
+|--------|-------|----------|
+| Metrics | Booking flow | lock contention, success rate, p95 latency |
+| Logs | API & background jobs | validation failures, refund errors |
+| Traces | End-to-end requests | search → booking → payment |
+| Audit | Sensitive actions | cancellations, refunds, provider approvals |
+
+## 9. Reliability, DR & Capacity
+
+| Requirement | Target |
+|-------------|--------|
+| RTO | ≤ 4 hours |
+| RPO | ≤ 1 hour |
+| Booking integrity | No double bookings |
+| Back-pressure handling | Graceful degradation |
+
+## 10. Acceptance Criteria
+
+- Booking confirmation within 3 seconds (p95).
+- Slot lock TTL enforced with clear expiry behavior.
+- Refunds initiated within SLA for eligible cancellations.
+- Audit logs exist for cancellations, refunds, and provider actions.
+
+## 11. Risks & Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Double booking | Revenue loss | Atomic locks + DB constraints |
+| Payment failures | Abandoned bookings | Retry + idempotency |
+| Notification failures | No-shows | Multi-channel fallback |
+| Peak traffic | SLA breach | Autoscaling + rate limits |
+
+## 12. Glossary
 
 | Term | Definition |
 |------|------------|

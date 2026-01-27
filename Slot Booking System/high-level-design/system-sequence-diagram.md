@@ -96,9 +96,10 @@ sequenceDiagram
         System-->>-User: updatedSummary(discountedPrice)
     end
     
-    User->>+System: confirmBooking(bookingDetails)
-    System-->>System: Lock slots temporarily
-    System-->>-User: paymentRequired(orderId, amount)
+    User->>+System: confirmBooking(bookingDetails, Idempotency-Key)
+    System-->>System: Validate idempotency
+    System-->>System: Lock slots temporarily (TTL)
+    System-->>-User: paymentRequired(orderId, amount, lockExpiresAt)
     
     User->>+System: processPayment(orderId, paymentMethod)
     System->>+Payment: charge(amount, paymentDetails)
@@ -295,6 +296,27 @@ sequenceDiagram
 
 ---
 
+## SSD-11: Join Waitlist & Notify
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant System as Slot Booking System
+    participant Notify as Notification Service
+    participant Scheduler as Scheduler
+    
+    User->>+System: joinWaitlist(resourceId, date)
+    System-->>System: Validate eligibility
+    System-->>-User: waitlistConfirmed()
+    
+    Note over Scheduler: Slot becomes available
+    Scheduler->>+System: slotAvailable(resourceId, slotId)
+    System->>Notify: notifyWaitlist(userId, slotId)
+    System-->>Scheduler: notificationQueued()
+```
+
+---
+
 ## Summary of System Operations
 
 | SSD | Primary Operation | Actors | External Systems |
@@ -309,3 +331,4 @@ sequenceDiagram
 | 08 | Approve Provider | Admin | Notification |
 | 09 | Send Notification | System | Push, Email, SMS |
 | 10 | Search Resources | User | Maps |
+| 11 | Waitlist Notify | User | Notification |

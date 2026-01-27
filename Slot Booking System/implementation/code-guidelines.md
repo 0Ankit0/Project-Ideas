@@ -139,6 +139,58 @@ async function bookSlot(slotId: string) {
 
 ---
 
+## Idempotency & Concurrency
+
+- Require `Idempotency-Key` for state-changing endpoints.
+- Persist idempotency records with request hash and response snapshot.
+- Use atomic slot reservation with TTL to prevent double booking.
+
+```typescript
+// Idempotency check
+const cached = await idempotencyRepo.find(key, endpoint, requestHash);
+if (cached) return cached.response;
+
+// Slot lock with TTL
+await slotRepo.lockSlots(slotIds, userId, ttlSeconds);
+```
+
+---
+
+## Transactions & Outbox Pattern
+
+- Wrap booking creation, payment intent creation, and audit logging in a single transaction.
+- Emit events via outbox to ensure reliable notifications.
+
+```typescript
+await db.transaction(async (tx) => {
+  const booking = await bookingRepo.create(tx, data);
+  await outboxRepo.enqueue(tx, { type: 'booking.created', payload: booking });
+  await auditRepo.record(tx, { actorId, action: 'booking.created' });
+});
+```
+
+---
+
+## Webhook Processing
+
+- Verify signatures and ensure idempotent processing using provider event IDs.
+- Persist webhook events for replay and audit.
+
+```typescript
+if (!verifySignature(payload, signature)) throw new UnauthorizedError();
+const stored = await webhookRepo.upsert(providerEventId, payload);
+if (!stored) return; // duplicate
+```
+
+---
+
+## Observability
+
+- Include `X-Request-Id` in logs and responses.
+- Add metrics for slot lock contention, booking success rate, and refund failures.
+
+---
+
 ## API Response Format
 
 ### Success Response

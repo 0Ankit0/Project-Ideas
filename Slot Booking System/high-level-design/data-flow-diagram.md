@@ -56,6 +56,7 @@ flowchart TB
         P6[6.0<br/>Notification<br/>Dispatch]
         P7[7.0<br/>Review<br/>Management]
         P8[8.0<br/>Reporting &<br/>Analytics]
+        P9[9.0<br/>Audit &<br/>Compliance]
     end
     
     subgraph "Data Stores"
@@ -66,6 +67,9 @@ flowchart TB
         D5[(Payments)]
         D6[(Reviews)]
         D7[(Notifications)]
+        D8[(Audit Logs)]
+        D9[(Idempotency Keys)]
+        D10[(Notification Preferences)]
     end
     
     %% User Management
@@ -89,16 +93,19 @@ flowchart TB
     D1 -->|User Data| P4
     D2 -->|Resource Data| P4
     P4 -->|Booking Record| D4
+    P4 -->|Idempotency Key| D9
     P4 -->|Payment Request| P5
     
     %% Payment Processing
     P5 <-->|Transaction| PAY_EXT
     P5 -->|Payment Record| D5
+    P5 -->|Idempotency Key| D9
     P5 -->|Confirmation| P4
     
     %% Notifications
     P4 -->|Booking Event| P6
     P6 -->|Notification Record| D7
+    D10 -->|User Preferences| P6
     P6 -->|Notification| NOTIF_EXT
     
     %% Reviews
@@ -111,6 +118,14 @@ flowchart TB
     D5 -->|Payment Data| P8
     P8 -->|Reports| ADMIN
     P8 -->|Reports| PROV
+
+    %% Audit & Compliance
+    P1 -->|Audit Events| P9
+    P2 -->|Audit Events| P9
+    P3 -->|Audit Events| P9
+    P4 -->|Audit Events| P9
+    P5 -->|Audit Events| P9
+    P9 -->|Audit Record| D8
 ```
 
 ---
@@ -272,6 +287,9 @@ flowchart TB
 | D5: Payments | Transactions | paymentId, amount, status |
 | D6: Reviews | User feedback | reviewId, rating, comment |
 | D7: Notifications | Sent notifications | notifId, userId, channel |
+| D8: Audit Logs | Compliance records | actorId, action, timestamp |
+| D9: Idempotency Keys | Request deduplication | key, status, response |
+| D10: Notification Preferences | User settings | userId, channels, quiet_hours |
 
 ---
 

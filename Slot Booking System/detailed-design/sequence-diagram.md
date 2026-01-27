@@ -73,10 +73,14 @@ sequenceDiagram
     participant PAY as PaymentService
     participant PG as PaymentGateway
     participant NS as NotificationService
+    participant IDS as IdempotencyService
+    participant AUD as AuditLogger
     participant BR as BookingRepository
     participant DB as Database
     
     C->>+BC: POST /bookings {resourceId, slotIds, promoCode}
+    BC->>+IDS: verify(Idempotency-Key, requestHash)
+    IDS-->>-BC: ok|replayResponse
     BC->>+BS: createBooking(userId, dto)
     
     %% Validate and lock slots
@@ -111,8 +115,11 @@ sequenceDiagram
     BR->>+DB: INSERT INTO bookings...
     DB-->>-BR: bookingId
     BR-->>-BS: savedBooking
+
+    BS->>+AUD: record("booking.created", bookingId)
+    AUD-->>-BS: logged
     
-    BS-->>-BC: bookingCreated(bookingId, amount)
+    BS-->>-BC: bookingCreated(bookingId, amount, lockExpiresAt)
     BC-->>-C: 201 {bookingId, amount, paymentUrl}
     
     %% Payment Flow
@@ -175,6 +182,7 @@ sequenceDiagram
     participant PG as PaymentGateway
     participant SS as SlotService
     participant NS as NotificationService
+    participant AUD as AuditLogger
     participant BR as BookingRepository
     participant DB as Database
     
@@ -202,6 +210,9 @@ sequenceDiagram
         BR->>+DB: UPDATE bookings SET status = 'CANCELLED'
         DB-->>-BR: updated
         BR-->>-BS: updatedBooking
+
+        BS->>+AUD: record("booking.cancelled", bookingId)
+        AUD-->>-BS: logged
         
         %% Release slots
         loop For each slot in booking
@@ -223,6 +234,8 @@ sequenceDiagram
                 PS-->>-BS: refundProcessed
             else Refund Failed
                 PS-->>BS: refundFailed(queued for retry)
+                BS->>+AUD: record("refund.failed", bookingId)
+                AUD-->>-BS: logged
             end
         end
         
@@ -412,6 +425,8 @@ sequenceDiagram
     participant NS as NotificationService
     participant PR as PaymentRepository
     participant DB as Database
+    participant WHR as WebhookRepository
+    participant AUD as AuditLogger
     
     PG->>+WC: POST /webhooks/payment {event, data, signature}
     
@@ -422,6 +437,10 @@ sequenceDiagram
         WC-->>PG: 401 Unauthorized
     else Valid Signature
         WC->>WC: parseEvent(payload)
+            WC->>+WHR: upsert(providerEventId, payload)
+            WHR->>+DB: INSERT ... ON CONFLICT DO NOTHING
+            DB-->>-WHR: stored|duplicate
+            WHR-->>-WC: status
         
         alt Event: payment.success
             WC->>+PS: handlePaymentSuccess(data)
@@ -438,6 +457,8 @@ sequenceDiagram
             
             PS->>+NS: sendPaymentConfirmation(payment)
             NS-->>-PS: queued
+            PS->>+AUD: record("payment.success", paymentId)
+            AUD-->>-PS: logged
             
             PS-->>-WC: handled
             
@@ -451,6 +472,8 @@ sequenceDiagram
             
             PS->>+NS: sendPaymentFailedNotification(payment)
             NS-->>-PS: queued
+            PS->>+AUD: record("payment.failed", paymentId)
+            AUD-->>-PS: logged
             
             PS-->>-WC: handled
             
@@ -461,6 +484,8 @@ sequenceDiagram
             
             PS->>+NS: sendRefundConfirmation(refund)
             NS-->>-PS: queued
+            PS->>+AUD: record("refund.processed", refundId)
+            AUD-->>-PS: logged
             
             PS-->>-WC: handled
         end

@@ -17,6 +17,7 @@ stateDiagram-v2
     [*] --> Draft: User selects slots
     
     Draft --> Pending: Slots locked successfully
+    Draft --> Waitlisted: No slots available
     Draft --> [*]: Lock failed / Timeout
     
     Pending --> AwaitingPayment: Booking created
@@ -41,6 +42,7 @@ stateDiagram-v2
     
     RefundPending --> Refunded: Refund processed
     Refunded --> [*]
+    Waitlisted --> Pending: Slot becomes available
     
     Completed --> [*]
     

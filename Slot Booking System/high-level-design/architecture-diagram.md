@@ -30,11 +30,14 @@ graph TB
         AUTH[Auth Service]
         USER[User Service]
         RES[Resource Service]
+        SLOT[Slot Service]
         BOOK[Booking Service]
         PAY[Payment Service]
         NOTIF[Notification Service]
         SEARCH[Search Service]
         REPORT[Reporting Service]
+        WEBHOOK[Webhook Processor]
+        SCHED[Scheduler/Workers]
     end
     
     subgraph "Domain Layer"
@@ -47,6 +50,8 @@ graph TB
         SEARCH_IDX[(Search Index<br/>Elasticsearch)]
         QUEUE[Message Queue<br/>RabbitMQ / Kafka]
         STORAGE[File Storage<br/>S3 / Cloud Storage]
+        IDEMP[(Idempotency Store)]
+        AUDIT[(Audit Log Store)]
     end
     
     WEB --> GATEWAY
@@ -62,21 +67,28 @@ graph TB
     
     GATEWAY --> USER
     GATEWAY --> RES
+    GATEWAY --> SLOT
     GATEWAY --> BOOK
     GATEWAY --> PAY
     GATEWAY --> SEARCH
     GATEWAY --> REPORT
+    GATEWAY --> WEBHOOK
     
     AUTH --> DOMAIN
     USER --> DOMAIN
     RES --> DOMAIN
+    SLOT --> DOMAIN
     BOOK --> DOMAIN
     PAY --> DOMAIN
     NOTIF --> DOMAIN
+    WEBHOOK --> DOMAIN
+    SCHED --> DOMAIN
     
     DOMAIN --> DB
     DOMAIN --> CACHE
     DOMAIN --> QUEUE
+    DOMAIN --> IDEMP
+    DOMAIN --> AUDIT
     RES --> STORAGE
     SEARCH --> SEARCH_IDX
 ```
@@ -110,6 +122,8 @@ graph TB
         SVC_SEARCH[Search Service]
         SVC_REPORT[Reporting Service]
         SVC_FILE[File Service]
+        SVC_WEBHOOK[Webhook Processor]
+        SVC_SCHED[Scheduler/Workers]
     end
     
     subgraph "Data Stores"
@@ -123,6 +137,8 @@ graph TB
         CACHE[(Redis Cache)]
         MQ[Message Queue]
         ES[(Elasticsearch)]
+        IDEMP[(Idempotency Store)]
+        AUDIT[(Audit Log Store)]
     end
     
     subgraph "External"
@@ -140,6 +156,7 @@ graph TB
     AUTH_GW --> SVC_BOOK
     AUTH_GW --> SVC_PAY
     AUTH_GW --> SVC_SEARCH
+    AUTH_GW --> SVC_WEBHOOK
     
     SVC_USER --> DB_USER
     SVC_RES --> DB_RES
@@ -161,6 +178,9 @@ graph TB
     SVC_USER --> CACHE
     SVC_RES --> CACHE
     SVC_BOOK --> CACHE
+    SVC_BOOK --> IDEMP
+    SVC_BOOK --> AUDIT
+    SVC_WEBHOOK --> AUDIT
 ```
 
 ---
@@ -219,6 +239,7 @@ flowchart LR
         P2[Payment Service]
         P3[User Service]
         P4[Resource Service]
+        P5[Slot Service]
     end
     
     subgraph "Event Bus"
@@ -231,18 +252,21 @@ flowchart LR
         C3[Search Indexer]
         C4[Audit Logger]
         C5[Payout Calculator]
+        C6[Scheduler]
     end
     
-    P1 -->|BookingCreated<br/>BookingCancelled| EB
-    P2 -->|PaymentCompleted<br/>RefundProcessed| EB
+    P1 -->|BookingCreated<br/>BookingCancelled<br/>BookingRescheduled| EB
+    P2 -->|PaymentCompleted<br/>PaymentFailed<br/>RefundProcessed| EB
     P3 -->|UserRegistered<br/>UserUpdated| EB
     P4 -->|ResourceCreated<br/>AvailabilityChanged| EB
+    P5 -->|SlotReserved<br/>SlotLockExpired| EB
     
     EB --> C1
     EB --> C2
     EB --> C3
     EB --> C4
     EB --> C5
+    EB --> C6
 ```
 
 ---

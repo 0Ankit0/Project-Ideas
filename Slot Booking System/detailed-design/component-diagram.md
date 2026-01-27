@@ -28,10 +28,14 @@ graph TB
     subgraph "Service Layer"
         USER_SVC[User<br/>Service]
         RESOURCE_SVC[Resource<br/>Service]
+        SLOT_SVC[Slot<br/>Service]
         BOOKING_SVC[Booking<br/>Service]
         PAYMENT_SVC[Payment<br/>Service]
         NOTIFICATION_SVC[Notification<br/>Service]
         SEARCH_SVC[Search<br/>Service]
+        WAITLIST_SVC[Waitlist<br/>Service]
+        AUDIT_SVC[Audit<br/>Service]
+        WEBHOOK_SVC[Webhook<br/>Service]
     end
     
     subgraph "Domain Layer"
@@ -47,6 +51,8 @@ graph TB
         QUEUE_PUB[Message<br/>Publisher]
         EXT_PAY[Payment<br/>Gateway Adapter]
         EXT_NOTIF[Notification<br/>Provider Adapter]
+        IDEMP_REPO[Idempotency<br/>Store]
+        AUDIT_REPO[Audit Log<br/>Store]
     end
     
     WEB --> GW
@@ -56,12 +62,14 @@ graph TB
     GW --> AUTH
     AUTH --> USER_SVC
     AUTH --> RESOURCE_SVC
+    AUTH --> SLOT_SVC
     AUTH --> BOOKING_SVC
     AUTH --> PAYMENT_SVC
     AUTH --> SEARCH_SVC
     
     USER_SVC --> USER_DOM
     RESOURCE_SVC --> RESOURCE_DOM
+    SLOT_SVC --> RESOURCE_DOM
     BOOKING_SVC --> BOOKING_DOM
     PAYMENT_SVC --> PAYMENT_DOM
     
@@ -70,11 +78,15 @@ graph TB
     BOOKING_DOM --> DB_REPO
     BOOKING_DOM --> CACHE_REPO
     PAYMENT_DOM --> DB_REPO
+    BOOKING_DOM --> IDEMP_REPO
+    BOOKING_DOM --> AUDIT_REPO
     
     BOOKING_SVC --> QUEUE_PUB
     QUEUE_PUB --> NOTIFICATION_SVC
     PAYMENT_SVC --> EXT_PAY
     NOTIFICATION_SVC --> EXT_NOTIF
+    WAITLIST_SVC --> DB_REPO
+    WEBHOOK_SVC --> PAYMENT_SVC
 ```
 
 ---

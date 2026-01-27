@@ -12,6 +12,24 @@
 
 ---
 
+## API Principles
+
+- **Versioning**: URI versioning (`/v1`) with backwards-compatible changes only.
+- **Idempotency**: `Idempotency-Key` required for POST/PATCH/DELETE that mutate state.
+- **Pagination**: Cursor-based pagination for large collections.
+- **Correlation**: `X-Request-Id` echoed in responses for tracing.
+
+## Standard Headers
+
+| Header | Description |
+|--------|-------------|
+| Authorization | Bearer token |
+| Idempotency-Key | Client-generated UUID |
+| X-Request-Id | Correlation id |
+| X-Tenant-Id | Optional tenant scoping |
+
+---
+
 ## Authentication Endpoints
 
 ### Register
@@ -82,7 +100,8 @@ GET /v1/resources
 | lat, lng | float | Center for location search |
 | radius | int | Radius in km |
 | minPrice, maxPrice | float | Price range |
-| page, limit | int | Pagination |
+| cursor | string | Pagination cursor |
+| limit | int | Page size |
 
 **Response:** `200 OK`
 ```json
@@ -98,7 +117,7 @@ GET /v1/resources
       "imageUrl": "https://..."
     }
   ],
-  "pagination": { "page": 1, "limit": 20, "total": 100 }
+  "pagination": { "limit": 20, "nextCursor": "cursor-abc" }
 }
 ```
 
@@ -153,6 +172,7 @@ GET /v1/resources/:resourceId/slots
 ```
 POST /v1/bookings
 ```
+**Headers:** `Idempotency-Key: <uuid>`
 **Request:**
 ```json
 {
@@ -170,7 +190,8 @@ POST /v1/bookings
   "status": "pending",
   "totalAmount": 90.00,
   "discountAmount": 10.00,
-  "paymentUrl": "/v1/payments/initiate?bookingId=uuid"
+  "paymentUrl": "/v1/payments/initiate?bookingId=uuid",
+  "lockExpiresAt": "2024-01-20T10:10:00Z"
 }
 ```
 
@@ -178,7 +199,7 @@ POST /v1/bookings
 ```
 GET /v1/bookings
 ```
-**Query:** `status=upcoming|past|cancelled`, `page`, `limit`
+**Query:** `status=upcoming|past|cancelled`, `cursor`, `limit`
 
 ### Get Booking Details
 ```
@@ -209,6 +230,30 @@ PUT /v1/bookings/:bookingId/reschedule
 **Request:**
 ```json
 { "newSlotIds": ["uuid3", "uuid4"] }
+```
+**Response:** `200 OK`
+```json
+{
+  "status": "confirmed",
+  "oldSlotIds": ["uuid1", "uuid2"],
+  "newSlotIds": ["uuid3", "uuid4"],
+  "priceDifference": 10.00
+}
+```
+
+### Join Waitlist
+```
+POST /v1/resources/:resourceId/waitlist
+```
+**Request:**
+```json
+{ "date": "2024-01-20", "slotDurationMinutes": 60 }
+```
+
+### Notification Preferences
+```
+GET /v1/users/me/notification-preferences
+PUT /v1/users/me/notification-preferences
 ```
 
 ---
@@ -247,6 +292,14 @@ POST /v1/payments/:paymentId/verify
 POST /v1/webhooks/payment
 ```
 
+**Headers:**
+- `X-Signature`: HMAC signature
+- `X-Request-Id`: Correlation id
+
+**Guarantees**:
+- At-least-once delivery with retries.
+- Idempotent processing using `gateway_txn_id`.
+
 ---
 
 ## Provider Endpoints
@@ -279,6 +332,7 @@ PUT /v1/provider/resources/:resourceId/availability
 ```
 GET /v1/provider/bookings
 ```
+**Query:** `status=upcoming|past|cancelled`, `cursor`, `limit`
 
 ### Get Earnings
 ```
@@ -330,8 +384,11 @@ GET /v1/admin/analytics/revenue
 | 403 | FORBIDDEN | Permission denied |
 | 404 | NOT_FOUND | Resource not found |
 | 409 | CONFLICT | Slot unavailable |
+| 409 | SLOT_LOCKED | Slot is temporarily locked |
+| 409 | BOOKING_CONFLICT | Booking state conflict |
 | 429 | RATE_LIMITED | Too many requests |
 | 500 | SERVER_ERROR | Internal error |
+| 400 | IDEMPOTENCY_REQUIRED | Missing Idempotency-Key |
 
 ---
 

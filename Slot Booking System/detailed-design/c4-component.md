@@ -35,6 +35,8 @@ graph TB
             PAY_SVC[Payment Service<br/>Payment logic]
             NOTIF_SVC[Notification Service<br/>Send notifications]
             SEARCH_SVC[Search Service<br/>Index and search]
+            WAITLIST_SVC[Waitlist Service<br/>Queue handling]
+            AUDIT_SVC[Audit Service<br/>Compliance logs]
         end
         
         subgraph "Repositories"
@@ -43,6 +45,8 @@ graph TB
             SLOT_REPO[Slot Repository]
             BOOK_REPO[Booking Repository]
             PAY_REPO[Payment Repository]
+            IDEMP_REPO[Idempotency Repository]
+            AUDIT_REPO[Audit Repository]
         end
         
         subgraph "External Adapters"
@@ -68,6 +72,9 @@ graph TB
     BOOK_SVC --> SLOT_SVC
     BOOK_SVC --> PAY_SVC
     BOOK_SVC --> NOTIF_SVC
+    BOOK_SVC --> IDEMP_REPO
+    BOOK_SVC --> AUDIT_REPO
+    WAITLIST_SVC --> BOOK_REPO
     SLOT_SVC --> SLOT_REPO
     PAY_SVC --> PAY_REPO
     
@@ -86,6 +93,8 @@ graph TB
     SLOT_REPO --> DB
     BOOK_REPO --> DB
     PAY_REPO --> DB
+    IDEMP_REPO --> DB
+    AUDIT_REPO --> DB
 ```
 
 ---

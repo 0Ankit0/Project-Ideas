@@ -223,6 +223,16 @@ classDiagram
         +getDetails()
         +generateConfirmation()
     }
+
+    class WaitlistEntry {
+        -String waitlistId
+        -String userId
+        -String resourceId
+        -DateTime requestedAt
+        -String status
+        +notifyAvailable(slotId)
+        +cancel()
+    }
     
     class BookingStatus {
         <<enumeration>>
@@ -298,6 +308,15 @@ classDiagram
         +initiate(amount, reason)
         +process()
     }
+
+    class IdempotencyKey {
+        -String key
+        -String endpoint
+        -String requestHash
+        -String status
+        -DateTime createdAt
+        +isValid()
+    }
     
     class PromoCode {
         -String code
@@ -319,6 +338,7 @@ classDiagram
     Booking "1" --> "1..*" Slot
     Booking "1" --> "0..1" Payment
     Booking "*" --> "0..1" PromoCode
+    Booking "1" --> "0..*" WaitlistEntry
     RecurringBooking "1" --> "*" Booking
     Payment --> PaymentStatus
     Payment --> PaymentMethod

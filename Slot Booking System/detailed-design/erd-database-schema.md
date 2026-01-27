@@ -12,6 +12,9 @@ erDiagram
     users ||--o{ reviews : writes
     users ||--o{ payments : initiates
     users ||--o| providers : becomes
+    users ||--o{ notification_preferences : has
+    users ||--o{ audit_logs : performs
+    users ||--o{ idempotency_keys : owns
     
     providers ||--|{ resources : owns
     providers ||--o{ payouts : receives
@@ -24,6 +27,8 @@ erDiagram
     slots ||--o| bookings : reserved_by
     bookings ||--|| payments : paid_with
     payments ||--o| refunds : has
+    bookings ||--o{ booking_events : emits
+    payments ||--o{ webhook_events : receives
     
     users {
         uuid id PK
@@ -96,6 +101,52 @@ erDiagram
         uuid resource_id FK
         int rating
         text comment
+    }
+
+    notification_preferences {
+        uuid id PK
+        uuid user_id FK
+        boolean email_enabled
+        boolean sms_enabled
+        boolean push_enabled
+        jsonb quiet_hours
+    }
+
+    booking_events {
+        uuid id PK
+        uuid booking_id FK
+        varchar type
+        jsonb payload
+        timestamp created_at
+    }
+
+    webhook_events {
+        uuid id PK
+        uuid payment_id FK
+        varchar provider_event_id
+        varchar event_type
+        jsonb payload
+        timestamp received_at
+    }
+
+    audit_logs {
+        uuid id PK
+        uuid actor_id FK
+        varchar action
+        jsonb metadata
+        timestamp created_at
+    }
+
+    idempotency_keys {
+        uuid id PK
+        uuid user_id FK
+        varchar idempotency_key
+        varchar endpoint
+        varchar request_hash
+        varchar status
+        jsonb response_snapshot
+        timestamp created_at
+        timestamp expires_at
     }
 ```
 
@@ -229,6 +280,57 @@ CREATE TABLE resource_amenities (
 | valid_from | TIMESTAMP | |
 | valid_to | TIMESTAMP | |
 | is_active | BOOLEAN | |
+
+### `notification_preferences`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PRIMARY KEY |
+| user_id | UUID | FK → users |
+| email_enabled | BOOLEAN | DEFAULT true |
+| sms_enabled | BOOLEAN | DEFAULT false |
+| push_enabled | BOOLEAN | DEFAULT true |
+| quiet_hours | JSONB | |
+
+### `booking_events`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PRIMARY KEY |
+| booking_id | UUID | FK → bookings |
+| type | VARCHAR(50) | NOT NULL |
+| payload | JSONB | |
+| created_at | TIMESTAMP | DEFAULT NOW() |
+
+### `webhook_events`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PRIMARY KEY |
+| payment_id | UUID | FK → payments |
+| provider_event_id | VARCHAR(255) | UNIQUE |
+| event_type | VARCHAR(100) | NOT NULL |
+| payload | JSONB | |
+| received_at | TIMESTAMP | DEFAULT NOW() |
+
+### `audit_logs`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PRIMARY KEY |
+| actor_id | UUID | FK → users |
+| action | VARCHAR(100) | NOT NULL |
+| metadata | JSONB | |
+| created_at | TIMESTAMP | DEFAULT NOW() |
+
+### `idempotency_keys`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PRIMARY KEY |
+| user_id | UUID | FK → users |
+| idempotency_key | VARCHAR(64) | NOT NULL |
+| endpoint | VARCHAR(255) | NOT NULL |
+| request_hash | VARCHAR(64) | NOT NULL |
+| status | VARCHAR(20) | NOT NULL |
+| response_snapshot | JSONB | |
+| created_at | TIMESTAMP | DEFAULT NOW() |
+| expires_at | TIMESTAMP | |
 
 ---
 
