@@ -19,11 +19,17 @@ flowchart TB
     P3[3.0<br/>AI<br/>Classification]
     P4[4.0<br/>Entity<br/>Extraction]
     P5[5.0<br/>Validation]
+    P6[6.0<br/>Review &<br/>Correction]
+    P7[7.0<br/>Export]
+    P8[8.0<br/>Audit &<br/>Compliance]
     
     D1[(Documents)]
     D2[(OCR Text)]
     D3[(Extractions)]
     D4[(ML Models)]
+    D5[(Review Tasks)]
+    D6[(Export Jobs)]
+    D7[(Audit Logs)]
     
     USER -->|Upload| P1
     P1 -->|File| D1
@@ -35,7 +41,17 @@ flowchart TB
     D4 -->|Models| P4
     P4 -->|Entities| P5
     P5 -->|Validated Data| D3
-    D3 -->|Results| USER
+    P5 -->|Low Confidence| P6
+    P6 -->|Corrections| D3
+    P6 -->|Review Task| D5
+    D3 -->|Export Request| P7
+    P7 -->|Export Files| D6
+    D6 -->|Results| USER
+    P1 -->|Audit Event| P8
+    P5 -->|Audit Event| P8
+    P6 -->|Audit Event| P8
+    P7 -->|Audit Event| P8
+    P8 -->|Records| D7
 ```
 
 ## Level 2: Entity Extraction (4.0)

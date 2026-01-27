@@ -7,6 +7,7 @@ graph TB
     subgraph "Upload Layer"
         WEB[Web Upload]
         API[REST API]
+        REVIEW_UI[Review UI]
     end
     
     subgraph "Storage"
@@ -25,10 +26,17 @@ graph TB
         TABLE[Table Detector<br/>CV Model]
         VALIDATOR[Validator<br/>Confidence Scoring]
     end
+
+    subgraph "Workflow"
+        REVIEW[Human Review Service]
+        EXPORT[Export Service]
+        NOTIF[Notification Service]
+    end
     
     subgraph "Data Layer"
         DB[(PostgreSQL<br/>Metadata)]
         RESULTS[(MongoDB<br/>Extractions)]
+        AUDIT[(Audit Logs)]
     end
     
     subgraph "ML Infrastructure"
@@ -39,6 +47,7 @@ graph TB
     WEB --> API
     API --> S3
     API --> QUEUE
+    REVIEW_UI --> API
     
     QUEUE --> OCR
     OCR --> CLASSIFIER
@@ -49,7 +58,13 @@ graph TB
     TABLE --> VALIDATOR
     
     VALIDATOR --> RESULTS
+    VALIDATOR --> REVIEW
+    REVIEW --> RESULTS
+    REVIEW --> AUDIT
+    EXPORT --> RESULTS
+    EXPORT --> NOTIF
     API --> DB
+    API --> AUDIT
     
     MODELS --> CLASSIFIER
     MODELS --> NER

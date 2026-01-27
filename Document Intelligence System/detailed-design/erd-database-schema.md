@@ -9,6 +9,10 @@ erDiagram
     extractions ||--o{ tables : contains
     users ||--o{ documents : uploads
     users ||--o{ corrections : makes
+    users ||--o{ review_tasks : assigned
+    users ||--o{ audit_logs : performs
+    documents ||--o{ review_tasks : requires
+    documents ||--o{ export_jobs : exported
     
     documents {
         uuid id PK
@@ -79,6 +83,30 @@ erDiagram
         string newValue
         timestamp correctedAt
     }
+
+    review_tasks {
+        uuid id PK
+        uuid documentId FK
+        uuid assignedTo FK
+        string status
+        timestamp createdAt
+    }
+
+    export_jobs {
+        uuid id PK
+        uuid documentId FK
+        string format
+        string status
+        timestamp createdAt
+    }
+
+    audit_logs {
+        uuid id PK
+        uuid actorId FK
+        string action
+        jsonb metadata
+        timestamp createdAt
+    }
 ```
 
 ## Table Definitions
@@ -135,6 +163,39 @@ CREATE TABLE key_values (
     manually_verified BOOLEAN DEFAULT FALSE,
     INDEX idx_extraction (extraction_id),
     INDEX idx_key (key)
+);
+```
+
+### review_tasks
+```sql
+CREATE TABLE review_tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL REFERENCES documents(id),
+    assigned_to UUID REFERENCES users(id),
+    status VARCHAR(20) DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### export_jobs
+```sql
+CREATE TABLE export_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL REFERENCES documents(id),
+    format VARCHAR(10) NOT NULL,
+    status VARCHAR(20) DEFAULT 'queued',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### audit_logs
+```sql
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_id UUID REFERENCES users(id),
+    action VARCHAR(100) NOT NULL,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 

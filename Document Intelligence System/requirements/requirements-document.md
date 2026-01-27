@@ -215,7 +215,60 @@ An AI-powered document intelligence system that automates document processing th
 
 ---
 
-## 7. Glossary
+## 7. Stakeholders & Personas
+
+| Role | Goals | Primary Needs |
+|------|-------|---------------|
+| Business Owner | Reduce manual processing cost | KPIs, throughput, accuracy |
+| Operations Lead | Process documents reliably | Queue visibility, retries |
+| Data Scientist | Improve extraction quality | Training data, feedback loop |
+| Compliance Officer | Meet regulatory requirements | Audit trails, retention |
+| End User | Review and correct outputs | Intuitive UI, low latency |
+
+## 8. Assumptions & Dependencies
+
+| Type | Assumption/Dependency | Impact |
+|------|------------------------|--------|
+| Data | Documents are legible and not corrupted | OCR accuracy impacts |
+| Data | Known document templates exist for priority domains | Improves KV extraction |
+| Infra | Object storage available for originals | Required for retention |
+| Security | SSO provider available | Required for RBAC |
+
+## 9. Observability & Auditability
+
+| Signal | Scope | Examples |
+|--------|-------|----------|
+| Metrics | OCR, classification, extraction | accuracy, p95 latency |
+| Logs | Processing pipeline | OCR errors, parser failures |
+| Traces | End-to-end request | upload → extraction → export |
+| Audit | User actions | review edits, exports |
+
+## 10. Reliability, DR & Capacity
+
+| Requirement | Target |
+|-------------|--------|
+| RTO | ≤ 4 hours |
+| RPO | ≤ 15 minutes |
+| Multi-AZ processing | Required for production |
+| Queue durability | At-least-once processing |
+
+## 11. Acceptance Criteria
+
+- OCR accuracy $> 98\%$ for good-quality scans.
+- Entity extraction F1 $> 90\%$ for target domain.
+- 95% of documents processed within SLA.
+- All review actions are audit logged.
+
+## 12. Risks & Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Poor scan quality | Low OCR accuracy | Image enhancement, manual review |
+| Template drift | Field extraction failures | Auto-template detection and retraining |
+| Data leakage | Compliance risk | PII redaction and access controls |
+| Vendor API outage | Processing delays | Failover OCR engine |
+
+## 13. Glossary
 
 | Term | Definition |
 |------|------------|

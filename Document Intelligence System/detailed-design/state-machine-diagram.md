@@ -21,7 +21,8 @@ stateDiagram-v2
     
     Failed --> Queued: Retry
     Failed --> [*]: Max Retries
-    Completed --> [*]
+    Completed --> Exported: Export Requested
+    Exported --> [*]
 ```
 
 ## 2. Extraction Field State

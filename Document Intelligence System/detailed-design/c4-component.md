@@ -11,6 +11,7 @@ graph TB
         NER_COMP[NER Component]
         KV_COMP[KeyValue Component]
         VAL_COMP[Validation Component]
+        REVIEW_COMP[Review Dispatcher]
     end
     
     subgraph "External"
@@ -18,6 +19,7 @@ graph TB
         OCR_API[OCR API]
         MODELS[Model Registry]
         DB[(Database)]
+        AUDIT[(Audit Logs)]
     end
     
     QUEUE --> ORCH
@@ -30,6 +32,8 @@ graph TB
     NER_COMP --> KV_COMP
     KV_COMP --> VAL_COMP
     VAL_COMP --> DB
+    VAL_COMP --> REVIEW_COMP
+    REVIEW_COMP --> AUDIT
 ```
 
 ## NER Service Components
@@ -64,5 +68,6 @@ graph TB
 - **NER Component**: Extract named entities
 - **KeyValue Component**: Extract field-value pairs
 - **Validation Component**: Verify accuracy + confidence
+- **Review Dispatcher**: Route low-confidence docs to review
 - **Model Loader**: Load ML models from registry
 - **Post-Processor**: Normalize and validate entities

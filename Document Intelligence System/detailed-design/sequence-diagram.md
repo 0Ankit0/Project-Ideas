@@ -34,6 +34,57 @@ sequenceDiagram
     Worker->>Worker: notifyComplete()
 ```
 
+## SD-04: Review & Correction
+
+```mermaid
+sequenceDiagram
+    participant Reviewer
+    participant API as Review API
+    participant Review as Review Service
+    participant DB as Database
+    participant Audit as Audit Logger
+    
+    Reviewer->>+API: openReviewTask(documentId)
+    API->>+Review: getExtraction(documentId)
+    Review->>+DB: SELECT extraction
+    DB-->>-Review: data
+    Review-->>-API: extraction
+    API-->>-Reviewer: showReviewUI
+    
+    Reviewer->>+API: submitCorrections(edits)
+    API->>+Review: saveCorrections(edits)
+    Review->>+DB: INSERT corrections
+    DB-->>-Review: saved
+    Review->>+Audit: record("review.completed", documentId)
+    Audit-->>-Review: logged
+    Review-->>-API: ok
+    API-->>-Reviewer: 200 OK
+```
+
+## SD-05: Export Extracted Data
+
+```mermaid
+sequenceDiagram
+    participant Analyst
+    participant API as Export API
+    participant Export as Export Service
+    participant DB as Database
+    participant Notify as Notification Service
+    
+    Analyst->>+API: requestExport(documentIds, format)
+    API->>+Export: createExportJob()
+    Export->>+DB: INSERT export_job
+    DB-->>-Export: jobId
+    Export-->>-API: jobQueued
+    API-->>-Analyst: 202 Accepted
+    
+    Export->>+DB: fetchExtractions(documentIds)
+    DB-->>-Export: data
+    Export->>Export: generateFile()
+    Export->>+Notify: exportReady(userId, link)
+    Notify-->>-Export: sent
+```
+
 ## SD-02: NER Entity Extraction
 
 ```mermaid
