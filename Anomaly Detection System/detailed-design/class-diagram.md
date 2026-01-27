@@ -62,6 +62,30 @@ classDiagram
         +checkRules(anomaly) List~AlertRule~
         +routeToChannels(alert, rules) void
     }
+
+    class AlertRule {
+        +id str
+        +severity str
+        +conditions Dict
+        +channels List~str~
+        +active bool
+    }
+
+    class WebhookEndpoint {
+        +id str
+        +name str
+        +url str
+        +events List~str~
+        +status str
+    }
+
+    class FeedbackService {
+        +saveFeedback(anomalyId, label, notes) void
+    }
+
+    class AuditLogger {
+        +record(action, entityId, metadata) void
+    }
     
     class DetectionPipeline {
         -featureEngine FeatureEngine
@@ -78,6 +102,9 @@ classDiagram
     DetectionPipeline --> FeatureEngine
     DetectionPipeline --> AnomalyDetector
     DetectionPipeline --> AlertService
+    AlertService --> AlertRule
+    AlertService --> WebhookEndpoint
+    FeedbackService --> AuditLogger
 ```
 
 ## Data Classes
@@ -112,6 +139,23 @@ classDiagram
         +str channel
         +str status
         +DateTime sentAt
+    }
+
+    class Feedback {
+        +str feedbackId
+        +str anomalyId
+        +str userId
+        +str label
+        +str notes
+        +DateTime createdAt
+    }
+
+    class AuditLog {
+        +str auditId
+        +str actorId
+        +str action
+        +Dict metadata
+        +DateTime createdAt
     }
     
     class TrainingConfig {

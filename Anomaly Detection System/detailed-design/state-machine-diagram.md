@@ -8,6 +8,7 @@ stateDiagram-v2
     Detected --> AlertSent: Alert Triggered
     AlertSent --> Acknowledged: Operator ACK
     AlertSent --> Escalated: No ACK (timeout)
+    AlertSent --> Suppressed: Suppression Rule
     
     Acknowledged --> Resolved: Issue Fixed
     Acknowledged --> FalsePositive: Marked False
@@ -16,6 +17,7 @@ stateDiagram-v2
     Resolved --> [*]
     FalsePositive --> Learning: Feedback Stored
     Learning --> [*]
+    Suppressed --> [*]
 ```
 
 ## 2. ML Model Lifecycle
@@ -54,9 +56,11 @@ stateDiagram-v2
     
     Sent --> Acknowledged: User ACK
     Sent --> Escalated: Timeout
+    Sent --> Suppressed: Quiet Hours
     
     Acknowledged --> Resolved: Closed
     Escalated --> Acknowledged: Higher ACK
+    Suppressed --> [*]
     
     Resolved --> [*]
 ```

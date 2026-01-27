@@ -8,6 +8,9 @@ erDiagram
     ml_models ||--o{ anomalies : detects
     users ||--o{ alerts : acknowledges
     alert_rules ||--o{ alerts : matches
+    anomalies ||--o{ feedback : labeled_by
+    webhook_endpoints ||--o{ alerts : delivers
+    users ||--o{ audit_logs : performs
     
     data_sources {
         uuid id PK
@@ -83,6 +86,23 @@ erDiagram
         string notes
         timestamp created_at
     }
+
+    webhook_endpoints {
+        uuid id PK
+        string name
+        string url
+        jsonb events
+        string status
+        timestamp created_at
+    }
+
+    audit_logs {
+        uuid id PK
+        uuid actor_id FK
+        string action
+        jsonb metadata
+        timestamp created_at
+    }
 ```
 
 ## Table Definitions
@@ -138,6 +158,29 @@ CREATE TABLE ml_models (
     status VARCHAR(20) DEFAULT 'training',
     trained_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(algorithm, version)
+);
+```
+
+### webhook_endpoints
+```sql
+CREATE TABLE webhook_endpoints (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    url TEXT NOT NULL,
+    events JSONB NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### audit_logs
+```sql
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_id UUID REFERENCES users(id),
+    action VARCHAR(100) NOT NULL,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 

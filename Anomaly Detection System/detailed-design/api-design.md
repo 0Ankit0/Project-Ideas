@@ -1,7 +1,38 @@
 # API Design - Anomaly Detection System
 
 **Base URL**: `https://api.example.com/v1`  
-**Auth**: Bearer Token
+**Auth**: Bearer Token (OAuth2/JWT)
+
+---
+
+## API Principles
+
+- **Versioning**: URI versioning (`/v1`) with backwards-compatible changes only.
+- **Idempotency**: `Idempotency-Key` supported for POST/PATCH endpoints.
+- **Pagination**: Cursor-based pagination for large collections.
+- **Correlation**: `X-Request-Id` echoed on all responses.
+
+## Standard Headers
+
+| Header | Description |
+|--------|-------------|
+| Authorization | Bearer token |
+| Idempotency-Key | Client-generated UUID |
+| X-Request-Id | Correlation id |
+| X-Tenant-Id | Optional tenant scoping |
+
+## Error Response Format
+
+```json
+{
+  "type": "https://errors.example.com/invalid-data",
+  "title": "Invalid data format",
+  "status": 400,
+  "detail": "Missing required field: values.cpu",
+  "instance": "/v1/data",
+  "requestId": "req-123"
+}
+```
 
 ---
 
@@ -29,6 +60,35 @@
 
 ---
 
+## Register Data Source
+**POST** `/sources`
+
+```json
+{
+  "name": "prod-kafka-cpu",
+  "type": "kafka",
+  "schema": {
+    "values.cpu": "number",
+    "values.memory": "number"
+  },
+  "tags": ["prod", "infra"]
+}
+```
+
+**Response**: `201 Created`
+
+---
+
+## List Data Sources
+**GET** `/sources`
+
+**Query Params**:
+- `status`: active | disabled
+- `cursor`: pagination cursor
+- `limit`: int (default: 50)
+
+---
+
 ## Get Anomalies
 **GET** `/anomalies`
 
@@ -37,6 +97,7 @@
 - `status`: detected | acknowledged | resolved
 - `start`: ISO timestamp
 - `end`: ISO timestamp
+- `cursor`: pagination cursor
 - `limit`: int (default: 100)
 
 **Response**: `200 OK`
@@ -53,9 +114,20 @@
     }
   ],
   "total": 150,
-  "page": 1
+  "nextCursor": "cursor-abc"
 }
 ```
+
+---
+
+## Get Alerts
+**GET** `/alerts`
+
+**Query Params**:
+- `status`: open | acknowledged | resolved | suppressed
+- `severity`: low | medium | high | critical
+- `cursor`: pagination cursor
+- `limit`: int (default: 50)
 
 ---
 
@@ -66,6 +138,20 @@
 {
   "notes": "Investigating spike in CPU usage",
   "isFalsePositive": false
+}
+```
+
+**Response**: `200 OK`
+
+---
+
+## Resolve Alert
+**PATCH** `/alerts/{alertId}/resolve`
+
+```json
+{
+  "resolution": "root cause fixed",
+  "notes": "scaled service"
 }
 ```
 
@@ -97,6 +183,21 @@
   "status": "queued"
 }
 ```
+
+---
+
+## Deploy Model Version
+**POST** `/models/{modelId}/deploy`
+
+```json
+{
+  "environment": "production",
+  "rollout": "canary",
+  "trafficPercent": 10
+}
+```
+
+**Response**: `202 Accepted`
 
 ---
 
@@ -141,6 +242,43 @@
 
 ---
 
+## Register Webhook
+**POST** `/webhooks`
+
+```json
+{
+  "name": "pagerduty-alerts",
+  "url": "https://events.pagerduty.com/v2/enqueue",
+  "events": ["alert.created", "alert.resolved"],
+  "secret": "webhook-signing-secret"
+}
+```
+
+**Response**: `201 Created`
+
+---
+
+## Submit Feedback Label
+**POST** `/anomalies/{anomalyId}/feedback`
+
+```json
+{
+  "label": "false_positive",
+  "notes": "expected seasonal spike"
+}
+```
+
+**Response**: `200 OK`
+
+---
+
+## Health Check
+**GET** `/health`
+
+**Response**: `200 OK`
+
+---
+
 ## Error Responses
 
 | Code | HTTP | Description |
@@ -149,3 +287,16 @@
 | SOURCE_NOT_FOUND | 404 | Data source not configured |
 | MODEL_NOT_READY | 503 | Model not yet trained |
 | RATE_LIMITED | 429 | Too many requests |
+| UNAUTHORIZED | 401 | Missing or invalid token |
+| FORBIDDEN | 403 | Insufficient permissions |
+
+## Rate Limiting
+
+- Default limit: 1000 requests/minute per tenant.
+- `429` responses include `Retry-After` header.
+
+## Webhook Delivery Guarantees
+
+- At-least-once delivery with exponential backoff.
+- Requests signed with `X-Signature` HMAC.
+- Dead-letter queue for failed deliveries.

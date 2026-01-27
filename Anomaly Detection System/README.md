@@ -18,7 +18,10 @@ Anomaly Detection System/
 │   ├── use-case-descriptions.md
 │   ├── system-context-diagram.md
 │   ├── activity-diagram.md
-│   └── bpmn-swimlane-diagram.md
+│   ├── bpmn-swimlane-diagram.md
+│   ├── data-dictionary.md
+│   ├── business-rules.md
+│   └── event-catalog.md
 ├── high-level-design/         # Phase 3
 │   ├── system-sequence-diagram.md
 │   ├── domain-model.md
@@ -37,6 +40,16 @@ Anomaly Detection System/
 │   ├── deployment-diagram.md
 │   ├── network-infrastructure.md
 │   └── cloud-architecture.md
+├── edge-cases/                # Cross-cutting
+│   ├── README.md
+│   ├── data-ingestion.md
+│   ├── feature-engineering.md
+│   ├── model-scoring.md
+│   ├── alerting.md
+│   ├── storage.md
+│   ├── api-and-ui.md
+│   ├── security-and-compliance.md
+│   └── operations.md
 └── implementation/            # Phase 6
     ├── code-guidelines.md
     └── c4-code-diagram.md
@@ -146,7 +159,7 @@ Anomaly Detection System/
 
 ## 📝 Documentation Stats
 
-- **24 files** across **6 phases**
+- **36 files** across **7 sections**
 - **25+ Mermaid diagrams**
 - Python AI/ML code examples
 - Cloud deployment patterns

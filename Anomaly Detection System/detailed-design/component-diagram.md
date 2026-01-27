@@ -20,10 +20,13 @@ graph TB
     subgraph "Detection"
         DETECTOR[Anomaly Detector<br/>Python ML]
         SCORER[Scoring Service<br/>Python]
+        EXPLAIN[Explainability Service]
     end
     
     subgraph "Alerting"
         ROUTER[Alert Router<br/>Python]
+        RULES[Rule Engine]
+        DEDUP[Deduplicator]
         SLACK_INT[Slack Integration]
         EMAIL_INT[Email Integration]
         WEBHOOK_INT[Webhook Integration]
@@ -33,11 +36,14 @@ graph TB
         INFLUX[(InfluxDB)]
         PG[(PostgreSQL)]
         REDIS[(Redis)]
+        AUDIT[(Audit Logs)]
+        WH_REG[(Webhook Registry)]
     end
     
     subgraph "ML Infrastructure"
         MLFLOW[MLflow Registry]
         TRAINER[Training Service]
+        MONITOR[Drift Monitor]
     end
     
     KAFKA_CONS --> STREAM
@@ -48,16 +54,22 @@ graph TB
     
     DETECTOR --> MLFLOW
     DETECTOR --> SCORER
+    DETECTOR --> EXPLAIN
     SCORER --> INFLUX
     SCORER --> ROUTER
     
-    ROUTER --> SLACK_INT
-    ROUTER --> EMAIL_INT
-    ROUTER --> WEBHOOK_INT
+    ROUTER --> RULES
+    RULES --> DEDUP
+    DEDUP --> SLACK_INT
+    DEDUP --> EMAIL_INT
+    DEDUP --> WEBHOOK_INT
     
     TRAINER --> MLFLOW
+    MONITOR --> TRAINER
     API --> PG
     DASH --> API
+    ROUTER --> AUDIT
+    WEBHOOK_INT --> WH_REG
 ```
 
 ## Component Responsibilities
@@ -69,7 +81,11 @@ graph TB
 | Feature Engine | Python | Compute features |
 | Anomaly Detector | scikit-learn, TF | ML inference |
 | Alert Router | Python | Route alerts to channels |
+| Rule Engine | Python | Match alert rules |
+| Deduplicator | Python | Suppress duplicate alerts |
 | Training Service | Python, MLflow | Train ML models |
+| Drift Monitor | Python | Detect data/model drift |
 | InfluxDB | Time-Series | Store metrics and anomalies |
 | PostgreSQL | Database | Store metadata, config |
 | Redis | Cache | Cache features, recent data |
+| Audit Logs | Database | Compliance event records |

@@ -41,6 +41,7 @@ graph TB
         RULES[Rule Engine]
         DEDUP[Deduplicator]
         CHANNELS[Channel Dispatcher]
+        AUDIT[Audit Logger]
     end
     
     subgraph "Channels"
@@ -51,6 +52,7 @@ graph TB
     
     subgraph "External"
         DB[(PostgreSQL)]
+        WH_REG[(Webhook Registry)]
     end
     
     ROUTER --> RULES
@@ -60,6 +62,8 @@ graph TB
     CHANNELS --> EMAIL
     CHANNELS --> WEBHOOK
     RULES --> DB
+    ROUTER --> AUDIT
+    WEBHOOK --> WH_REG
 ```
 
 **Component Descriptions**:
@@ -72,3 +76,4 @@ graph TB
 - **Alert Router**: Match anomalies to rules
 - **Rule Engine**: Evaluate alert conditions
 - **Deduplicator**: Prevent duplicate alerts
+- **Audit Logger**: Record alert actions for compliance

@@ -183,6 +183,78 @@
 
 ---
 
+## Epic 6: Observability & Compliance
+
+### US-6.1: Audit All Changes
+**As a** security officer  
+**I want to** audit config and alert actions  
+**So that** compliance requirements are met
+
+**Acceptance Criteria:**
+- [ ] Record user, action, timestamp, and payload diff
+- [ ] Store audit logs immutably
+- [ ] Provide exportable audit reports
+
+### US-6.2: Monitor System Health
+**As a** platform engineer  
+**I want to** monitor ingestion, scoring, and alerting metrics  
+**So that** I can detect failures early
+
+**Acceptance Criteria:**
+- [ ] Dashboard for throughput and latency
+- [ ] Alerts on queue lag and error spikes
+- [ ] Trace request IDs across services
+
+---
+
+## Epic 7: Data Management
+
+### US-7.1: Manage Retention Policies
+**As a** system admin  
+**I want to** set data retention rules  
+**So that** storage and compliance are controlled
+
+**Acceptance Criteria:**
+- [ ] Configure raw vs aggregated retention
+- [ ] Automatic purge with audit records
+- [ ] Support legal hold exceptions
+
+### US-7.2: Export Data
+**As a** data analyst  
+**I want to** export anomalies and labels  
+**So that** I can perform offline analysis
+
+**Acceptance Criteria:**
+- [ ] Export to CSV/Parquet
+- [ ] Async job for large exports
+- [ ] Track export status
+
+---
+
+## Epic 8: Model Operations
+
+### US-8.1: Detect Model Drift
+**As a** data scientist  
+**I want to** detect model drift  
+**So that** I can retrain in time
+
+**Acceptance Criteria:**
+- [ ] Drift metrics displayed per model
+- [ ] Alerts when drift thresholds exceeded
+- [ ] Suggested retraining window
+
+### US-8.2: Rollback Model
+**As a** data scientist  
+**I want to** rollback to a previous model  
+**So that** I can recover from regressions
+
+**Acceptance Criteria:**
+- [ ] One-click rollback
+- [ ] Model version history visible
+- [ ] Rollback audit record
+
+---
+
 ## Story Map
 
 ```
@@ -202,3 +274,5 @@
 │            │ Investigate│ Suppress   │ Configure              │
 └────────────┴────────────┴────────────┴────────────────────────┘
 ```
+
+Additional epics cover observability, compliance, data management, and model operations.

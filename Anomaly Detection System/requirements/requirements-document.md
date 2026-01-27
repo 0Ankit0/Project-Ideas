@@ -188,7 +188,81 @@ An AI-powered anomaly detection system that monitors data streams in real-time, 
 
 ---
 
-## 6. Glossary
+## 6. Stakeholders & Personas
+
+| Role | Goals | Primary Needs |
+|------|-------|---------------|
+| Business Owner | Reduce risk and losses | KPIs, ROI, alerting outcomes |
+| Operations/On-Call | Fast triage and resolution | Clear alerts, noise control, runbooks |
+| Data Scientist | Model quality | Experimentation, feedback labels, drift insights |
+| Platform Engineer | Reliable pipelines | Scalability, observability, automation |
+| Security Officer | Compliance and auditability | Access control, audit trails |
+
+## 7. Assumptions & Dependencies
+
+| Type | Assumption/Dependency | Impact |
+|------|------------------------|--------|
+| Data | At least 1–4 weeks of historical data available | Cold-start mitigation needed if not met |
+| Data | Event timestamps are provided in UTC | Time alignment requires normalization |
+| Infra | Kafka/PubSub available for streaming | Fallback to batch if unavailable |
+| People | Domain experts will review alerts | Required for feedback loop |
+| Security | Identity provider supports OAuth2/JWT | Required for SSO/RBAC |
+
+## 8. Compliance, Privacy & Security Requirements
+
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-C-001 | Encrypt data in transit (TLS 1.2+) | 100% of traffic |
+| NFR-C-002 | Encrypt data at rest (AES-256) | All storage layers |
+| NFR-C-003 | Role-based access control (RBAC) | All APIs and UI |
+| NFR-C-004 | Audit logs for config changes and alert actions | Immutable logs |
+| NFR-C-005 | Data retention policy enforced | Configurable by tenant |
+| NFR-C-006 | PII masking in logs and UI | Default enabled |
+
+## 9. Observability & Auditability
+
+| Signal | Scope | Examples |
+|--------|-------|----------|
+| Metrics | Ingestion, scoring, alerting | throughput, p95 latency, alert rate |
+| Logs | Structured event logs | schema validation errors, model version |
+| Traces | Distributed traces | end-to-end latency for a data point |
+| Audit | User actions | rule changes, acknowledgements |
+
+## 10. Reliability, DR & Capacity
+
+| Requirement | Target |
+|-------------|--------|
+| RTO (Recovery Time Objective) | ≤ 30 minutes |
+| RPO (Recovery Point Objective) | ≤ 5 minutes |
+| Multi-AZ redundancy | Required for production |
+| Back-pressure handling | Graceful degradation |
+| Capacity scaling | Horizontal autoscaling |
+
+## 11. Accessibility & Localization
+
+- WCAG 2.1 AA compliant UI controls.
+- Keyboard navigable dashboards and alert actions.
+- Timezone-aware display and configurable locale formatting.
+
+## 12. Acceptance Criteria
+
+- System detects anomalies within 1 second for p95 traffic.
+- Alert delivery meets SLA across all enabled channels.
+- False positive rate < 5% in steady state.
+- Model versioning and rollback supported within 5 minutes.
+- Audit log entries exist for all config and alert actions.
+
+## 13. Risks & Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Data drift | Rising false positives/negatives | Drift detection, retraining triggers |
+| Alert storms | On-call fatigue | Deduplication, suppression, batching |
+| Schema drift | Pipeline failures | Schema registry, validation gates |
+| Cold start | Poor initial accuracy | Heuristics + warm-up period |
+| Latency spikes | SLA breach | Autoscaling, load shedding |
+
+## 14. Glossary
 
 | Term | Definition |
 |------|------------|
