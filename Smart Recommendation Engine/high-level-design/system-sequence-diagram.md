@@ -18,6 +18,7 @@ sequenceDiagram
     ModelServing-->>-API: scores[]
     API-->>API: rankByScore()
     API-->>API: applyBusinessRules()
+    API-->>API: applyDiversityPolicy()
     API-->>-User: recommendations[]
 ```
 

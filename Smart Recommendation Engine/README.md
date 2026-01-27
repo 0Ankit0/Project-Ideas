@@ -18,7 +18,10 @@ Smart Recommendation Engine/
 │   ├── use-case-descriptions.md
 │   ├── system-context-diagram.md
 │   ├── activity-diagram.md
-│   └── bpmn-swimlane-diagram.md
+│   ├── bpmn-swimlane-diagram.md
+│   ├── data-dictionary.md
+│   ├── business-rules.md
+│   └── event-catalog.md
 ├── high-level-design/         # Phase 3: System architecture
 │   ├── system-sequence-diagram.md
 │   ├── domain-model.md
@@ -37,6 +40,15 @@ Smart Recommendation Engine/
 │   ├── deployment-diagram.md       # ML model serving
 │   ├── network-infrastructure.md
 │   └── cloud-architecture.md       # Feature store, model registry
+├── edge-cases/                # Cross-cutting
+│   ├── README.md
+│   ├── data-ingestion.md
+│   ├── feature-engineering.md
+│   ├── model-serving.md
+│   ├── ranking-and-bias.md
+│   ├── api-and-ui.md
+│   ├── security-and-compliance.md
+│   └── operations.md
 └── implementation/            # Phase 6: Code guidelines
     ├── code-guidelines.md          # Python best practices
     └── c4-code-diagram.md
@@ -151,14 +163,15 @@ Smart Recommendation Engine/
 
 ## 📝 Documentation Status
 
-- ✅ **Requirements**: Complete (2 files)
-- ✅ **Analysis**: Complete (5 files)
-- ✅ **High-Level Design**: Complete (5 files) 
-- ✅ **Detailed Design**: Complete (7 files)
-- ✅ **Infrastructure**: Complete (3 files)
-- ✅ **Implementation**: Complete (2 files)
+- ✅ **Requirements**: Complete
+- ✅ **Analysis**: Complete
+- ✅ **High-Level Design**: Complete
+- ✅ **Detailed Design**: Complete
+- ✅ **Infrastructure**: Complete
+- ✅ **Edge Cases**: Complete
+- ✅ **Implementation**: Complete
 
-**Total**: 24 files with 25+ Mermaid diagrams
+**Total**: 36 files with 25+ Mermaid diagrams
 
 ---
 

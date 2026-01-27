@@ -70,12 +70,26 @@ classDiagram
         -loadModel(modelId) Model
         -cacheResult(key, value)
     }
+
+    class PolicyEngine {
+        +applyDiversity(rankedItems) List~Item~
+        +applyFilters(userId, items) List~Item~
+    }
+
+    class DriftMonitor {
+        +detect(featureStats) DriftReport
+    }
+
+    class BiasEvaluator {
+        +evaluate(recommendations) BiasReport
+    }
     
     BaseRecommender <|-- CollaborativeFilteringRecommender
     BaseRecommender <|-- ContentBasedRecommender
     BaseRecommender <|-- HybridRecommender
     RecommendationEngine --> BaseRecommender
     RecommendationEngine --> FeatureEngineer
+    RecommendationEngine --> PolicyEngine
     ModelTrainer --> BaseRecommender
     PredictionService --> BaseRecommender
 ```

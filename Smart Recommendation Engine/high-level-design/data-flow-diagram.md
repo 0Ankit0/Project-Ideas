@@ -27,6 +27,7 @@ flowchart TB
         P2[2.0<br/>Feature<br/>Engineering]
         P3[3.0<br/>Model<br/>Training]
         P4[4.0<br/>Recommendation<br/>Generation]
+        P5[5.0<br/>Monitoring &<br/>Audit]
     end
     
     subgraph "Data Stores"
@@ -34,6 +35,7 @@ flowchart TB
         D2[(Features)]
         D3[(Models)]
         D4[(Predictions)]
+        D5[(Audit Logs)]
     end
     
     USER -->|User Actions| P1
@@ -51,6 +53,9 @@ flowchart TB
     D3 -->|Model| P4
     P4 -->|Scores| D4
     P4 -->|Recommendations| USER
+    P4 -->|Audit Event| P5
+    P3 -->|Audit Event| P5
+    P5 -->|Records| D5
 ```
 
 ## Level 2: Recommendation Generation (4.0)
@@ -67,6 +72,7 @@ flowchart TB
         P4_3[4.3<br/>ML<br/>Inference]
         P4_4[4.4<br/>Rank &<br/>Filter]
         P4_5[4.5<br/>Generate<br/>Explanations]
+        P4_6[4.6<br/>Policy &<br/>Diversity]
     end
     
     subgraph "Data Stores"
@@ -80,6 +86,7 @@ flowchart TB
     P4_2 --> P4_3
     D3 --> P4_3
     P4_3 --> P4_4
-    P4_4 --> P4_5
+    P4_4 --> P4_6
+    P4_6 --> P4_5
     P4_5 --> RES((Recommendations))
 ```

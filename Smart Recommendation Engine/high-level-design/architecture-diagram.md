@@ -19,10 +19,16 @@ graph TB
         EXP[Experiment Tracking<br/>MLflow/W&B]
         REGISTRY[Model Registry]
     end
+
+    subgraph "Monitoring"
+        DRIFT[Drift Monitor]
+        BIAS[Bias & Fairness Monitor]
+    end
     
     subgraph "Model Serving"
         SERVING[Model Server<br/>TF Serving/FastAPI]
         CACHE[Prediction Cache<br/>Redis]
+        POLICY[Policy Engine<br/>Rules]
     end
     
     subgraph "API Layer"
@@ -32,6 +38,7 @@ graph TB
     subgraph "Storage"
         DB[(PostgreSQL<br/>Metadata)]
         VECTOR[(Vector DB<br/>Embeddings)]
+        AUDIT[(Audit Logs)]
     end
     
     EVENTS --> FEATURE_PIPELINE
@@ -41,16 +48,20 @@ graph TB
     FEATURE_STORE --> TRAIN
     TRAIN --> EXP
     TRAIN --> REGISTRY
+    DRIFT --> TRAIN
+    BIAS --> TRAIN
     
     FEATURE_STORE --> SERVING
     REGISTRY --> SERVING
     SERVING --> CACHE
+    SERVING --> POLICY
     
     API --> FEATURE_STORE
     API --> SERVING
     API --> CACHE
     API --> DB
     API --> VECTOR
+    API --> AUDIT
 ```
 
 ## Layered Architecture

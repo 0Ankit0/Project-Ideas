@@ -17,10 +17,11 @@ stateDiagram-v2
     Testing --> Production: Test Passes
     Testing --> Registered: Test Fails
     
-    Production --> Deprecated: New Model Deployed
-    Production --> Rollback: Performance Degradation
+    Production --> Monitoring: Active
+    Monitoring --> Deprecated: New Model Deployed
+    Monitoring --> Rollback: Performance Degradation
     
-    Rollback --> Production: Issue Resolved
+    Rollback --> Monitoring: Issue Resolved
     Deprecated --> Archived: Retention Period
     Archived --> [*]
 ```

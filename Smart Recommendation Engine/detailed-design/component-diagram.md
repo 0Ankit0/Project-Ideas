@@ -12,6 +12,9 @@ graph TB
         TRAINING_SVC[Training Service<br/>Python/MLflow]
         INFERENCE_SVC[Inference Service<br/>TF Serving/FastAPI]
         EXP_SVC[Experiment Service<br/>Python]
+        DRIFT_SVC[Drift Monitor]
+        BIAS_SVC[Bias Monitor]
+        POLICY_SVC[Policy Engine]
     end
     
     subgraph "Data Components"
@@ -29,21 +32,27 @@ graph TB
         DB[(PostgreSQL)]
         CACHE[(Redis)]
         STREAM[Kafka]
+        AUDIT[(Audit Logs)]
     end
     
     REC_API --> FEATURE_SVC
     REC_API --> INFERENCE_SVC
     REC_API --> CACHE
+    REC_API --> POLICY_SVC
+    REC_API --> AUDIT
     
     ADMIN_API --> TRAINING_SVC
     ADMIN_API --> EXP_SVC
     
     TRAINING_SVC --> FEATURE_STORE
     TRAINING_SVC --> MODEL_REG
+    DRIFT_SVC --> MODEL_REG
+    BIAS_SVC --> MODEL_REG
     
     INFERENCE_SVC --> MODEL_REG
     INFERENCE_SVC --> FEATURE_STORE
     INFERENCE_SVC --> VECTOR_DB
+    POLICY_SVC --> DB
     
     EVENT_PROC --> STREAM
     EVENT_PROC --> FEATURE_ENG
@@ -64,5 +73,8 @@ graph TB
 | Training Service | Python, MLflow | Train and evaluate models |
 | Inference Service | TensorFlow Serving | Real-time ML predictions |
 | Experiment Service | Python | Manage A/B tests |
+| Drift Monitor | Python | Detect data/model drift |
+| Bias Monitor | Python | Fairness and bias checks |
+| Policy Engine | Python | Apply business rules/diversity |
 | Event Processor | Kafka Consumer | Process user action events |
 | Feature Engineer | PySpark | Compute features from raw data |

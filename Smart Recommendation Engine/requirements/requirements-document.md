@@ -240,9 +240,48 @@ An AI-powered recommendation engine that learns from user behavior and configura
 | Vector Database (Milvus, Pinecone) | External | Medium |
 | Model Registry (MLflow, Weights & Biases) | External | Low |
 
----
 
-## 8. Glossary
+## 8. Stakeholders & Personas
+
+| Role | Goals | Primary Needs |
+|------|-------|---------------|
+| Product Owner | Improve engagement | KPIs, A/B results |
+| Data Scientist | Model performance | Training data, drift signals |
+| Platform Engineer | Reliability | Scalable serving, monitoring |
+| Compliance Officer | Privacy | Consent tracking, audit logs |
+
+## 9. Observability & Auditability
+
+| Signal | Scope | Examples |
+|--------|-------|----------|
+| Metrics | Serving & pipelines | precision@k, p95 latency |
+| Logs | Feature pipeline | missing data, schema drift |
+| Traces | Request paths | API → model → vector DB |
+| Audit | Model lifecycle | deployments, rollbacks |
+
+## 10. Reliability, DR & Capacity
+
+| Requirement | Target |
+|-------------|--------|
+| RTO | ≤ 4 hours |
+| RPO | ≤ 15 minutes |
+| Serving fallback | Popularity-based recommendations |
+
+## 11. Acceptance Criteria
+
+- p95 API latency < 100ms under target load.
+- Drift detection alerts within 24 hours of distribution shift.
+- A/B experiments produce statistically valid results.
+
+## 12. Risks & Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Bias amplification | Fairness risk | Diversity constraints + audits |
+| Data drift | Accuracy loss | Retraining triggers |
+| Cold start | Poor UX | Popularity + content-based fallback |
+
+## 13. Glossary
 
 | Term | Definition |
 |------|------------|
