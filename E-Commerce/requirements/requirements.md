@@ -406,3 +406,60 @@ The system will support:
 - Integration with legacy ERP systems for accounting
 - Compliance with varying tax laws (GST/VAT/Sales Tax)
 - Strict budget for cloud infrastructure costs
+
+---
+
+## 5. Stakeholders & Personas
+
+| Role | Goals | Primary Needs |
+|------|-------|---------------|
+| Customer | Fast, reliable shopping | Availability, fast checkout |
+| Vendor | Maximize sales | Catalog tools, payouts |
+| Admin | Governance & growth | Analytics, policy controls |
+| Logistics Ops | Smooth deliveries | Route visibility, exception handling |
+| Support Agent | Issue resolution | Order history, audit trails |
+
+## 6. Observability & Auditability
+
+| Signal | Scope | Examples |
+|--------|-------|----------|
+| Metrics | Checkout & payments | cart conversion, payment failures |
+| Logs | Order lifecycle | status transitions, refund errors |
+| Traces | End-to-end flows | search → order → delivery |
+| Audit | Sensitive ops | refunds, vendor approvals |
+
+## 7. Reliability, DR & Capacity
+
+| Requirement | Target |
+|-------------|--------|
+| RTO | ≤ 15 minutes |
+| RPO | ≤ 5 minutes |
+| Flash sale readiness | 1,000,000 concurrent users |
+
+## 8. Acceptance Criteria
+
+- p95 API latency < 100ms under normal load.
+- Checkout success rate > 98%.
+- Delivery status updates within 5 minutes of carrier events.
+- Refund initiation within SLA for eligible cancellations.
+
+## 9. Risks & Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Inventory oversell | Revenue loss | Atomic reservations + safety stock |
+| Payment outages | Lost orders | Multi-gateway routing |
+| Delivery failures | CX issues | Exception workflows + RTO handling |
+| Fraud | Chargebacks | Anomaly detection + risk scoring |
+
+## 10. Glossary
+
+| Term | Definition |
+|------|------------|
+| **Line Haul** | Long-distance transportation between hubs |
+| **Branch Delivery** | Last-mile delivery from local branch |
+| **Vendor** | Third-party seller |
+| **SKU** | Stock Keeping Unit |
+| **BNPL** | Buy Now Pay Later |
+| **RTO** | Return to Origin |
+| **WISMO** | Where Is My Order |

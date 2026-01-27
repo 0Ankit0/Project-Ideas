@@ -12,6 +12,9 @@
 | 4 | [detailed-design](./detailed-design/) | Class, sequence, state diagrams, ERD, API design |
 | 5 | [infrastructure](./infrastructure/) | Deployment, network, cloud architecture |
 | 6 | [implementation](./implementation/) | Implementation guidelines, C4 code diagram |
+| 7 | [edge-cases](./edge-cases/) | Edge cases and mitigations across subsystems |
+
+Additional analysis artifacts: data dictionary, business rules, and event catalog.
 
 ## System Overview
 

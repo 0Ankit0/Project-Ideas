@@ -305,6 +305,15 @@ classDiagram
         +requestReturn(itemIds) Return
         +addNote(note) void
     }
+
+    class RiskAssessment {
+        -UUID id
+        -UUID orderId
+        -Decimal riskScore
+        -String decision
+        -DateTime createdAt
+        +evaluate(order) RiskAssessment
+    }
     
     class OrderItem {
         -UUID id
@@ -370,6 +379,7 @@ classDiagram
     Order "1" --> "*" OrderItem
     Order "1" --> "*" VendorOrder
     Order "*" --> "0..1" Coupon
+    Order "1" --> "0..1" RiskAssessment
 ```
 
 ---

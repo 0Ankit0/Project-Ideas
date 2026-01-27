@@ -22,6 +22,7 @@ graph TB
     LogisticsPartner[Logistics Partner<br>🚚 External System<br>3PL Integration]
     NotificationSvc[Notification Services<br>📧 External System<br>SMS, Email, Push]
     MapsAPI[Maps Service<br>🗺️ External System<br>Google Maps]
+    FraudSvc[Fraud & Anomaly Service<br>🔍 Internal System]
     
     Customer -->|Browses products,<br>places orders,<br>tracks deliveries| System
     Vendor -->|Manages products,<br>fulfills orders,<br>views analytics| System
@@ -32,6 +33,7 @@ graph TB
     System <-->|Creates shipments,<br>gets tracking| LogisticsPartner
     System -->|Sends notifications| NotificationSvc
     System -->|Gets directions,<br>calculates ETA| MapsAPI
+    System -->|Risk checks| FraudSvc
     
     style System fill:#438DD5,color:#fff
     style PaymentGW fill:#999,color:#fff
@@ -70,6 +72,8 @@ graph TB
             PaymentSvc[Payment Service<br>Container: Node.js<br>Payment handling]
             LogSvc[Logistics Service<br>Container: Node.js<br>Shipping management]
             NotifSvc[Notification Service<br>Container: Python<br>Multi-channel notifications]
+            FraudSvc[Fraud Service<br>Container: Python<br>Risk scoring]
+            AuditSvc[Audit Service<br>Container: Node.js<br>Compliance logs]
         end
         
         subgraph "Data Stores"
@@ -77,6 +81,7 @@ graph TB
             Redis[(Redis<br>Cache<br>Sessions, caching)]
             Elastic[(Elasticsearch<br>Search Engine<br>Product search)]
             S3[(S3<br>Object Store<br>Images, files)]
+            AuditDB[(Audit Logs)]
         end
         
         subgraph "Message Bus"
@@ -103,12 +108,16 @@ graph TB
     Gateway --> OrderSvc
     Gateway --> PaymentSvc
     Gateway --> LogSvc
+    Gateway --> FraudSvc
+    Gateway --> AuditSvc
     
     UserSvc --> DB
     ProductSvc --> DB
     OrderSvc --> DB
     PaymentSvc --> DB
     LogSvc --> DB
+    FraudSvc --> DB
+    AuditSvc --> AuditDB
     
     UserSvc --> Redis
     ProductSvc --> Redis
@@ -119,6 +128,8 @@ graph TB
     PaymentSvc --> Kafka
     LogSvc --> Kafka
     Kafka --> NotifSvc
+    OrderSvc --> FraudSvc
+    PaymentSvc --> FraudSvc
     
     PaymentSvc --> PaymentGW
     NotifSvc --> SMS

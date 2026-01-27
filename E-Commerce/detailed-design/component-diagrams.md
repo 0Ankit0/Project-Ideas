@@ -60,6 +60,8 @@ graph TB
             NotificationSvc[Notification Service]
             AnalyticsSvc[Analytics Service]
             MediaSvc[Media Service]
+            FraudSvc[Fraud & Anomaly Service]
+            AuditSvc[Audit Service]
         end
     end
     
@@ -69,6 +71,7 @@ graph TB
         Elasticsearch[(Elasticsearch)]
         S3[(S3)]
         Kafka[Kafka]
+        AuditDB[(Audit Logs)]
     end
     
     CustomerWeb --> Gateway
@@ -115,6 +118,8 @@ graph TB
     ShipmentSvc --> Kafka
     NotificationSvc --> Kafka
     AnalyticsSvc --> PostgreSQL
+    FraudSvc --> PostgreSQL
+    AuditSvc --> AuditDB
 ```
 
 ---
@@ -549,3 +554,5 @@ graph TB
 | Shipment Service | PostgreSQL, Kafka, Maps | Order, Notification |
 | Notification Service | Kafka, Email/SMS/Push | - |
 | Analytics Service | PostgreSQL, Kafka | - |
+| Fraud & Anomaly Service | PostgreSQL, Kafka | Order, Payment |
+| Audit Service | Audit DB | All Services |

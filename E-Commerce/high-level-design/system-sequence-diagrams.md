@@ -35,6 +35,7 @@ sequenceDiagram
     System-->>Customer: paymentOptions
     
     Customer->>System: placeOrder()
+    System-->>System: riskCheck()
     System->>PaymentGW: createPaymentOrder(amount)
     PaymentGW-->>System: paymentURL
     System-->>Customer: redirect(paymentURL)

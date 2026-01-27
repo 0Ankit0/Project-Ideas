@@ -53,10 +53,13 @@ flowchart TB
         LM[Logistics Module]
         NM[Notification Module]
         AM[Analytics Module]
+        FAD[Fraud & Anomaly Detection]
+        AUD[Audit & Compliance]
         
         DB[(Database)]
         Cache[(Cache)]
         Search[(Search Engine)]
+        AuditLog[(Audit Logs)]
     end
     
     PaymentGW[Payment Gateway]
@@ -84,6 +87,8 @@ flowchart TB
     OM <--> DB
     PM <--> DB
     LM <--> DB
+    FAD <--> DB
+    AUD <--> AuditLog
     
     UM <--> Cache
     PC <--> Cache
@@ -95,6 +100,12 @@ flowchart TB
     OM --> NM
     PM --> NM
     LM --> NM
+    OM --> FAD
+    PM --> FAD
+    UM --> AUD
+    OM --> AUD
+    PM --> AUD
+    LM --> AUD
 ```
 
 ---
@@ -319,7 +330,8 @@ flowchart TB
 | Search Index | Product search data | Elasticsearch |
 | Cache | Frequently accessed data | Redis |
 | File Storage | Images, documents | S3/GCS |
-| Event Store | Async events, audit logs | Kafka/RabbitMQ |
+| Event Store | Async events | Kafka/RabbitMQ |
+| Audit Store | Compliance logs | PostgreSQL/Cold Storage |
 
 ---
 

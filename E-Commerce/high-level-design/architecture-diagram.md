@@ -39,6 +39,8 @@ graph TB
         NotifSvc[Notification Service]
         VendorSvc[Vendor Service]
         AnalyticsSvc[Analytics Service]
+        FraudSvc[Fraud & Anomaly Service]
+        AuditSvc[Audit Service]
     end
     
     subgraph "Data Layer"
@@ -47,6 +49,7 @@ graph TB
         Redis[(Redis<br>Cache)]
         Elastic[(Elasticsearch)]
         S3[(S3<br>Object Storage)]
+        AuditDB[(Audit Logs)]
     end
     
     subgraph "Message Layer"
@@ -81,6 +84,7 @@ graph TB
     Gateway --> SearchSvc
     Gateway --> LogisticsSvc
     Gateway --> VendorSvc
+    Gateway --> FraudSvc
     
     UserSvc --> PrimaryDB
     ProductSvc --> PrimaryDB
@@ -88,6 +92,8 @@ graph TB
     PaymentSvc --> PrimaryDB
     VendorSvc --> PrimaryDB
     LogisticsSvc --> PrimaryDB
+    FraudSvc --> PrimaryDB
+    AuditSvc --> AuditDB
     
     ProductSvc --> ReplicaDB
     OrderSvc --> ReplicaDB
@@ -106,6 +112,7 @@ graph TB
     OrderSvc --> Kafka
     PaymentSvc --> Kafka
     LogisticsSvc --> Kafka
+    FraudSvc --> Kafka
     
     NotifSvc --> RabbitMQ
     Kafka --> NotifSvc
@@ -115,6 +122,10 @@ graph TB
     NotifSvc --> Email
     NotifSvc --> Push
     LogisticsSvc --> Maps
+    OrderSvc --> FraudSvc
+    PaymentSvc --> FraudSvc
+    OrderSvc --> AuditSvc
+    PaymentSvc --> AuditSvc
 ```
 
 ---

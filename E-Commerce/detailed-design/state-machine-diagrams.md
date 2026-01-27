@@ -11,6 +11,9 @@ State machine diagrams showing object state transitions for key entities.
 stateDiagram-v2
     [*] --> Pending: Order Placed
     
+    Pending --> FraudReview: Risk Check
+    FraudReview --> Confirmed: Risk Cleared
+    FraudReview --> Cancelled: Risk Rejected
     Pending --> Confirmed: Payment Success
     Pending --> Cancelled: Payment Failed
     Pending --> Cancelled: Customer Cancels
