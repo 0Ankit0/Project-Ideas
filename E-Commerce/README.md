@@ -11,7 +11,7 @@
 | 3 | [high-level-design](./high-level-design/) | Sequence diagrams, domain model, DFD, architecture, C4 |
 | 4 | [detailed-design](./detailed-design/) | Class, sequence, state diagrams, ERD, API design |
 | 5 | [infrastructure](./infrastructure/) | Deployment, network, cloud architecture |
-| 6 | [implementation](./implementation/) | Implementation guidelines, C4 code diagram |
+| 6 | [implementation](./implementation/) | Implementation guidelines, C4 code diagram, implementation playbook |
 | 7 | [edge-cases](./edge-cases/) | Edge cases and mitigations across subsystems |
 
 Additional analysis artifacts: data dictionary, business rules, and event catalog.
@@ -97,3 +97,27 @@ Phases
 │  • Code                                                         │
 │  • C4 Code Diagram (optional, class-level)                      │
 └─────────────────────────────────────────────────────────────────┘
+
+
+## Getting Started
+
+1. Start with `requirements/requirements.md`.
+2. Review `analysis/use-case-descriptions.md` and process flows.
+3. Study `high-level-design/architecture-diagram.md` and `high-level-design/c4-diagrams.md`.
+4. Implement APIs using `detailed-design/api-design.md`.
+5. Validate deployment readiness using `infrastructure/deployment-diagram.md`.
+6. Review failure scenarios in `edge-cases/README.md`.
+7. Execute build/deploy checklist in `implementation/implementation-playbook.md`.
+
+
+## Documentation Status
+
+- ✅ Requirements complete
+- ✅ Analysis complete
+- ✅ High-level design complete
+- ✅ Detailed design complete
+- ✅ Infrastructure complete
+- ✅ Edge cases complete
+- ✅ Implementation guidance complete
+
+**Total:** 36 documentation files across 7 phases.
