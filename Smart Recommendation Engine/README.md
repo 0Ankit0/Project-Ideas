@@ -51,7 +51,8 @@ Smart Recommendation Engine/
 │   └── operations.md
 └── implementation/            # Phase 6: Code guidelines
     ├── code-guidelines.md          # Python best practices
-    └── c4-code-diagram.md
+    ├── c4-code-diagram.md
+    └── implementation-playbook.md   # Step-by-step build and go-live checklist
 ```
 
 ---
@@ -158,6 +159,7 @@ Smart Recommendation Engine/
 4. **Database Setup**: Use `detailed-design/erd-database-schema.md`
 5. **Deploy**: Follow `infrastructure/deployment-diagram.md`
 6. **Code**: Use `implementation/code-guidelines.md`
+7. **Execution Plan**: `implementation/implementation-playbook.md`
 
 ---
 

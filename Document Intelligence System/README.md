@@ -165,6 +165,7 @@ Document Intelligence System/
 3. **Check Architecture**: Review `high-level-design/architecture-diagram.md`
 4. **API Integration**: Check `detailed-design/api-design.md`
 5. **Set Up Models**: Follow `implementation/code-guidelines.md`
+6. **Execution Plan**: `implementation/implementation-playbook.md`
 6. **Deploy**: Use `infrastructure/deployment-diagram.md`
 
 ---

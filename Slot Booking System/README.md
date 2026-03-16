@@ -51,7 +51,8 @@ Slot Booking System/
 │   └── operations.md
 └── implementation/            # Phase 6: Code guidelines
     ├── code-guidelines.md
-    └── c4-code-diagram.md
+    ├── c4-code-diagram.md
+    └── implementation-playbook.md
 ```
 
 ---
@@ -124,6 +125,7 @@ Slot Booking System/
 4. **API Integration**: `detailed-design/api-design.md`
 5. **Database Setup**: `detailed-design/erd-database-schema.md`
 6. **Deploy**: `infrastructure/deployment-diagram.md`
+7. **Execution Plan**: `implementation/implementation-playbook.md`
 
 ---
 
@@ -138,7 +140,7 @@ Slot Booking System/
 
 ---
 
-## 📝 Documentation Stats
+## 📝 Documentation Status
 
 - **36 files** across **7 sections**
 - **25+ Mermaid diagrams**
