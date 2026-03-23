@@ -63,6 +63,7 @@ Validator checks include:
 | Healthcare Appointment System | Covered by validator |
 | Logistics Tracking System | Covered by validator |
 | Learning Management System | Covered by validator |
+| Ticketing and Project Management System | Covered by validator |
 
 ## 6) Change Management Rules
 
