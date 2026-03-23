@@ -66,6 +66,7 @@ Validator checks include:
 | Library Management System | Covered by validator |
 | Restaurant Management System | Covered by validator |
 | Ticketing and Project Management System | Covered by validator |
+| Backend as a Service Platform | Covered by validator |
 
 ## 6) Change Management Rules
 
