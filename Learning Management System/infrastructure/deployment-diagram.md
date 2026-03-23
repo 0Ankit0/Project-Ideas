@@ -1,17 +1,25 @@
-# Deployment Diagram
+# Deployment Diagram - Learning Management System
 
-## Objective
+```mermaid
+flowchart TB
+    internet[Internet / Learners] --> edge[WAF / CDN]
+    staffNet[Staff / Admin Network] --> internalAccess[Internal Access Gateway]
+    edge --> learnerWeb[Learner Portal Frontend]
+    internalAccess --> staffWeb[Staff Workspace Frontend]
+    learnerWeb --> api[Application API Cluster]
+    staffWeb --> api
+    api --> workers[Background Worker Cluster]
+    api --> db[(Managed PostgreSQL)]
+    api --> search[(Search / Analytics Cluster)]
+    api --> queue[(Managed Queue / Bus)]
+    api --> object[(Object Storage / CDN Origin)]
+    workers --> db
+    workers --> queue
+    workers --> object
+```
 
-This document captures deployment diagram guidance for the **Learning Management System**.
+## Deployment Notes
 
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+- Learner and staff experiences should be separated at the edge but can share the same core backend platform.
+- Background workers handle notifications, progress aggregation, grading queues, certificate issuance, and projection updates.
+- Media content and downloadable learning assets should use object storage plus CDN distribution.

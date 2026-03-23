@@ -1,17 +1,9 @@
-# Assessment And Grading
+# Edge Cases - Assessment and Grading
 
-## Objective
-
-This document captures assessment and grading guidance for the **Learning Management System**.
-
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+| Scenario | Impact | Mitigation |
+|----------|--------|------------|
+| Learner loses connectivity during timed assessment | Attempt integrity becomes unclear | Autosave progress and define timeout/recovery rules |
+| Auto-grading differs from instructor override | Score disputes and confusion | Preserve original score, override reason, and final published grade clearly |
+| Reviewer publishes grade to wrong learner context | Privacy and correctness risk | Use strong submission identity checks and confirmation steps |
+| Attempt limit changes after learners already started | Fairness and audit concerns | Version assessment rules and apply effective-date behavior explicitly |
+| Rubric edited during active grading cycle | Inconsistent scores across learners | Lock rubric versions for active review sessions |

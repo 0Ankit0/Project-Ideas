@@ -1,17 +1,24 @@
-# Activity Diagram
+# Activity Diagram - Learning Management System
 
-## Objective
+## Enroll-to-Certification Flow
 
-This document captures activity diagram guidance for the **Learning Management System**.
-
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+flowchart TD
+    start([Learner needs training]) --> browse[Browse or search course catalog]
+    browse --> eligible{Eligible and seats available?}
+    eligible -- No --> wait[Waitlist or request access]
+    eligible -- Yes --> enroll[Enroll learner]
+    wait --> enroll
+    enroll --> learn[Consume lessons and resources]
+    learn --> checkpoint{Lesson or module completion?}
+    checkpoint -- Yes --> progress[Update progress and unlock next content]
+    checkpoint -- No --> learn
+    progress --> assessment{Assessment due?}
+    assessment -- Yes --> submit[Submit quiz or assignment]
+    submit --> grade[Auto-grade or manual review]
+    grade --> passed{Completion criteria met?}
+    passed -- No --> remediate[Retry, remediate, or continue learning]
+    remediate --> learn
+    passed -- Yes --> certify[Issue certificate and update dashboards]
+    certify --> end([Learning record completed])
+```

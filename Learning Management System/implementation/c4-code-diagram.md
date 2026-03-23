@@ -1,17 +1,46 @@
-# C4 Code Diagram
+# C4 Code Diagram - Learning Management System
 
-## Objective
+```mermaid
+flowchart TB
+    subgraph api[apps/api]
+        controllers[Controllers]
+        guards[Auth Guards]
+        commands[Command Handlers]
+        queries[Query Handlers]
+    end
 
-This document captures c4 code diagram guidance for the **Learning Management System**.
+    subgraph domain[packages/domain]
+        identity[Identity Module]
+        courses[Courses Module]
+        enrollments[Enrollments Module]
+        assessments[Assessments Module]
+        grading[Grading Module]
+        progress[Progress Module]
+        certificates[Certificates Module]
+    end
 
-## Scope
+    subgraph worker[apps/worker]
+        notifications[Notification Jobs]
+        progressProjector[Progress Projector]
+        gradingQueue[Grading Queue Workers]
+        certificatesJobs[Certificate Jobs]
+    end
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+    controllers --> guards
+    controllers --> commands
+    controllers --> queries
+    commands --> identity
+    commands --> courses
+    commands --> enrollments
+    commands --> assessments
+    commands --> grading
+    commands --> progress
+    commands --> certificates
+    queries --> courses
+    queries --> enrollments
+    queries --> progress
+    notifications --> enrollments
+    progressProjector --> progress
+    gradingQueue --> grading
+    certificatesJobs --> certificates
+```

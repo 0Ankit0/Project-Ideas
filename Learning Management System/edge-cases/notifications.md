@@ -1,17 +1,9 @@
-# Notifications
+# Edge Cases - Notifications
 
-## Objective
-
-This document captures notifications guidance for the **Learning Management System**.
-
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+| Scenario | Impact | Mitigation |
+|----------|--------|------------|
+| Learner receives duplicate reminders | Noise and reduced trust | Use deduplication keys and send-history checks |
+| Grade published before feedback artifacts are ready | Learner sees incomplete outcome | Delay learner notification until publication bundle is complete |
+| Tenant disables some channels mid-course | Message delivery becomes inconsistent | Respect tenant-level preferences with fallback-channel rules |
+| Live session rescheduled close to start time | Learners miss session | Escalate urgent schedule-change notifications across multiple channels |
+| Certificate issued but notification provider fails | Learner unaware of completion | Retry asynchronously and surface in-app status regardless of email delivery |

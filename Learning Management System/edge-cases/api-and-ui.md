@@ -1,17 +1,9 @@
-# Api And Ui
+# Edge Cases - API and UI
 
-## Objective
-
-This document captures api and ui guidance for the **Learning Management System**.
-
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+| Scenario | Impact | Mitigation |
+|----------|--------|------------|
+| Search index lags after course publication | Learners cannot find new content | Show publication freshness and reconcile critical catalog reads |
+| Learner opens assessment in multiple windows | Attempt collisions occur | Lock active attempts or define deterministic continuation behavior |
+| Large cohort dashboard becomes slow | Staff lose operational visibility | Use projection-based summaries and paginated drill-downs |
+| Staff workspace leaks learner data across tenants | Severe isolation breach | Enforce tenant scoping before query and render on every route |
+| Lesson player fails to render embedded content | Progress flow breaks | Provide graceful fallback with retry and support messaging |

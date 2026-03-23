@@ -1,17 +1,15 @@
-# Event Catalog
+# Event Catalog - Learning Management System
 
-## Objective
-
-This document captures event catalog guidance for the **Learning Management System**.
-
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+| Event | Producer | Consumers | Description |
+|-------|----------|-----------|-------------|
+| tenant.user_invited | Identity Service | Notification Service | Tenant user invited to LMS |
+| course.published | Course Service | Catalog Search, Notification, Reporting | Course available to audience |
+| enrollment.created | Enrollment Service | Notification, Reporting | Learner enrolled in course or cohort |
+| lesson.progress_updated | Progress Service | Reporting, Recommendation, Notification | Learner progress checkpoint recorded |
+| assessment.started | Assessment Service | Monitoring, Timer Service | Timed or tracked attempt began |
+| assessment.submitted | Assessment Service | Auto-Grading, Review Queue | Attempt completed |
+| grade.published | Grading Service | Learner Portal, Notification, Reporting | Final or provisional grade released |
+| learner.at_risk_detected | Analytics Service | Instructor Dashboard, Notification | Engagement or performance risk surfaced |
+| certificate.issued | Certification Service | Learner Portal, Notification, Reporting | Completion credential created |
+| live_session.scheduled | Scheduling Service | Notification, Calendar Integration | Synchronous session scheduled |
+| admin.policy_changed | Admin Service | Audit, Policy Engine | Rules or templates updated |

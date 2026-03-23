@@ -1,17 +1,67 @@
-# Architecture Diagram
+# Architecture Diagram - Learning Management System
 
-## Objective
+```mermaid
+flowchart TB
+    subgraph access[Access Channels]
+        learnerPortal[Learner Portal]
+        staffWorkspace[Staff Workspace]
+    end
 
-This document captures architecture diagram guidance for the **Learning Management System**.
+    subgraph platform[Core Platform]
+        gateway[API Gateway]
+        identity[Identity and Access]
+        course[Course and Authoring Service]
+        enrollment[Enrollment and Cohort Service]
+        assessment[Assessment Service]
+        grading[Grading and Review Service]
+        progress[Progress Tracking Service]
+        certificate[Certification Service]
+        notification[Notification Service]
+        reporting[Reporting and Search Projection]
+    end
 
-## Scope
+    subgraph data[Data Layer]
+        pg[(PostgreSQL)]
+        search[(Search Index)]
+        bus[(Message Bus)]
+        object[(Object Storage)]
+    end
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
+    learnerPortal --> gateway
+    staffWorkspace --> gateway
+    gateway --> identity
+    gateway --> course
+    gateway --> enrollment
+    gateway --> assessment
+    gateway --> grading
+    gateway --> progress
+    gateway --> certificate
+    course --> pg
+    enrollment --> pg
+    assessment --> pg
+    grading --> pg
+    progress --> pg
+    certificate --> pg
+    course --> object
+    course --> search
+    enrollment --> bus
+    assessment --> bus
+    grading --> bus
+    progress --> bus
+    certificate --> bus
+    bus --> notification
+    bus --> reporting
+    reporting --> search
+```
 
-## Implementation Notes
+## Responsibilities
 
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+| Component | Responsibility |
+|-----------|----------------|
+| Course and Authoring Service | Course definitions, versions, modules, lessons, publishing |
+| Enrollment and Cohort Service | Learner enrollment, seat rules, cohorts, schedules |
+| Assessment Service | Attempts, timers, submissions, auto-grading triggers |
+| Grading and Review Service | Manual review, rubric scoring, feedback, overrides |
+| Progress Tracking Service | Lesson completion, resume state, engagement signals |
+| Certification Service | Completion evaluation and certificate issuance |
+| Reporting and Search Projection | Catalog discovery, dashboards, analytics summaries |

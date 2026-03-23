@@ -1,17 +1,28 @@
-# State Machine Diagram
+# State Machine Diagram - Learning Management System
 
-## Objective
+## Course Version Lifecycle
 
-This document captures state machine diagram guidance for the **Learning Management System**.
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> in_review
+    in_review --> published
+    published --> archived
+    in_review --> draft
+    published --> draft_update
+    draft_update --> in_review
+```
 
-## Scope
+## Enrollment Lifecycle
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+stateDiagram-v2
+    [*] --> invited
+    invited --> active
+    active --> completed
+    active --> dropped
+    active --> expired
+    expired --> reactivated
+    reactivated --> active
+    completed --> certified
+```

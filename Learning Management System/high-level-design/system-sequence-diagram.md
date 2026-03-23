@@ -1,17 +1,42 @@
-# System Sequence Diagram
+# System Sequence Diagram - Learning Management System
 
-## Objective
+## Enrollment to Learning Sequence
 
-This document captures system sequence diagram guidance for the **Learning Management System**.
+```mermaid
+sequenceDiagram
+    participant L as Learner
+    participant P as Learner Portal
+    participant API as Platform API
+    participant E as Enrollment Service
+    participant Policy as Policy Engine
+    participant N as Notification Service
 
-## Scope
+    L->>P: Request enrollment
+    P->>API: POST /enrollments
+    API->>Policy: Validate policy, prerequisite, and schedule rules
+    API->>E: Create enrollment
+    E->>N: Notify learner and instructor
+    N-->>L: Enrollment confirmation
+```
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
+## Assessment to Certificate Sequence
 
-## Implementation Notes
+```mermaid
+sequenceDiagram
+    participant Learner as Learner
+    participant API as Platform API
+    participant Assess as Assessment Service
+    participant Grade as Grading Service
+    participant Cert as Certification Service
+    participant Notify as Notification Service
 
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+    Learner->>API: Submit assessment
+    API->>Assess: Record attempt
+    Assess->>Grade: Auto-grade or enqueue review
+    Grade->>Cert: Recalculate completion
+    alt completion criteria met
+        Cert->>Notify: Notify certificate issuance
+    else criteria not met
+        Grade->>Notify: Publish score and feedback
+    end
+```

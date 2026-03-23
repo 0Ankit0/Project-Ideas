@@ -1,17 +1,43 @@
-# Bpmn Swimlane Diagram
+# BPMN Swimlane Diagram - Learning Management System
 
-## Objective
+```mermaid
+flowchart LR
+    subgraph lane1[Learner]
+        l1[Discover course]
+        l2[Enroll or request access]
+        l3[Consume lessons]
+        l4[Submit assessment]
+        l5[Review result or certificate]
+    end
 
-This document captures bpmn swimlane diagram guidance for the **Learning Management System**.
+    subgraph lane2[Instructor / Reviewer]
+        i1[Approve or manage enrollment]
+        i2[Facilitate learning]
+        i3[Review submissions]
+        i4[Publish grades and feedback]
+    end
 
-## Scope
+    subgraph lane3[Content Admin / Author]
+        c1[Create and publish course]
+    end
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
+    subgraph lane4[Tenant Admin]
+        t1[Configure tenant rules and cohorts]
+        t2[Review reports]
+    end
 
-## Implementation Notes
+    subgraph lane5[Platform Admin]
+        p1[Manage integrations and platform policy]
+    end
 
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+    c1 --> l1 --> l2 --> i1 --> l3 --> i2 --> l4 --> i3 --> i4 --> l5
+    t1 --> i1
+    t1 --> t2
+    p1 --> t1
+```
+
+## Swimlane Interpretation
+
+- Learner-facing actions stay streamlined while staff workflows manage publication, grading, and operational policy.
+- Tenant configuration governs enrollment, deadlines, and reporting visibility.
+- Platform administration controls cross-tenant integrations and system-level compliance features.

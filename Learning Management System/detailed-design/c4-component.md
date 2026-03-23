@@ -1,17 +1,27 @@
-# C4 Component
+# C4 Component Diagram - Learning Management System
 
-## Objective
+```mermaid
+flowchart TB
+    subgraph backend[Backend Application]
+        auth[Auth and Tenant Guard]
+        courseApi[Course API]
+        enrollmentApi[Enrollment API]
+        lessonApi[Lesson and Progress API]
+        assessmentApi[Assessment API]
+        gradingApi[Grading API]
+        adminApi[Admin API]
+        projector[Search and Analytics Projector]
+        notifier[Notification Adapter]
+    end
 
-This document captures c4 component guidance for the **Learning Management System**.
-
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+    auth --> courseApi
+    auth --> enrollmentApi
+    auth --> lessonApi
+    auth --> assessmentApi
+    auth --> gradingApi
+    auth --> adminApi
+    enrollmentApi --> notifier
+    gradingApi --> notifier
+    courseApi --> projector
+    lessonApi --> projector
+```

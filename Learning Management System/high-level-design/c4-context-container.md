@@ -1,17 +1,57 @@
-# C4 Context Container
+# C4 Context and Container Diagrams - Learning Management System
 
-## Objective
+## C4 Context
 
-This document captures c4 context container guidance for the **Learning Management System**.
+```mermaid
+flowchart LR
+    learners[Learners]
+    staff[Instructors, Reviewers, Admins]
+    idp[Identity Provider]
+    live[Live Session Provider]
+    notify[Notification Services]
+    analytics[Analytics / BI]
 
-## Scope
+    system[Learning Management System]
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
+    learners --> system
+    staff --> system
+    system --> idp
+    system --> live
+    system --> notify
+    system --> analytics
+```
 
-## Implementation Notes
+## C4 Container
 
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+flowchart TB
+    subgraph users[Users]
+        learnerWeb[Learner Portal Web App]
+        staffWeb[Staff Workspace Web App]
+    end
+
+    subgraph app[Application Containers]
+        api[REST API]
+        workers[Background Workers]
+        projector[Search and Analytics Projector]
+    end
+
+    subgraph stores[Data Stores]
+        db[(PostgreSQL)]
+        idx[(Search Index)]
+        queue[(Message Bus)]
+        blob[(Object Storage)]
+    end
+
+    learnerWeb --> api
+    staffWeb --> api
+    api --> db
+    api --> blob
+    api --> queue
+    workers --> db
+    workers --> queue
+    projector --> db
+    projector --> idx
+    queue --> workers
+    queue --> projector
+```

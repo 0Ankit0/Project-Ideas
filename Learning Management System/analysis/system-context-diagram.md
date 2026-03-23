@@ -1,17 +1,36 @@
-# System Context Diagram
+# System Context Diagram - Learning Management System
 
-## Objective
+```mermaid
+flowchart LR
+    learners[Learners]
+    staff[Instructors, Reviewers, Authors, Admins]
+    idp[Identity Provider / SSO]
+    notify[Email / Chat / Push Services]
+    live[Live Session Provider]
+    storage[Media and File Storage]
+    analytics[Analytics / BI]
 
-This document captures system context diagram guidance for the **Learning Management System**.
+    subgraph lms[Learning Management System]
+        learnerPortal[Learner Portal]
+        staffWorkspace[Staff Workspace]
+        api[Application API]
+        search[Catalog and Analytics Search]
+    end
 
-## Scope
+    learners --> learnerPortal
+    staff --> staffWorkspace
+    learnerPortal --> api
+    staffWorkspace --> api
+    api --> idp
+    api --> notify
+    api --> live
+    api --> storage
+    api --> analytics
+    api --> search
+```
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
+## Context Notes
 
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+- Learners primarily interact through the catalog, course player, assessment, and account workflows.
+- Staff use dedicated operational surfaces for authoring, grading, cohort management, and reporting.
+- The LMS integrates with identity, media storage, live-session tooling, notifications, and analytics platforms.

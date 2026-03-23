@@ -1,17 +1,9 @@
-# Progress Tracking
+# Edge Cases - Progress Tracking
 
-## Objective
-
-This document captures progress tracking guidance for the **Learning Management System**.
-
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+| Scenario | Impact | Mitigation |
+|----------|--------|------------|
+| Learner watches media offline and syncs later | Progress ordering becomes inconsistent | Accept delayed events with idempotent sequence handling |
+| Completion rules depend on multiple content types | Learner dashboard may misreport status | Centralize completion evaluation in policy services |
+| Learner completes content in multiple tabs or devices | Double-counted or conflicting state | Use versioned progress checkpoints and latest-valid event reconciliation |
+| Course content changes after partial completion | Progress percentages drift | Bind progress to course version and translate only through explicit migration rules |
+| Attendance data for live sessions arrives late | Certification timing becomes incorrect | Support pending-attendance state before final completion evaluation |

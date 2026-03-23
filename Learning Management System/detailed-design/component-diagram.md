@@ -1,17 +1,30 @@
-# Component Diagram
+# Component Diagram - Learning Management System
 
-## Objective
+```mermaid
+flowchart LR
+    ui[Learner Portal / Staff Workspace] --> api[API Layer]
+    api --> auth[Access Control Component]
+    api --> catalog[Catalog and Authoring Component]
+    api --> enrollment[Enrollment and Cohort Component]
+    api --> delivery[Content Delivery and Progress Component]
+    api --> assessment[Assessment Component]
+    api --> grading[Grading and Feedback Component]
+    api --> certification[Certification Component]
+    api --> reporting[Reporting Component]
+    assessment --> policy[Policy and Rule Evaluation Component]
+    grading --> policy
+    certification --> policy
+```
 
-This document captures component diagram guidance for the **Learning Management System**.
+## Component Responsibilities
 
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+| Component | Responsibility |
+|-----------|----------------|
+| Access Control | Authentication, tenant scoping, RBAC |
+| Catalog and Authoring | Courses, versions, lessons, metadata, publication |
+| Enrollment and Cohort | Learner assignment, schedules, access windows |
+| Content Delivery and Progress | Lesson rendering state, checkpoints, completion tracking |
+| Assessment | Attempts, submissions, timers, question delivery |
+| Grading and Feedback | Rubrics, reviewer workflows, overrides |
+| Certification | Completion evaluation and credential issuance |
+| Reporting | Dashboards, exports, engagement summaries |

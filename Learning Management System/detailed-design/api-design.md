@@ -1,17 +1,53 @@
-# Api Design
+# API Design - Learning Management System
 
-## Objective
+## API Style
+- RESTful JSON APIs with tenant-aware authorization and role-based access checks.
+- Cursor pagination for activity-heavy collections such as enrollments, attempts, and notifications.
+- Idempotency keys for enrollment creation, grading publication, and certificate issuance actions.
+- Learner-facing reads optimize for freshness on progress and grade visibility, while reporting remains projection-based.
 
-This document captures api design guidance for the **Learning Management System**.
+## Core Endpoints
 
-## Scope
+| Area | Method | Endpoint | Purpose |
+|------|--------|----------|---------|
+| Catalog | GET | `/api/v1/courses` | Search or list published courses |
+| Catalog | POST | `/api/v1/courses` | Create course |
+| Catalog | PATCH | `/api/v1/courses/{courseId}/publish` | Publish a course version |
+| Enrollments | POST | `/api/v1/enrollments` | Enroll learner |
+| Cohorts | POST | `/api/v1/cohorts` | Create cohort |
+| Lessons | GET | `/api/v1/lessons/{lessonId}` | Retrieve learner lesson content |
+| Progress | POST | `/api/v1/progress/events` | Record progress checkpoint |
+| Assessments | POST | `/api/v1/assessments/{assessmentId}/attempts` | Start or submit attempt |
+| Grading | POST | `/api/v1/attempts/{attemptId}/grade` | Grade attempt |
+| Certificates | GET | `/api/v1/certificates/{certificateId}` | Retrieve certificate metadata |
+| Reports | GET | `/api/v1/reports/cohort-performance` | Cohort analytics summary |
+| Admin | PATCH | `/api/v1/admin/policies/{policyId}` | Update tenant or platform policy |
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
+## Example: Enrollment Request
 
-## Implementation Notes
+```json
+{
+  "tenantId": "ten_01",
+  "learnerId": "usr_2001",
+  "courseId": "course_44",
+  "cohortId": "cohort_2026_spring",
+  "enrolledBy": "usr_admin_7"
+}
+```
 
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+## Example: Progress Event
+
+```json
+{
+  "lessonId": "lesson_900",
+  "learnerId": "usr_2001",
+  "eventType": "lesson_completed",
+  "percentComplete": 100,
+  "recordedAt": "2026-03-23T10:00:00Z"
+}
+```
+
+## Authorization Notes
+- Learners may access only their own enrollment, progress, assessments, and certificates.
+- Staff access is scoped by tenant and role to authoring, instruction, review, or administrative surfaces.
+- Grade overrides, certificate reissues, and tenant policy changes require elevated permissions and full audit logging.

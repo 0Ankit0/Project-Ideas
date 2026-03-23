@@ -1,17 +1,35 @@
-# Domain Model
+# Domain Model - Learning Management System
 
-## Objective
+## Core Domain Areas
 
-This document captures domain model guidance for the **Learning Management System**.
+| Domain Area | Key Concepts |
+|-------------|--------------|
+| Identity and Tenancy | Tenant, User, RoleAssignment, Audience |
+| Catalog and Authoring | Course, CourseVersion, Module, Lesson, Resource |
+| Delivery and Access | Cohort, Enrollment, LiveSession, AccessWindow |
+| Assessment and Grading | Assessment, Attempt, SubmissionArtifact, GradeRecord, Rubric |
+| Progress and Certification | ProgressRecord, CompletionRule, Certificate |
+| Operations | Notification, AuditLog, AnalyticsSnapshot |
 
-## Scope
+## Relationship Summary
+- A **tenant** owns users, courses, cohorts, reporting scope, and administrative policies.
+- A **course** can have many versions, modules, lessons, assessments, cohorts, and certificates.
+- A **learner** can hold many enrollments, progress records, attempts, grades, and certificates.
+- **Completion rules** depend on course structure, assessment outcomes, and optional attendance requirements.
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+erDiagram
+    TENANT ||--o{ USER : contains
+    TENANT ||--o{ COURSE : owns
+    COURSE ||--o{ COURSE_VERSION : versions
+    COURSE_VERSION ||--o{ MODULE : contains
+    MODULE ||--o{ LESSON : contains
+    MODULE ||--o{ ASSESSMENT : contains
+    COURSE ||--o{ COHORT : offers
+    USER ||--o{ ENROLLMENT : joins
+    COHORT ||--o{ ENROLLMENT : includes
+    USER ||--o{ ASSESSMENT_ATTEMPT : submits
+    ASSESSMENT ||--o{ ASSESSMENT_ATTEMPT : receives
+    USER ||--o{ PROGRESS_RECORD : generates
+    USER ||--o{ CERTIFICATE : earns
+```

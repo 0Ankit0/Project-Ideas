@@ -1,17 +1,13 @@
-# Readme
+# Edge Cases - Learning Management System
 
-## Objective
+This folder captures cross-cutting scenarios that can break content integrity, grading accuracy, progress reliability, learner communication, security, or operational stability if they are not handled deliberately.
 
-This document captures readme guidance for the **Learning Management System**.
+## Contents
 
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+- `content-ingestion.md`
+- `assessment-and-grading.md`
+- `progress-tracking.md`
+- `notifications.md`
+- `api-and-ui.md`
+- `security-and-compliance.md`
+- `operations.md`

@@ -1,17 +1,9 @@
-# Content Ingestion
+# Edge Cases - Content Ingestion
 
-## Objective
-
-This document captures content ingestion guidance for the **Learning Management System**.
-
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+| Scenario | Impact | Mitigation |
+|----------|--------|------------|
+| Author publishes a course with missing required lesson metadata | Learners encounter broken flows | Validate drafts before publication and block invalid releases |
+| Course content is updated while learners are mid-course | Historical learner state becomes inconsistent | Version courses and pin active learners to stable content snapshots |
+| Large media upload stalls or fails | Authoring workflow degrades | Support resumable uploads and background processing states |
+| Imported content duplicates existing modules or assessments | Catalog confusion and duplicate grading logic | Provide import deduplication and review workflows |
+| Embedded external resource becomes unavailable | Lesson completion becomes blocked | Detect failed embeds and allow fallback links or replacement assets |

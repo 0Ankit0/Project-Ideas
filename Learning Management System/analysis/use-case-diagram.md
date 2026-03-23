@@ -1,17 +1,39 @@
-# Use Case Diagram
+# Use Case Diagram - Learning Management System
 
-## Objective
+```mermaid
+flowchart LR
+    learner[Learner]
+    instructor[Instructor]
+    reviewer[Teaching Assistant / Reviewer]
+    author[Content Admin / Author]
+    tenantAdmin[Tenant Admin]
+    platformAdmin[Platform Admin]
 
-This document captures use case diagram guidance for the **Learning Management System**.
+    subgraph system[Learning Management System]
+        uc1([Search course catalog])
+        uc2([Enroll learner])
+        uc3([Consume lesson content])
+        uc4([Submit assessment])
+        uc5([Review and grade])
+        uc6([Author or publish course])
+        uc7([Track learner progress])
+        uc8([Issue certificate])
+        uc9([Manage tenant policies])
+        uc10([Manage platform integrations])
+    end
 
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+    learner --> uc1
+    learner --> uc3
+    learner --> uc4
+    instructor --> uc2
+    instructor --> uc5
+    instructor --> uc7
+    reviewer --> uc5
+    author --> uc6
+    tenantAdmin --> uc2
+    tenantAdmin --> uc9
+    platformAdmin --> uc10
+    uc3 --> uc7
+    uc4 --> uc5
+    uc5 --> uc8
+```

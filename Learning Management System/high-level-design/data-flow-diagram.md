@@ -1,17 +1,29 @@
-# Data Flow Diagram
+# Data Flow Diagram - Learning Management System
 
-## Objective
+```mermaid
+flowchart LR
+    learner[ Learner Portal ] --> api[ Application API ]
+    staff[ Staff Workspace ] --> api
+    api --> identity[ Identity Service ]
+    api --> course[ Course Service ]
+    api --> enroll[ Enrollment Service ]
+    api --> assess[ Assessment Service ]
+    api --> progress[ Progress Service ]
+    api --> report[ Reporting Service ]
+    course --> db[(PostgreSQL)]
+    enroll --> db
+    assess --> db
+    progress --> db
+    course --> search[(Search Index)]
+    assess --> bus[(Event Bus)]
+    progress --> bus
+    enroll --> bus
+    bus --> notify[ Notification Service ]
+    bus --> report
+```
 
-This document captures data flow diagram guidance for the **Learning Management System**.
+## Data Flow Notes
 
-## Scope
-
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+1. Catalog and authoring data flows from the transactional store into the search layer for learner discovery.
+2. Progress, assessment, and enrollment events feed reporting and notification workflows asynchronously.
+3. Learner-facing status views should prefer authoritative transactional data where freshness is critical.

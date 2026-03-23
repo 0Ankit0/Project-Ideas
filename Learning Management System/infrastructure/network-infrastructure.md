@@ -1,17 +1,18 @@
-# Network Infrastructure
+# Network Infrastructure - Learning Management System
 
-## Objective
+## Network Zones
 
-This document captures network infrastructure guidance for the **Learning Management System**.
+| Zone | Purpose | Key Controls |
+|------|---------|--------------|
+| Public Edge | Learner access to portal and media delivery | TLS termination, WAF, rate limiting |
+| Staff Access | Instructor/admin operational access | SSO, zero-trust gateway or private access |
+| Application Zone | API and background workers | Private subnets, service identity, secrets management |
+| Data Zone | Database, search, queue, object storage | No public access, encryption, restricted paths |
+| Integration Zone | Identity, notifications, live session, analytics | Outbound allow-list, credential rotation |
 
-## Scope
+## Traffic Principles
 
-- System: Learning Management System
-- Goal: Course delivery platform with enrollment, learning progress, assessments, and certification workflows.
-- Primary actors: Learners, Instructors, Content Admin, Platform Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+- Learner traffic enters only through the public edge.
+- Staff and admin access should traverse explicit access controls and stronger session requirements.
+- Search and analytics outputs must not bypass application-level authorization for protected learner data.
+- Media delivery should be tokenized or scoped when content is not public.
