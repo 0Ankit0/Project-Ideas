@@ -13,37 +13,42 @@ erDiagram
     USER ||--o{ ORDER : places
     USER ||--o{ CART : has
     USER ||--o{ WISHLIST : has
+    USER ||--o{ WISHLIST_SHARE_LINK : creates
     USER ||--o{ REVIEW : writes
     USER ||--o{ WALLET : has
-    
+    USER ||--o{ NOTIFICATION : receives
+
     VENDOR ||--o{ PRODUCT : sells
     VENDOR ||--o{ PAYOUT : receives
     VENDOR ||--|| BANK_ACCOUNT : has
     VENDOR ||--o{ WAREHOUSE : has
-    
+
     PRODUCT ||--o{ PRODUCT_VARIANT : has
+    PRODUCT_VARIANT ||--o{ VARIANT_PRICE_HISTORY : snapshots
     PRODUCT }o--|| CATEGORY : belongs_to
     PRODUCT }o--|| BRAND : has
     PRODUCT ||--o{ PRODUCT_IMAGE : has
     PRODUCT ||--o{ REVIEW : has
-    
+
     PRODUCT_VARIANT ||--o{ INVENTORY : tracked_in
     INVENTORY }o--|| WAREHOUSE : stored_at
-    
+
     CART ||--o{ CART_ITEM : contains
     CART_ITEM }o--|| PRODUCT_VARIANT : references
-    
+
     ORDER ||--o{ ORDER_ITEM : contains
     ORDER_ITEM }o--|| PRODUCT_VARIANT : references
     ORDER ||--o{ SHIPMENT : has
+    ORDER ||--o{ ORDER_EVENT : emits
     ORDER }o--o| COUPON : uses
     ORDER ||--|| PAYMENT : has
     ORDER }o--|| ADDRESS : delivered_to
-    
+
     SHIPMENT ||--o{ SHIPMENT_TRACKING : has
+    SHIPMENT ||--|| SHIPPING_LABEL : has
     SHIPMENT }o--|| BRANCH : assigned_to
     SHIPMENT }o--o| DELIVERY_AGENT : delivered_by
-    
+
     LINE_HAUL_TRIP ||--o{ SHIPMENT : contains
     LINE_HAUL_TRIP }o--|| HUB : origin
     LINE_HAUL_TRIP }o--|| HUB : destination
@@ -51,7 +56,8 @@ erDiagram
 
     RETURN ||--|| ORDER_ITEM : for
     RETURN ||--|| REFUND : triggers
-    
+    RETURN ||--o{ RETURN_EVENT : emits
+
     ADMIN ||--o{ ADMIN_ROLE : has
     ADMIN_ROLE ||--o{ PERMISSION : grants
 ```
@@ -70,6 +76,8 @@ classDiagram
         +String passwordHash
         +UserType type
         +UserStatus status
+        +Boolean otpEnabled
+        +Boolean otpVerified
         +DateTime createdAt
         +DateTime lastLoginAt
         +register()
@@ -77,7 +85,7 @@ classDiagram
         +updateProfile()
         +resetPassword()
     }
-    
+
     class Address {
         +UUID id
         +UUID userId
@@ -95,7 +103,7 @@ classDiagram
         +validate()
         +checkServiceability()
     }
-    
+
     class Wallet {
         +UUID id
         +UUID userId
@@ -105,7 +113,7 @@ classDiagram
         +debit()
         +getTransactions()
     }
-    
+
     class WalletTransaction {
         +UUID id
         +UUID walletId
@@ -114,9 +122,20 @@ classDiagram
         +String reference
         +DateTime createdAt
     }
-    
+
+    class Notification {
+        +UUID id
+        +UUID userId
+        +String title
+        +String body
+        +String type
+        +JSON extraData
+        +DateTime createdAt
+    }
+
     User "1" --> "*" Address
     User "1" --> "1" Wallet
+    User "1" --> "*" Notification
     Wallet "1" --> "*" WalletTransaction
 ```
 
@@ -137,7 +156,7 @@ classDiagram
         +getProducts()
         +getSubcategories()
     }
-    
+
     class Product {
         +UUID id
         +UUID vendorId
@@ -154,7 +173,7 @@ classDiagram
         +updateStock()
         +publish()
     }
-    
+
     class ProductVariant {
         +UUID id
         +UUID productId
@@ -168,7 +187,16 @@ classDiagram
         +checkAvailability()
         +getPrice()
     }
-    
+
+    class VariantPriceHistory {
+        +UUID id
+        +UUID variantId
+        +Decimal previousPrice
+        +Decimal currentPrice
+        +String changeReason
+        +DateTime createdAt
+    }
+
     class ProductImage {
         +UUID id
         +UUID productId
@@ -176,7 +204,7 @@ classDiagram
         +Integer position
         +Boolean isPrimary
     }
-    
+
     class Inventory {
         +UUID id
         +UUID variantId
@@ -188,19 +216,20 @@ classDiagram
         +release()
         +deduct()
     }
-    
+
     class Brand {
         +UUID id
         +String name
         +String logo
         +Boolean isActive
     }
-    
+
     Category "1" --> "*" Product
     Product "1" --> "*" ProductVariant
     Product "1" --> "*" ProductImage
     Product "*" --> "1" Brand
     ProductVariant "1" --> "*" Inventory
+    ProductVariant "1" --> "*" VariantPriceHistory
 ```
 
 ---
@@ -219,7 +248,25 @@ classDiagram
         +getTotal()
         +checkout()
     }
-    
+
+    class Wishlist {
+        +UUID id
+        +UUID userId
+        +addProduct(productId)
+        +removeProduct(productId)
+        +listItems()
+    }
+
+    class WishlistShareLink {
+        +UUID id
+        +UUID userId
+        +String token
+        +String title
+        +Boolean isActive
+        +DateTime createdAt
+        +revoke()
+    }
+
     class CartItem {
         +UUID id
         +UUID cartId
@@ -227,7 +274,7 @@ classDiagram
         +Integer quantity
         +Decimal priceAtAdd
     }
-    
+
     class Order {
         +UUID id
         +String orderNumber
@@ -246,7 +293,7 @@ classDiagram
         +cancel()
         +track()
     }
-    
+
     class OrderItem {
         +UUID id
         +UUID orderId
@@ -259,7 +306,7 @@ classDiagram
         +markShipped()
         +markDelivered()
     }
-    
+
     class Coupon {
         +UUID id
         +String code
@@ -274,9 +321,21 @@ classDiagram
         +validate()
         +apply()
     }
-    
+
+    class OrderEvent {
+        +UUID id
+        +UUID orderId
+        +String eventType
+        +String message
+        +JSON payload
+        +DateTime createdAt
+    }
+
     Cart "1" --> "*" CartItem
+    User "1" --> "*" Wishlist
+    User "1" --> "*" WishlistShareLink
     Order "1" --> "*" OrderItem
+    Order "1" --> "*" OrderEvent
     Order "*" --> "0..1" Coupon
 ```
 
@@ -301,7 +360,7 @@ classDiagram
         +capture()
         +refund()
     }
-    
+
     class Refund {
         +UUID id
         +UUID paymentId
@@ -315,7 +374,7 @@ classDiagram
         +initiate()
         +process()
     }
-    
+
     class VendorPayout {
         +UUID id
         +UUID vendorId
@@ -330,7 +389,7 @@ classDiagram
         +calculate()
         +process()
     }
-    
+
     Payment "1" --> "*" Refund
 ```
 
@@ -347,6 +406,9 @@ classDiagram
         +UUID vendorId
         +UUID branchId
         +ShipmentStatus status
+        +String labelArtifactUrl
+        +JSON labelPayload
+        +DateTime labelGeneratedAt
         +ShipmentType type
         +Decimal weight
         +JSON dimensions
@@ -356,7 +418,14 @@ classDiagram
         +track()
         +updateStatus()
     }
-    
+
+    class ShippingLabel {
+        +UUID shipmentId
+        +String url
+        +JSON payload
+        +DateTime generatedAt
+    }
+
     class ShipmentTracking {
         +UUID id
         +UUID shipmentId
@@ -365,7 +434,7 @@ classDiagram
         +String remarks
         +DateTime timestamp
     }
-    
+
     class Hub {
         +UUID id
         +String name
@@ -377,7 +446,7 @@ classDiagram
         +getInbound()
         +getOutbound()
     }
-    
+
     class Branch {
         +UUID id
         +UUID hubId
@@ -389,7 +458,7 @@ classDiagram
         +assignAgent()
         +getDeliveries()
     }
-    
+
     class DeliveryAgent {
         +UUID id
         +UUID branchId
@@ -401,7 +470,7 @@ classDiagram
         +assignDelivery()
         +completeDelivery()
     }
-    
+
     class LineHaulTrip {
         +UUID id
         +UUID originHubId
@@ -414,7 +483,7 @@ classDiagram
         +dispatch()
         +complete()
     }
-    
+
     class Vehicle {
         +UUID id
         +String number
@@ -422,8 +491,9 @@ classDiagram
         +Integer capacity
         +VehicleStatus status
     }
-    
+
     Shipment "1" --> "*" ShipmentTracking
+    Shipment "1" --> "1" ShippingLabel
     Hub "1" --> "*" Branch
     Branch "1" --> "*" DeliveryAgent
     LineHaulTrip "*" --> "1" Hub : origin
@@ -452,7 +522,7 @@ classDiagram
         +activate()
         +suspend()
     }
-    
+
     class BankAccount {
         +UUID id
         +UUID vendorId
@@ -464,7 +534,7 @@ classDiagram
         +Boolean isVerified
         +verify()
     }
-    
+
     class Warehouse {
         +UUID id
         +UUID vendorId
@@ -475,7 +545,7 @@ classDiagram
         +Boolean isDefault
         +Boolean isActive
     }
-    
+
     class VendorDocument {
         +UUID id
         +UUID vendorId
@@ -486,7 +556,7 @@ classDiagram
         +DateTime uploadedAt
         +DateTime verifiedAt
     }
-    
+
     Vendor "1" --> "*" BankAccount
     Vendor "1" --> "*" Warehouse
     Vendor "1" --> "*" VendorDocument
@@ -506,21 +576,20 @@ classDiagram
         DELIVERY_AGENT
         HUB_OPERATOR
     }
-    
+
     class OrderStatus {
         <<enumeration>>
-        PENDING
+        PENDING_PAYMENT
         CONFIRMED
         PROCESSING
         PACKED
         SHIPPED
-        IN_TRANSIT
         OUT_FOR_DELIVERY
         DELIVERED
         CANCELLED
         RETURNED
     }
-    
+
     class PaymentStatus {
         <<enumeration>>
         PENDING
@@ -530,19 +599,18 @@ classDiagram
         REFUNDED
         PARTIALLY_REFUNDED
     }
-    
+
     class ShipmentStatus {
         <<enumeration>>
-        CREATED
-        PICKED_UP
-        IN_TRANSIT
-        AT_HUB
+        CONFIRMED
+        PROCESSING
+        SHIPPED
         OUT_FOR_DELIVERY
         DELIVERED
         RTO_INITIATED
         RTO_DELIVERED
     }
-    
+
     class VendorStatus {
         <<enumeration>>
         PENDING_APPROVAL

@@ -1,7 +1,7 @@
 # C4 Code Diagram
 
 ## Overview
-C4 Code diagrams showing class-level details for key components. This is the lowest level of the C4 model.
+C4 Code diagrams showing class-level details for key components. This is the lowest level of the C4 model. The diagrams below are aligned to the current FastAPI monolith and its implemented integrations rather than the earlier Kafka/Razorpay-oriented draft.
 
 ---
 
@@ -16,7 +16,7 @@ classDiagram
             +list_orders(db, current_user, skip, limit): List~OrderResponse~
             +cancel_order(order_id, reason, db, current_user): OrderResponse
         }
-        
+
         class OrderCreate {
             +address_id: UUID
             +payment_method: PaymentMethod
@@ -24,7 +24,7 @@ classDiagram
             +notes: Optional~str~
         }
     }
-    
+
     namespace Application {
         class OrderService {
             -db: AsyncSession
@@ -32,12 +32,12 @@ classDiagram
             -cart_service: CartService
             -inventory_client: InventoryClient
             -payment_client: PaymentClient
-            -event_publisher: EventPublisher
+            -event_notifier: CommerceEventNotifier
             +create_order(user_id, order_data): Order
             +get_order(order_id): Order
             +cancel_order(order_id, reason): None
         }
-        
+
         class CheckoutService {
             -pricing_engine: PricingEngine
             -coupon_validator: CouponValidator
@@ -45,11 +45,11 @@ classDiagram
             +validate_checkout(cart, address): CheckoutResult
             +calculate_total(cart, address, coupon): OrderTotal
         }
-        
+
         class OrderSplitter {
             +split_by_vendor(order): List~VendorOrder~
         }
-        
+
         class PricingEngine {
             +calculate_subtotal(items): Decimal
             +calculate_discount(items, coupon): Decimal
@@ -57,7 +57,7 @@ classDiagram
             +calculate_tax(subtotal, address): Decimal
         }
     }
-    
+
     namespace Domain {
         class Order {
             +id: UUID
@@ -70,7 +70,7 @@ classDiagram
             +cancel(reason): None
             +update_status(status): None
         }
-        
+
         class OrderItem {
             +id: UUID
             +product_id: UUID
@@ -80,7 +80,7 @@ classDiagram
             +get_line_total(): Decimal
         }
     }
-    
+
     namespace Infrastructure {
         class OrderRepository {
             -db: AsyncSession
@@ -88,31 +88,32 @@ classDiagram
             +save(order): Order
             +find_by_user(user_id, skip, limit): List~Order~
         }
-        
+
         class InventoryClient {
             -http_client: httpx.AsyncClient
             +check_availability(items): AvailabilityResult
             +reserve_stock(order_id, items): None
             +release_stock(order_id): None
         }
-        
-        class EventPublisher {
-            -kafka_producer: AIOKafkaProducer
-            +publish(topic, event): None
+
+        class CommerceEventNotifier {
+            -notification_service: NotificationService
+            -websocket_manager: ConnectionManager
+            +emit(event_type, payload): None
         }
     }
-    
+
     OrderRouter --> OrderService
     OrderRouter --> OrderCreate
-    
+
     OrderService --> CheckoutService
     OrderService --> OrderSplitter
     OrderService --> OrderRepository
     OrderService --> InventoryClient
-    OrderService --> EventPublisher
-    
+    OrderService --> CommerceEventNotifier
+
     CheckoutService --> PricingEngine
-    
+
     OrderService --> Order
     Order --> OrderItem
 ```
@@ -129,25 +130,24 @@ classDiagram
             +create_payment(order_id, amount, db): PaymentOrderResponse
             +get_payment_status(payment_id, db): PaymentStatusResponse
         }
-        
+
         class WebhookRouter {
-            +handle_razorpay(request, raw_body): JSONResponse
-            +handle_stripe(request, raw_body): JSONResponse
+            +handle_gateway_webhook(gateway, request, raw_body): JSONResponse
         }
     }
-    
+
     namespace Application {
         class PaymentService {
             -db: AsyncSession
             -payment_repo: PaymentRepository
             -gateway_factory: GatewayFactory
             -order_client: OrderClient
-            -event_publisher: EventPublisher
+            -event_notifier: CommerceEventNotifier
             +create_payment_order(order_id, amount): PaymentOrder
             +handle_webhook(gateway, payload): None
             +refund(payment_id, amount): Refund
         }
-        
+
         class RefundService {
             -refund_repo: RefundRepository
             -gateway_factory: GatewayFactory
@@ -155,7 +155,7 @@ classDiagram
             +process_refund(refund_id): None
         }
     }
-    
+
     namespace Domain {
         class Payment {
             +id: UUID
@@ -168,7 +168,7 @@ classDiagram
             +capture(): None
             +fail(reason): None
         }
-        
+
         class Refund {
             +id: UUID
             +payment_id: UUID
@@ -178,7 +178,7 @@ classDiagram
             +process(): None
         }
     }
-    
+
     namespace GatewayAdapters {
         class PaymentGateway {
             <<protocol>>
@@ -186,16 +186,21 @@ classDiagram
             +verify_payment(payment_id): VerifyResult
             +refund(payment_id, amount): RefundResult
         }
-        
-        class RazorpayAdapter {
+
+        class KhaltiAdapter {
             -api_key: str
-            -api_secret: str
-            -client: razorpay.Client
             +create_order(amount): GatewayOrder
             +verify_payment(payment_id): VerifyResult
             +refund(payment_id, amount): RefundResult
         }
-        
+
+        class EsewaAdapter {
+            -merchant_code: str
+            +create_order(amount): GatewayOrder
+            +verify_payment(payment_id): VerifyResult
+            +refund(payment_id, amount): RefundResult
+        }
+
         class StripeAdapter {
             -api_key: str
             -client: stripe.Client
@@ -203,34 +208,44 @@ classDiagram
             +verify_payment(payment_id): VerifyResult
             +refund(payment_id, amount): RefundResult
         }
-        
+
+        class PayPalAdapter {
+            -client_id: str
+            +create_order(amount): GatewayOrder
+            +verify_payment(payment_id): VerifyResult
+            +refund(payment_id, amount): RefundResult
+        }
+
         class GatewayFactory {
             +get_gateway(name): PaymentGateway
         }
     }
-    
+
     namespace Security {
         class SignatureValidator {
-            +validate_razorpay(payload, signature): bool
-            +validate_stripe(payload, signature): bool
+            +validate_webhook(gateway, payload, signature): bool
         }
     }
-    
+
     PaymentRouter --> PaymentService
     WebhookRouter --> PaymentService
     WebhookRouter --> SignatureValidator
-    
+
     PaymentService --> GatewayFactory
     PaymentService --> Payment
-    
+
     RefundService --> Refund
     RefundService --> GatewayFactory
-    
-    GatewayFactory --> RazorpayAdapter
+
+    GatewayFactory --> KhaltiAdapter
+    GatewayFactory --> EsewaAdapter
     GatewayFactory --> StripeAdapter
-    
-    RazorpayAdapter ..|> PaymentGateway
+    GatewayFactory --> PayPalAdapter
+
+    KhaltiAdapter ..|> PaymentGateway
+    EsewaAdapter ..|> PaymentGateway
     StripeAdapter ..|> PaymentGateway
+    PayPalAdapter ..|> PaymentGateway
 ```
 
 ---
@@ -246,7 +261,7 @@ classDiagram
             +getTracking(req, res): Promise~void~
             +updateStatus(req, res): Promise~void~
         }
-        
+
         class DeliveryController {
             -deliveryService: DeliveryService
             +getAssignments(req, res): Promise~void~
@@ -254,18 +269,18 @@ classDiagram
             +reportException(req, res): Promise~void~
         }
     }
-    
+
     namespace Application {
         class ShipmentService {
             -shipmentRepository: ShipmentRepository
             -trackingRepository: TrackingRepository
             -partnerClient: PartnerClient
-            -eventPublisher: EventPublisher
+            -eventNotifier: CommerceEventNotifier
             +createShipment(order): Promise~Shipment~
             +updateStatus(awb, status): Promise~void~
             +getTracking(awb): Promise~TrackingInfo~
         }
-        
+
         class DeliveryService {
             -agentRepository: AgentRepository
             -shipmentRepository: ShipmentRepository
@@ -274,20 +289,20 @@ classDiagram
             +completeDelivery(awb, pod): Promise~void~
             +handleException(awb, exception): Promise~void~
         }
-        
-        class RouteOptimizer {
+
+        class DeliveryPlanner {
             -mapsClient: MapsClient
-            +optimizeRoute(shipments): Promise~OptimizedRoute~
             +calculateETA(origin, destination): Promise~Duration~
+            +suggestDeliverySequence(shipments): Promise~DeliveryPlan~
         }
-        
+
         class AssignmentEngine {
             -agentRepository: AgentRepository
             +assignToAgent(shipment): Promise~Agent~
             +rebalance(branchId): Promise~void~
         }
     }
-    
+
     namespace Domain {
         class Shipment {
             +id: UUID
@@ -300,7 +315,7 @@ classDiagram
             +assignAgent(agent): void
             +markDelivered(pod): void
         }
-        
+
         class TrackingEvent {
             +id: UUID
             +shipmentId: UUID
@@ -308,7 +323,7 @@ classDiagram
             +location: Location
             +timestamp: DateTime
         }
-        
+
         class DeliveryAgent {
             +id: UUID
             +name: string
@@ -320,31 +335,31 @@ classDiagram
             +assignDelivery(shipment): void
         }
     }
-    
+
     namespace Infrastructure {
         class PartnerClient {
             -httpClient: AxiosInstance
             +createShipment(data): Promise~ShipmentResponse~
             +getTracking(awb): Promise~TrackingResponse~
         }
-        
+
         class MapsClient {
             -apiKey: string
             +getDirections(origin, dest): Promise~Route~
             +calculateDistance(origin, dest): Promise~Distance~
         }
     }
-    
+
     ShipmentController --> ShipmentService
     DeliveryController --> DeliveryService
-    
+
     ShipmentService --> Shipment
     ShipmentService --> TrackingEvent
     ShipmentService --> PartnerClient
-    
+
     DeliveryService --> DeliveryAgent
     DeliveryService --> AssignmentEngine
-    
+
     RouteOptimizer --> MapsClient
     AssignmentEngine --> DeliveryAgent
 ```
@@ -362,7 +377,7 @@ classDiagram
             +handleOrderShipped(event): Promise~void~
             +handleOrderDelivered(event): Promise~void~
         }
-        
+
         class PaymentEventConsumer {
             -notificationOrchestrator: NotificationOrchestrator
             +handlePaymentSuccess(event): Promise~void~
@@ -370,7 +385,7 @@ classDiagram
             +handleRefundProcessed(event): Promise~void~
         }
     }
-    
+
     namespace Application {
         class NotificationOrchestrator {
             -templateProcessor: TemplateProcessor
@@ -379,87 +394,87 @@ classDiagram
             +send(type, userId, data): Promise~void~
             +sendBulk(type, userIds, data): Promise~void~
         }
-        
+
         class TemplateProcessor {
             -templateRepository: TemplateRepository
             +render(templateId, data): Promise~RenderedContent~
         }
-        
+
         class PreferenceManager {
             -preferenceRepository: PreferenceRepository
             +getPreferences(userId): Promise~Preferences~
             +shouldSend(userId, channel, type): Promise~boolean~
         }
-        
+
         class ChannelRouter {
             -channels: Map~string, Channel~
             +route(notification, channels): Promise~void~
         }
     }
-    
+
     namespace Channels {
         class Channel {
             <<interface>>
             +send(notification): Promise~void~
         }
-        
+
         class EmailChannel {
             -emailProvider: EmailProvider
             +send(notification): Promise~void~
         }
-        
+
         class SMSChannel {
             -smsProvider: SMSProvider
             +send(notification): Promise~void~
         }
-        
+
         class PushChannel {
             -pushProvider: PushProvider
             +send(notification): Promise~void~
         }
     }
-    
+
     namespace Providers {
         class EmailProvider {
             <<interface>>
             +sendEmail(to, subject, body): Promise~void~
         }
-        
+
         class SendGridProvider {
             -apiKey: string
             +sendEmail(to, subject, body): Promise~void~
         }
-        
+
         class SMSProvider {
             <<interface>>
             +sendSMS(to, message): Promise~void~
         }
-        
+
         class TwilioProvider {
             -accountSid: string
             -authToken: string
             +sendSMS(to, message): Promise~void~
         }
     }
-    
+
     OrderEventConsumer --> NotificationOrchestrator
     PaymentEventConsumer --> NotificationOrchestrator
-    
+
     NotificationOrchestrator --> TemplateProcessor
     NotificationOrchestrator --> PreferenceManager
     NotificationOrchestrator --> ChannelRouter
-    
+
     ChannelRouter --> EmailChannel
     ChannelRouter --> SMSChannel
     ChannelRouter --> PushChannel
-    
+
     EmailChannel ..|> Channel
     SMSChannel ..|> Channel
     PushChannel ..|> Channel
-    
+
     EmailChannel --> SendGridProvider
     SMSChannel --> TwilioProvider
-    
+
     SendGridProvider ..|> EmailProvider
     TwilioProvider ..|> SMSProvider
 ```
@@ -473,7 +488,7 @@ classDiagram
 | **API** | HTTP handling, validation, routing | Controllers, DTOs, Middleware |
 | **Application** | Business logic orchestration | Services, Use Cases |
 | **Domain** | Core business entities and rules | Entities, Value Objects, Domain Events |
-| **Infrastructure** | External integrations, persistence | Repositories, API Clients, Message Publishers |
+| **Infrastructure** | External integrations, persistence | Repositories, API clients, storage adapters, notification dispatchers |
 
 ---
 
@@ -485,6 +500,6 @@ classDiagram
 | **Factory** | Create gateway instances | Payment gateway selection |
 | **Adapter** | Integrate external services | API clients, providers |
 | **Strategy** | Interchangeable algorithms | Pricing, routing |
-| **Observer** | Event-driven communication | Kafka event publishing |
+| **Observer** | Event-driven communication | Persisted notifications and websocket fanout |
 | **Decorator** | Add cross-cutting concerns | Logging, caching |
 | **DI/IoC** | Dependency management | All layers |

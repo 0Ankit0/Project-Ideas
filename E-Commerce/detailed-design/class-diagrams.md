@@ -30,7 +30,7 @@ classDiagram
         +verifyEmail(token) void
         +verifyPhone(otp) void
     }
-    
+
     class Address {
         -UUID id
         -UUID userId
@@ -53,7 +53,7 @@ classDiagram
         +setAsDefault() void
         +geocode() void
     }
-    
+
     class AuthToken {
         -String accessToken
         -String refreshToken
@@ -63,7 +63,7 @@ classDiagram
         +refresh() AuthToken
         +revoke() void
     }
-    
+
     class Session {
         -UUID id
         -UUID userId
@@ -75,7 +75,7 @@ classDiagram
         +isActive() Boolean
         +terminate() void
     }
-    
+
     class Wallet {
         -UUID id
         -UUID userId
@@ -87,7 +87,7 @@ classDiagram
         +getBalance() Decimal
         +getTransactions(page, limit) Transaction[]
     }
-    
+
     class WalletTransaction {
         -UUID id
         -UUID walletId
@@ -98,7 +98,7 @@ classDiagram
         -String description
         -DateTime createdAt
     }
-    
+
     User "1" --> "*" Address : has
     User "1" --> "1" Wallet : has
     User "1" --> "*" Session : has
@@ -129,7 +129,7 @@ classDiagram
         +getPath() Category[]
         +updateAttributes(attrs) void
     }
-    
+
     class Product {
         -UUID id
         -UUID vendorId
@@ -156,7 +156,7 @@ classDiagram
         +updateStock(variantId, quantity) void
         +getPrice() PriceRange
     }
-    
+
     class ProductVariant {
         -UUID id
         -UUID productId
@@ -177,7 +177,7 @@ classDiagram
         +releaseStock(quantity) void
         +getDiscountPercent() Decimal
     }
-    
+
     class ProductImage {
         -UUID id
         -UUID productId
@@ -188,7 +188,7 @@ classDiagram
         -Boolean isPrimary
         -DateTime createdAt
     }
-    
+
     class Inventory {
         -UUID id
         -UUID variantId
@@ -206,7 +206,7 @@ classDiagram
         +restock(quantity) void
         +isLowStock() Boolean
     }
-    
+
     class Brand {
         -UUID id
         -String name
@@ -216,7 +216,7 @@ classDiagram
         -Boolean isActive
         -DateTime createdAt
     }
-    
+
     class Review {
         -UUID id
         -UUID productId
@@ -232,7 +232,7 @@ classDiagram
         +markHelpful(userId) void
         +moderate(status) void
     }
-    
+
     Category "1" --> "*" Product
     Product "1" --> "*" ProductVariant
     Product "1" --> "*" ProductImage
@@ -263,7 +263,7 @@ classDiagram
         +removeCoupon() void
         +checkout() Order
     }
-    
+
     class CartItem {
         -UUID id
         -UUID cartId
@@ -276,7 +276,7 @@ classDiagram
         +getLineTotal() Decimal
         +isAvailable() Boolean
     }
-    
+
     class Order {
         -UUID id
         -String orderNumber
@@ -306,15 +306,6 @@ classDiagram
         +addNote(note) void
     }
 
-    class RiskAssessment {
-        -UUID id
-        -UUID orderId
-        -Decimal riskScore
-        -String decision
-        -DateTime createdAt
-        +evaluate(order) RiskAssessment
-    }
-    
     class OrderItem {
         -UUID id
         -UUID orderId
@@ -333,7 +324,7 @@ classDiagram
         +getProduct() Product
         +requestReturn() Return
     }
-    
+
     class VendorOrder {
         -UUID id
         -UUID orderId
@@ -351,7 +342,7 @@ classDiagram
         +markPacked() void
         +getShipment() Shipment
     }
-    
+
     class Coupon {
         -UUID id
         -String code
@@ -374,12 +365,11 @@ classDiagram
         +incrementUsage() void
         +isValid() Boolean
     }
-    
+
     Cart "1" --> "*" CartItem
     Order "1" --> "*" OrderItem
     Order "1" --> "*" VendorOrder
     Order "*" --> "0..1" Coupon
-    Order "1" --> "0..1" RiskAssessment
 ```
 
 ---
@@ -409,7 +399,7 @@ classDiagram
         +refund(amount) Refund
         +getStatus() PaymentStatus
     }
-    
+
     class Refund {
         -UUID id
         -UUID paymentId
@@ -426,7 +416,7 @@ classDiagram
         +process() RefundResult
         +getStatus() RefundStatus
     }
-    
+
     class VendorPayout {
         -UUID id
         -UUID vendorId
@@ -445,7 +435,7 @@ classDiagram
         +process() PayoutResult
         +getBreakdown() PayoutBreakdown[]
     }
-    
+
     class PayoutBreakdown {
         -UUID id
         -UUID payoutId
@@ -455,7 +445,7 @@ classDiagram
         -Decimal deductions
         -Decimal netAmount
     }
-    
+
     class PaymentGatewayAdapter {
         <<interface>>
         +createOrder(amount, currency) GatewayOrder
@@ -463,16 +453,23 @@ classDiagram
         +capturePayment(paymentId) CaptureResult
         +refundPayment(paymentId, amount) RefundResult
     }
-    
-    class RazorpayAdapter {
+
+    class KhaltiAdapter {
         -String apiKey
-        -String apiSecret
         +createOrder(amount, currency) GatewayOrder
         +verifyPayment(paymentId) VerifyResult
         +capturePayment(paymentId) CaptureResult
         +refundPayment(paymentId, amount) RefundResult
     }
-    
+
+    class EsewaAdapter {
+        -String merchantCode
+        +createOrder(amount, currency) GatewayOrder
+        +verifyPayment(paymentId) VerifyResult
+        +capturePayment(paymentId) CaptureResult
+        +refundPayment(paymentId, amount) RefundResult
+    }
+
     class StripeAdapter {
         -String apiKey
         +createOrder(amount, currency) GatewayOrder
@@ -480,11 +477,21 @@ classDiagram
         +capturePayment(paymentId) CaptureResult
         +refundPayment(paymentId, amount) RefundResult
     }
-    
+
+    class PayPalAdapter {
+        -String clientId
+        +createOrder(amount, currency) GatewayOrder
+        +verifyPayment(paymentId) VerifyResult
+        +capturePayment(paymentId) CaptureResult
+        +refundPayment(paymentId, amount) RefundResult
+    }
+
     Payment "1" --> "*" Refund
     VendorPayout "1" --> "*" PayoutBreakdown
-    PaymentGatewayAdapter <|.. RazorpayAdapter
+    PaymentGatewayAdapter <|.. KhaltiAdapter
+    PaymentGatewayAdapter <|.. EsewaAdapter
     PaymentGatewayAdapter <|.. StripeAdapter
+    PaymentGatewayAdapter <|.. PayPalAdapter
 ```
 
 ---
@@ -518,7 +525,7 @@ classDiagram
         +initiateRTO(reason) void
         +getTracking() TrackingEvent[]
     }
-    
+
     class TrackingEvent {
         -UUID id
         -UUID shipmentId
@@ -530,7 +537,7 @@ classDiagram
         -Float longitude
         -DateTime timestamp
     }
-    
+
     class Hub {
         -UUID id
         -String name
@@ -549,7 +556,7 @@ classDiagram
         +getInboundManifests() Manifest[]
         +getOutboundManifests() Manifest[]
     }
-    
+
     class Branch {
         -UUID id
         -UUID hubId
@@ -565,7 +572,7 @@ classDiagram
         +getPendingDeliveries() Shipment[]
         +assignDeliveries() void
     }
-    
+
     class DeliveryAgent {
         -UUID id
         -UUID branchId
@@ -586,7 +593,7 @@ classDiagram
         +completeDelivery(awb, pod) void
         +markUnavailable(reason) void
     }
-    
+
     class LineHaulTrip {
         -UUID id
         -String tripNumber
@@ -606,7 +613,7 @@ classDiagram
         +complete() void
         +logCheckpoint(location) void
     }
-    
+
     class Manifest {
         -UUID id
         -String manifestNumber
@@ -618,7 +625,7 @@ classDiagram
         +getShipments() Shipment[]
         +reconcile(scannedAwbs) ReconcileResult
     }
-    
+
     Shipment "1" --> "*" TrackingEvent
     Hub "1" --> "*" Branch
     Branch "1" --> "*" DeliveryAgent
@@ -658,7 +665,7 @@ classDiagram
         +getOrders() VendorOrder[]
         +getAnalytics(period) Analytics
     }
-    
+
     class VendorDocument {
         -UUID id
         -UUID vendorId
@@ -672,7 +679,7 @@ classDiagram
         +verify() void
         +reject(reason) void
     }
-    
+
     class BankAccount {
         -UUID id
         -UUID vendorId
@@ -688,7 +695,7 @@ classDiagram
         +verify() void
         +setAsPrimary() void
     }
-    
+
     class Warehouse {
         -UUID id
         -UUID vendorId
@@ -707,7 +714,7 @@ classDiagram
         +getInventory() Inventory[]
         +setAsDefault() void
     }
-    
+
     class VendorSettings {
         -UUID id
         -UUID vendorId
@@ -720,7 +727,7 @@ classDiagram
         -JSON notificationPrefs
         +update(settings) void
     }
-    
+
     Vendor "1" --> "*" VendorDocument
     Vendor "1" --> "*" BankAccount
     Vendor "1" --> "*" Warehouse

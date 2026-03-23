@@ -3,6 +3,12 @@
 ## Overview
 This document provides implementation guidelines, coding standards, and best practices for developing the e-commerce platform.
 
+Current implementation note:
+
+- The live backend in this repository is a FastAPI monolith under [`backend/src`](/Users/ankit/Projects/Python/fastapi/e-commerce/backend/src), not the service-split layout shown below.
+- Use [the backend guide](/Users/ankit/Projects/Python/fastapi/e-commerce/backend/README.md) and [the backend status matrix](/Users/ankit/Projects/Python/fastapi/e-commerce/docs/system-design/implementation/backend-status-matrix.md) as the source of truth for what is implemented today.
+- The current monolith includes shared wishlists, automatic commerce notifications, generated shipping labels, and admin OTP readiness endpoints; keep new work aligned to those existing modules instead of recreating parallel services inside the repo.
+
 ---
 
 ## Technology Stack
@@ -261,7 +267,7 @@ from typing import Any, Optional
 
 class AppException(Exception):
     """Base application exception."""
-    
+
     def __init__(
         self,
         code: str,
@@ -588,22 +594,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run linting
         run: npm run lint
-      
+
       - name: Run tests
         run: npm test -- --coverage
-      
+
       - name: Upload coverage
         uses: codecov/codecov-action@v3
 
@@ -612,10 +618,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Build Docker image
         run: docker build -t $ECR_REGISTRY/$SERVICE_NAME:$GITHUB_SHA .
-      
+
       - name: Push to ECR
         run: docker push $ECR_REGISTRY/$SERVICE_NAME:$GITHUB_SHA
 
@@ -666,9 +672,10 @@ router.get('/ready', async (req, res) => {
   const checks = {
     database: await checkDatabase(),
     redis: await checkRedis(),
-    kafka: await checkKafka()
+    storage: await checkObjectStorage(),
+    notifications: await checkNotificationWorker()
   };
-  
+
   const healthy = Object.values(checks).every(c => c);
   res.status(healthy ? 200 : 503).json({ ready: healthy, checks });
 });
@@ -705,11 +712,11 @@ export const authenticate = async (
   next: NextFunction
 ): Promise<void> => {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  
+
   if (!token) {
     throw new UnauthorizedError('No token provided');
   }
-  
+
   try {
     const payload = await verifyJWT(token);
     req.user = payload;
