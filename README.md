@@ -1,6 +1,6 @@
 # Project Ideas – System Design Documentation Suite
 
-This repository contains **ten production-grade project blueprints** with end-to-end documentation across requirements, analysis, architecture, detailed design, infrastructure, edge cases, and implementation guidance.
+This repository contains **eleven production-grade project blueprints** with end-to-end documentation across requirements, analysis, architecture, detailed design, infrastructure, edge cases, and implementation guidance.
 
 ## Included Projects
 
@@ -13,6 +13,7 @@ This repository contains **ten production-grade project blueprints** with end-to
 - Logistics Tracking System
 - Learning Management System
 - Library Management System
+- Restaurant Management System
 - Ticketing and Project Management System
 
 ## Documentation Completeness Guarantee
