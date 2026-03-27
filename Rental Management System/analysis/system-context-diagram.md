@@ -1,7 +1,7 @@
 # System Context Diagram
 
 ## Overview
-The system context diagram defines the boundaries of the house rental management platform and its interactions with external actors and services.
+System context diagrams defining the boundaries of the rental management platform and its interactions with external actors and services, applicable to any asset type (cars, flats, gear, equipment, etc.).
 
 ---
 
@@ -10,9 +10,9 @@ The system context diagram defines the boundaries of the house rental management
 ```mermaid
 graph TB
     subgraph Actors
-        Owner((Owner / Landlord))
-        Tenant((Tenant))
-        MaintStaff((Maintenance Staff))
+        Owner((Owner / Operator))
+        Customer((Customer / Renter))
+        Staff((Staff))
         Admin((Admin))
     end
 
@@ -20,31 +20,31 @@ graph TB
         PG[Payment Providers<br>Stripe / PayPal / Bank Transfer]
         Email[Email Service<br>SendGrid / SES]
         SMS[SMS Provider<br>Twilio / SNS]
-        Push[Push Notification<br>FCM / APNs]
+        Push[Push Notifications<br>FCM / APNs]
         ESign[E-Signature Provider<br>DocuSign / Adobe Sign]
         Storage[Object Storage<br>S3 / GCS]
-        BgCheck[Background Check<br>TransUnion / Experian]
         Maps[Maps Provider<br>Google Maps / OSM]
-        Accounting[Accounting Export<br>QuickBooks / CSV]
+        ID[Identity Verification<br>Onfido / Jumio]
+        Accounting[Accounting Export<br>QuickBooks / Xero / CSV]
     end
 
-    subgraph "House Rental Management Platform"
-        Platform[REST API + Web App]
+    subgraph "Rental Management Platform"
+        Platform[REST API + Web & Mobile App]
     end
 
-    Owner -->|manage properties, leases, rent, bills, maintenance| Platform
-    Tenant -->|browse, apply, sign lease, pay rent, maintenance| Platform
-    MaintStaff -->|view tasks, update status, log costs| Platform
+    Owner -->|manage assets, bookings, agreements, payments, maintenance| Platform
+    Customer -->|search, book, sign, pay, return, review| Platform
+    Staff -->|assess assets, update maintenance tasks| Platform
     Admin -->|verify users, resolve disputes, configure platform| Platform
 
     Platform -->|process payments and refunds| PG
     Platform -->|transactional emails| Email
     Platform -->|SMS reminders and OTPs| SMS
-    Platform -->|push notifications| Push
-    Platform -->|send and receive signed documents| ESign
-    Platform -->|store documents, photos, reports| Storage
-    Platform -->|tenant background and credit checks| BgCheck
-    Platform -->|property geolocation and maps| Maps
+    Platform -->|push and WebSocket notifications| Push
+    Platform -->|send and retrieve signed documents| ESign
+    Platform -->|store assets photos, agreements, assessments, reports| Storage
+    Platform -->|asset geolocation and pickup/return maps| Maps
+    Platform -->|customer identity verification| ID
     Platform -->|export financial data| Accounting
 ```
 
@@ -56,9 +56,9 @@ graph TB
 graph LR
     subgraph Clients
         OwnerWeb[Owner Web Portal]
-        TenantWeb[Tenant Web App]
-        TenantMobile[Tenant Mobile App]
-        MaintApp[Maintenance Staff App]
+        CustomerWeb[Customer Web App]
+        CustomerMobile[Customer Mobile App]
+        StaffApp[Staff Mobile App]
         AdminUI[Admin Dashboard]
     end
 
@@ -70,7 +70,7 @@ graph LR
     subgraph Payments
         Stripe[Stripe]
         PayPal[PayPal]
-        BankTransfer[Bank Transfer / ACH]
+        Bank[Bank Transfer / ACH]
     end
 
     subgraph Messaging
@@ -81,26 +81,26 @@ graph LR
 
     subgraph Operations
         ESign[E-Signature API]
-        BgCheck[Background Check API]
+        ID[Identity Verification API]
         Maps[Maps API]
         Storage[Object Storage]
     end
 
     OwnerWeb --> API
-    TenantWeb --> API
-    TenantMobile --> API
-    MaintApp --> API
+    CustomerWeb --> API
+    CustomerMobile --> API
+    StaffApp --> API
     AdminUI --> API
 
     API --> WS
     API --> Stripe
     API --> PayPal
-    API --> BankTransfer
+    API --> Bank
     API --> Email
     API --> SMS
     API --> Push
     API --> ESign
-    API --> BgCheck
+    API --> ID
     API --> Maps
     API --> Storage
 ```
@@ -137,7 +137,7 @@ graph TB
         PG[Payment Providers]
         Notify[Email / SMS / Push]
         ESign[E-Signature Provider]
-        BgCheck[Background Check]
+        ID[Identity Verification]
     end
 
     Internet --> CDN
@@ -152,7 +152,7 @@ graph TB
     API -- TLS --> PG
     API -- TLS --> Notify
     API -- TLS --> ESign
-    API -- TLS --> BgCheck
+    API -- TLS --> ID
 ```
 
 ---
@@ -161,12 +161,12 @@ graph TB
 
 | System | Purpose | Priority |
 |--------|---------|----------|
-| Payment providers | Rent and bill payment processing, refunds | Core |
-| Email provider | Transactional emails, lease documents | Core |
-| SMS gateway | Rent reminders, OTP, emergency maintenance alerts | Core |
-| E-signature provider | Digital lease signing | Core |
-| Object storage | Property photos, lease PDFs, bill scans, report exports | Core |
-| Push notifications | Real-time in-app alerts for tenants and owners | Core |
-| Background check API | Tenant credit and rental history screening | Optional |
-| Maps provider | Property geolocation, address autocomplete | Optional |
-| Accounting export | Financial data export for external accounting tools | Optional |
+| Payment providers | Booking payment, deposit hold, refunds, additional charges | Core |
+| Email provider | Transactional emails, agreement documents | Core |
+| SMS gateway | Booking reminders, OTP, overdue alerts | Core |
+| E-signature provider | Digital rental agreement signing | Core |
+| Object storage | Asset photos, signed PDFs, assessment reports, exports | Core |
+| Push notifications | Real-time in-app alerts for all actors | Core |
+| Identity verification | Customer ID check (driving licence, passport) | High |
+| Maps provider | Asset geolocation, pickup/return location display | Optional |
+| Accounting export | Financial data export to accounting tools | Optional |

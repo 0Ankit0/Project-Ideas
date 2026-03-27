@@ -1,6 +1,6 @@
-# House Rental Management System Design Documentation
+# Rental Management System Design Documentation
 
-> Comprehensive system design documentation for a full-fledged house rental management platform where property owners manage all leases, rents, utility bills, and maintenance for their properties.
+> Comprehensive system design documentation for a full-fledged, asset-agnostic rental management platform. The system supports any class of rentable asset — flats, cars, cameras, construction gear, boats, event equipment, and more — enabling owners and rental operators to manage assets, bookings, agreements, payments, maintenance, and damage assessments from a single platform.
 
 ## Documentation Structure
 
@@ -16,20 +16,32 @@
 ## System Overview
 
 ### Actors
-- **Owner/Landlord** - List properties, manage tenants, leases, rents, bills, and maintenance
-- **Tenant** - Browse listings, apply for lease, pay rent, submit maintenance requests
-- **Maintenance Staff** - Receive and resolve maintenance requests, log work done
-- **Admin** - Platform oversight, user management, analytics, dispute resolution
+- **Owner / Operator** — Lists and manages assets, reviews bookings, sets pricing, handles agreements, tracks payments, oversees maintenance
+- **Customer / Renter** — Searches assets, makes bookings, signs rental agreements, pays invoices, reports damage
+- **Staff** — Handles asset preparation, condition assessments, maintenance, and returns
+- **Admin** — Platform oversight, user verification, dispute resolution, configuration
+
+### Supported Asset Types (non-exhaustive)
+| Asset Class | Examples |
+|-------------|----------|
+| Real estate | Flats, houses, offices, storage units |
+| Vehicles | Cars, motorcycles, vans, trucks, boats |
+| Equipment | Cameras, drones, audio gear, tools |
+| Construction | Scaffolding, excavators, compressors |
+| Events | Tables, chairs, AV equipment, tents |
+| Sports | Bicycles, surfboards, skiing gear |
 
 ### Key Features
-- Property listing and management
-- Tenant onboarding and lease management
-- Rent collection, reminders, and payment tracking
-- Utility and bill management per unit
-- Maintenance request lifecycle management
+- Multi-category asset listing and availability management
+- Flexible pricing engine (hourly, daily, weekly, monthly; peak pricing; discounts)
+- Booking and reservation management with availability calendar
+- Digital rental agreement creation and e-signature
+- Security deposit collection, hold, and release
+- Pre- and post-rental condition assessment with photo evidence
+- Invoice generation, online payment collection, and late/damage fee handling
+- Maintenance and servicing lifecycle for assets
 - Financial reporting and analytics for owners
-- Document storage (lease agreements, inspection reports)
-- Notifications (email / SMS / in-app)
+- Real-time notifications (email / SMS / in-app)
 
 ## Diagram Generation
 
@@ -58,7 +70,7 @@ Phases
 │  • Use Case Descriptions                                        │
 │  • System Context Diagram (system boundaries)                   │
 │  • Flowchart / Activity Diagram (business process)              │
-│  • BPMN / Swimlane Diagram (cross-department workflows)         │
+│  • BPMN / Swimlane Diagram (cross-actor workflows)              │
 └───────────────────────────┬─────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────────┐
