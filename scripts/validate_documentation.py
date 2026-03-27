@@ -9,40 +9,94 @@ from typing import Dict, List
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+README_MUST_INCLUDE = [
+    "Documentation Structure",
+    "Key Features",
+    "Getting Started",
+    "Documentation Status",
+]
+
+SINGULAR_TEMPLATE = {
+    "requirements": ["requirements-document.md", "user-stories.md"],
+    "analysis": [
+        "use-case-diagram.md",
+        "use-case-descriptions.md",
+        "system-context-diagram.md",
+        "activity-diagram.md",
+        "bpmn-swimlane-diagram.md",
+        "data-dictionary.md",
+        "business-rules.md",
+        "event-catalog.md",
+    ],
+    "high-level-design": [
+        "system-sequence-diagram.md",
+        "domain-model.md",
+        "data-flow-diagram.md",
+        "architecture-diagram.md",
+        "c4-context-container.md",
+    ],
+    "detailed-design": [
+        "class-diagram.md",
+        "sequence-diagram.md",
+        "state-machine-diagram.md",
+        "erd-database-schema.md",
+        "component-diagram.md",
+        "api-design.md",
+        "c4-component.md",
+    ],
+    "infrastructure": [
+        "deployment-diagram.md",
+        "network-infrastructure.md",
+        "cloud-architecture.md",
+    ],
+    "implementation": [
+        "code-guidelines.md",
+        "c4-code-diagram.md",
+        "implementation-playbook.md",
+    ],
+}
+
+PLURAL_TEMPLATE = {
+    "requirements": ["requirements.md", "user-stories.md"],
+    "analysis": [
+        "use-case-diagram.md",
+        "use-case-descriptions.md",
+        "system-context-diagram.md",
+        "activity-diagrams.md",
+        "swimlane-diagrams.md",
+    ],
+    "high-level-design": [
+        "system-sequence-diagrams.md",
+        "domain-model.md",
+        "data-flow-diagrams.md",
+        "architecture-diagram.md",
+        "c4-diagrams.md",
+    ],
+    "detailed-design": [
+        "class-diagrams.md",
+        "sequence-diagrams.md",
+        "state-machine-diagrams.md",
+        "erd-database-schema.md",
+        "component-diagrams.md",
+        "api-design.md",
+        "c4-component-diagram.md",
+    ],
+    "infrastructure": [
+        "deployment-diagram.md",
+        "network-infrastructure.md",
+        "cloud-architecture.md",
+    ],
+    "implementation": [
+        "implementation-guidelines.md",
+        "c4-code-diagram.md",
+        "backend-status-matrix.md",
+    ],
+}
+
 PROJECTS: Dict[str, Dict[str, List[str]]] = {
+    # Singular-family projects
     "Anomaly Detection System": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
+        **SINGULAR_TEMPLATE,
         "edge-cases": [
             "README.md",
             "data-ingestion.md",
@@ -54,41 +108,9 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "security-and-compliance.md",
             "operations.md",
         ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
     },
     "Backend as a Service Platform": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
+        **SINGULAR_TEMPLATE,
         "edge-cases": [
             "README.md",
             "provider-selection-and-provisioning.md",
@@ -101,41 +123,9 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "security-and-compliance.md",
             "operations.md",
         ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
     },
     "Document Intelligence System": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
+        **SINGULAR_TEMPLATE,
         "edge-cases": [
             "README.md",
             "document-ingestion.md",
@@ -147,132 +137,35 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "security-and-compliance.md",
             "operations.md",
         ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
     },
-    "E-Commerce": {
-        "requirements": ["requirements.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagrams.md",
-            "swimlane-diagrams.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagrams.md",
-            "domain-model.md",
-            "data-flow-diagrams.md",
-            "architecture-diagram.md",
-            "c4-diagrams.md",
-        ],
-        "detailed-design": [
-            "class-diagrams.md",
-            "state-machine-diagrams.md",
-            "erd-database-schema.md",
-            "component-diagrams.md",
-            "api-design.md",
-            "c4-component-diagram.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
+    "Healthcare Appointment System": {
+        **SINGULAR_TEMPLATE,
         "edge-cases": [
             "README.md",
-            "inventory.md",
-            "orders.md",
-            "payments.md",
-            "shipping.md",
-            "returns.md",
-            "pricing.md",
+            "slot-availability.md",
+            "booking-and-payments.md",
+            "cancellations-and-refunds.md",
+            "notifications.md",
             "api-and-ui.md",
             "security-and-compliance.md",
             "operations.md",
         ],
-        "implementation": ["implementation-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
     },
-    "Ticketing and Project Management System": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
+    "Learning Management System": {
+        **SINGULAR_TEMPLATE,
         "edge-cases": [
             "README.md",
-            "ticket-intake-and-attachments.md",
-            "assignment-and-sla.md",
-            "project-planning-and-milestones.md",
-            "change-management-and-replanning.md",
+            "content-ingestion.md",
+            "assessment-and-grading.md",
+            "progress-tracking.md",
+            "notifications.md",
             "api-and-ui.md",
             "security-and-compliance.md",
             "operations.md",
         ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
     },
     "Library Management System": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
+        **SINGULAR_TEMPLATE,
         "edge-cases": [
             "README.md",
             "catalog-and-metadata.md",
@@ -284,41 +177,22 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "security-and-compliance.md",
             "operations.md",
         ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
+    },
+    "Logistics Tracking System": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "shipment-ingestion.md",
+            "route-and-handoffs.md",
+            "tracking-and-telemetry.md",
+            "delivery-exceptions.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
     },
     "Restaurant Management System": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
+        **SINGULAR_TEMPLATE,
         "edge-cases": [
             "README.md",
             "table-service-and-ordering.md",
@@ -330,41 +204,9 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "security-and-compliance.md",
             "operations.md",
         ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
     },
     "Slot Booking System": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
+        **SINGULAR_TEMPLATE,
         "edge-cases": [
             "README.md",
             "slot-availability.md",
@@ -375,176 +217,9 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "security-and-compliance.md",
             "operations.md",
         ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
-    },
-    "Healthcare Appointment System": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
-        "edge-cases": [
-            "README.md",
-            "slot-availability.md",
-            "booking-and-payments.md",
-            "cancellations-and-refunds.md",
-            "notifications.md",
-            "api-and-ui.md",
-            "security-and-compliance.md",
-            "operations.md",
-        ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
-    },
-    "Logistics Tracking System": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
-        "edge-cases": [
-            "README.md",
-            "shipment-ingestion.md",
-            "route-and-handoffs.md",
-            "tracking-and-telemetry.md",
-            "delivery-exceptions.md",
-            "api-and-ui.md",
-            "security-and-compliance.md",
-            "operations.md",
-        ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
-    },
-    "Learning Management System": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
-        "edge-cases": [
-            "README.md",
-            "content-ingestion.md",
-            "assessment-and-grading.md",
-            "progress-tracking.md",
-            "notifications.md",
-            "api-and-ui.md",
-            "security-and-compliance.md",
-            "operations.md",
-        ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
     },
     "Smart Recommendation Engine": {
-        "requirements": ["requirements-document.md", "user-stories.md"],
-        "analysis": [
-            "use-case-diagram.md",
-            "use-case-descriptions.md",
-            "system-context-diagram.md",
-            "activity-diagram.md",
-            "bpmn-swimlane-diagram.md",
-            "data-dictionary.md",
-            "business-rules.md",
-            "event-catalog.md",
-        ],
-        "high-level-design": [
-            "system-sequence-diagram.md",
-            "domain-model.md",
-            "data-flow-diagram.md",
-            "architecture-diagram.md",
-            "c4-context-container.md",
-        ],
-        "detailed-design": [
-            "class-diagram.md",
-            "sequence-diagram.md",
-            "state-machine-diagram.md",
-            "erd-database-schema.md",
-            "component-diagram.md",
-            "api-design.md",
-            "c4-component.md",
-        ],
-        "infrastructure": [
-            "deployment-diagram.md",
-            "network-infrastructure.md",
-            "cloud-architecture.md",
-        ],
+        **SINGULAR_TEMPLATE,
         "edge-cases": [
             "README.md",
             "data-ingestion.md",
@@ -555,23 +230,117 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "security-and-compliance.md",
             "operations.md",
         ],
-        "implementation": ["code-guidelines.md", "c4-code-diagram.md", "implementation-playbook.md"],
+    },
+    "Ticketing and Project Management System": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "ticket-intake-and-attachments.md",
+            "assignment-and-sla.md",
+            "project-planning-and-milestones.md",
+            "change-management-and-replanning.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    # Plural-family projects
+    "E-Commerce": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "recommendation-engine.md",
+        ],
+    },
+    "Content Management System": {
+        **PLURAL_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "content-ingestion-and-versioning.md",
+            "workflow-and-approvals.md",
+            "publishing-and-rollbacks.md",
+            "media-and-asset-processing.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Employee Management System": {
+        **PLURAL_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "onboarding-and-offboarding.md",
+            "attendance-and-leave.md",
+            "payroll-and-benefits.md",
+            "performance-and-review-cycles.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Finance-Management": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "compliance-framework.md",
+        ],
+        "implementation": [
+            "implementation-guidelines.md",
+            "c4-code-diagram.md",
+            "backend-status-matrix.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "ledger-consistency-and-close.md",
+            "reconciliation-and-settlement.md",
+            "budgeting-and-forecast-variance.md",
+            "tax-and-jurisdiction-rules.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Rental Management System": {
+        **PLURAL_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "inventory-availability-conflicts.md",
+            "booking-extensions-and-partial-returns.md",
+            "damage-claims-and-deposit-adjustments.md",
+            "offline-checkin-checkout-sync-conflicts.md",
+            "payment-reconciliation-across-channels.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Student Information System": {
+        **PLURAL_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "enrollment-and-seat-allocation.md",
+            "grades-and-transcript-corrections.md",
+            "attendance-and-term-policies.md",
+            "fee-assessment-and-waivers.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Resource Lifecycle Management Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "lifecycle-orchestration.md",
+        ],
     },
 }
-
-README_MUST_INCLUDE = [
-    "Documentation Structure",
-    "Key Features",
-    "Getting Started",
-    "Documentation Status",
-]
 
 
 @dataclass
 class ValidationError:
     project: str
     issue: str
-
 
 
 def validate() -> List[ValidationError]:
@@ -610,18 +379,13 @@ def validate() -> List[ValidationError]:
                 file_path = folder_path / filename
                 if not file_path.exists():
                     errors.append(
-                        ValidationError(
-                            project_name, f"Missing file: {folder}/{filename}"
-                        )
+                        ValidationError(project_name, f"Missing file: {folder}/{filename}")
                     )
                     continue
 
                 if file_path.stat().st_size == 0:
                     errors.append(
-                        ValidationError(
-                            project_name,
-                            f"Empty file: {folder}/{filename}",
-                        )
+                        ValidationError(project_name, f"Empty file: {folder}/{filename}")
                     )
 
     return errors

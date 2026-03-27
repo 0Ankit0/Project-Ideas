@@ -1,34 +1,42 @@
 # Project Ideas – System Design Documentation Suite
 
-This repository contains **twelve production-grade project blueprints** with end-to-end documentation across requirements, analysis, architecture, detailed design, infrastructure, edge cases, and implementation guidance.
+This repository contains production-grade project blueprints with end-to-end documentation across requirements, analysis, architecture, detailed design, infrastructure, edge cases, and implementation guidance.
 
 ## Included Projects
 
 - Anomaly Detection System
+- Backend as a Service Platform
+- Content Management System
 - Document Intelligence System
 - E-Commerce Platform
-- Slot Booking System
-- Smart Recommendation Engine
+- Employee Management System
+- Finance Management Platform
 - Healthcare Appointment System
-- Logistics Tracking System
 - Learning Management System
 - Library Management System
+- Logistics Tracking System
+- Rental Management System
+- Resource Lifecycle Management Platform
 - Restaurant Management System
+- Slot Booking System
+- Smart Recommendation Engine
+- Student Information System
 - Ticketing and Project Management System
-- Backend as a Service Platform
 
 ## Documentation Completeness Guarantee
 
-To make the repository robust and reduce the risk of missing documentation, this repo now includes:
+To make the repository robust and reduce the risk of missing documentation, this repo includes:
 
 1. A **cross-project quality standard** (`docs/documentation-quality-assurance.md`)
 2. An **automated validator** (`scripts/validate_documentation.py`) that checks:
-   - every project folder exists
-   - every phase folder exists
-   - required files exist and are non-empty
+   - every configured project folder exists
+   - required phase folders/files exist
+   - required files are non-empty
    - each project README includes mandatory orientation sections
 
-3. A per-project **implementation playbook** (`implementation/implementation-playbook.md`) with immediate build, test, release, and go-live checklists
+3. Implementation guidance artifacts by project style:
+   - singular-template projects: `implementation-playbook.md`
+   - generalized/plural-template projects: `implementation-guidelines.md` (+ `backend-status-matrix.md`)
 
 ## Common Documentation Phases (per project)
 
@@ -37,8 +45,8 @@ To make the repository robust and reduce the risk of missing documentation, this
 - `high-level-design/`
 - `detailed-design/`
 - `infrastructure/`
-- `edge-cases/`
 - `implementation/`
+- `edge-cases/` (for operationalized project variants)
 
 ## How to Validate Everything
 
@@ -48,7 +56,7 @@ Run:
 python3 scripts/validate_documentation.py
 ```
 
-Successful output means the current projects satisfy the baseline completeness and robustness checks.
+Successful output means configured projects satisfy baseline completeness and quality gates.
 
 ## Suggested Usage Path
 
@@ -56,5 +64,5 @@ Successful output means the current projects satisfy the baseline completeness a
 2. Review `requirements/`
 3. Read `high-level-design/` for architecture context
 4. Use `detailed-design/` and `implementation/` for build planning
-5. Confirm edge case coverage in `edge-cases/`
+5. Confirm edge-case coverage where available
 6. Review deployment readiness in `infrastructure/`
