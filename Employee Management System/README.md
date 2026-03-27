@@ -97,3 +97,14 @@ Phases
 │  • Code                                                         │
 │  • C4 Code Diagram (optional, class-level)                      │
 └─────────────────────────────────────────────────────────────────┘
+
+## Getting Started
+
+1. Start with `requirements/` to align scope and priorities.
+2. Review `analysis/` and `high-level-design/` for behavior and architecture context.
+3. Use `detailed-design/` + `implementation/` to plan build and rollout.
+
+## Documentation Status
+
+- ✅ Core documentation set is available.
+- ⏳ Keep this project aligned with repository QA standards as files evolve.

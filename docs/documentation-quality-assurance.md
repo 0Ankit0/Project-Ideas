@@ -12,9 +12,18 @@ Each project must include:
 - `high-level-design/`
 - `detailed-design/`
 - `infrastructure/`
-- `edge-cases/`
 - `implementation/`
-  - must include `implementation-playbook.md` for executable delivery guidance
+
+Projects should also include `edge-cases/` unless they are explicitly marked as a reusable baseline template.
+
+### Implementation file policy
+
+Each project must include:
+- `implementation/c4-code-diagram.md`
+- one delivery guide file: `implementation-playbook.md` **or** `implementation-guidelines.md`
+
+Projects using the generalized/E-Commerce style should also include:
+- `implementation/backend-status-matrix.md`
 
 ## 2) Required README Sections
 
@@ -33,8 +42,8 @@ For all required documentation files:
 
 - File exists
 - File is non-empty
-- Topic coverage is phase-appropriate (requirements, design, infra, edge-cases, implementation)
-- Implementation docs must include deployable steps, testing gates, and go-live checklists
+- Topic coverage is phase-appropriate (requirements, design, infra, implementation)
+- Where present, edge-case docs include failure mode, detection, and recovery content
 
 ## 4) Repository-level Validation Mechanism
 
@@ -56,17 +65,23 @@ Validator checks include:
 | Project | Coverage Status |
 |---|---|
 | Anomaly Detection System | Covered by validator |
+| Backend as a Service Platform | Covered by validator |
+| Content Management System | Covered by validator |
 | Document Intelligence System | Covered by validator |
 | E-Commerce | Covered by validator |
-| Slot Booking System | Covered by validator |
-| Smart Recommendation Engine | Covered by validator |
+| Employee Management System | Covered by validator |
+| Finance-Management | Covered by validator |
 | Healthcare Appointment System | Covered by validator |
-| Logistics Tracking System | Covered by validator |
 | Learning Management System | Covered by validator |
 | Library Management System | Covered by validator |
+| Logistics Tracking System | Covered by validator |
+| Rental Management System | Covered by validator |
+| Resource Lifecycle Management Platform | Covered by validator |
 | Restaurant Management System | Covered by validator |
+| Slot Booking System | Covered by validator |
+| Smart Recommendation Engine | Covered by validator |
+| Student Information System | Covered by validator |
 | Ticketing and Project Management System | Covered by validator |
-| Backend as a Service Platform | Covered by validator |
 
 ## 6) Change Management Rules
 
