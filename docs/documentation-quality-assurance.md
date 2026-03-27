@@ -67,6 +67,14 @@ Validator checks include:
 | Anomaly Detection System | Covered by validator |
 | Backend as a Service Platform | Covered by validator |
 | Content Management System | Covered by validator |
+| Messaging and Notification Platform | Covered by validator |
+| Identity and Access Management Platform | Covered by validator |
+| Customer Support and Contact Center Platform | Covered by validator |
+| Hospital Information System | Covered by validator |
+| Warehouse Management System | Covered by validator |
+| Payment Orchestration and Wallet Platform | Covered by validator |
+| Subscription Billing and Entitlements Platform | Covered by validator |
+| Customer Relationship Management Platform | Covered by validator |
 | Document Intelligence System | Covered by validator |
 | E-Commerce | Covered by validator |
 | Employee Management System | Covered by validator |
