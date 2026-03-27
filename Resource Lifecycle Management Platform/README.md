@@ -12,6 +12,7 @@ A generalized, multi-sector blueprint for systems that manage reservable or assi
 | 4 | [detailed-design](./detailed-design/) | API, ERD, state machines, components |
 | 5 | [infrastructure](./infrastructure/) | Deployment, network, cloud baseline |
 | 6 | [implementation](./implementation/) | Delivery guidance and engineering status |
+| 7 | [edge-cases](./edge-cases/) | Failure scenarios, detection signals, and recovery/mitigation runbooks |
 
 ## Key Features
 
@@ -23,13 +24,13 @@ A generalized, multi-sector blueprint for systems that manage reservable or assi
 
 ## Getting Started
 
-1. Read `requirements/requirements.md` for baseline scope.
-2. Confirm lifecycle states in `detailed-design/state-machine-diagrams.md`.
-3. Review APIs and events in `detailed-design/api-design.md`.
-4. Align platform rollout with `implementation/implementation-guidelines.md`.
+1. Start with `requirements/` to align scope and priorities.
+2. Review `analysis/` and `high-level-design/` for behavior and architecture context.
+3. Review `edge-cases/` before implementation to align failure handling and operational guardrails.
+4. Use `detailed-design/` + `implementation/` to plan build and rollout.
 
 ## Documentation Status
 
-- ✅ Baseline generalized blueprint created.
-- ✅ Sector specialization notes included across phases.
-- ⏳ Extend with sector-specific edge-case packs when instantiated for a concrete vertical.
+- ✅ Core documentation set is available across all seven phases.
+- ✅ Analysis coverage includes activity flow, swimlane/BPMN, data dictionary, business rules, and event catalog.
+- ✅ Edge-case pack includes operational, security/compliance, interface-surface, and domain scenario coverage.

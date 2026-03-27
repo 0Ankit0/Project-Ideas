@@ -14,7 +14,7 @@ Each project must include:
 - `infrastructure/`
 - `implementation/`
 
-Projects should also include `edge-cases/` unless they are explicitly marked as a reusable baseline template.
+Every project must include `edge-cases/` with a complete edge-case pack.
 
 ### Implementation file policy
 
@@ -43,7 +43,22 @@ For all required documentation files:
 - File exists
 - File is non-empty
 - Topic coverage is phase-appropriate (requirements, design, infra, implementation)
-- Where present, edge-case docs include failure mode, detection, and recovery content
+
+For all projects, `analysis/` must cover:
+- activity flow (`activity-diagram.md` or `activity-diagrams.md`)
+- swimlane/BPMN (`bpmn-swimlane-diagram.md` or `swimlane-diagrams.md`)
+- `data-dictionary.md`
+- `business-rules.md`
+- `event-catalog.md`
+
+For all projects, `edge-cases/` must include:
+- `README.md`
+- `security-and-compliance.md`
+- `operations.md`
+- one interface surface doc (`api-and-ui.md` or `api-and-sdk.md`)
+- at least four domain-specific scenario docs
+
+Every edge-case scenario doc should explicitly cover failure mode, impact, detection, and recovery/mitigation
 
 ## 4) Repository-level Validation Mechanism
 

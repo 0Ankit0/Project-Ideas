@@ -46,7 +46,7 @@ To make the repository robust and reduce the risk of missing documentation, this
 - `detailed-design/`
 - `infrastructure/`
 - `implementation/`
-- `edge-cases/` (for operationalized project variants)
+- `edge-cases/`
 
 ## How to Validate Everything
 
@@ -64,5 +64,5 @@ Successful output means configured projects satisfy baseline completeness and qu
 2. Review `requirements/`
 3. Read `high-level-design/` for architecture context
 4. Use `detailed-design/` and `implementation/` for build planning
-5. Confirm edge-case coverage where available
+5. Review `edge-cases/` for failure-mode handling and operational safeguards
 6. Review deployment readiness in `infrastructure/`
