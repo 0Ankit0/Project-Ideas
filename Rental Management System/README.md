@@ -55,57 +55,45 @@ All diagrams are written in Mermaid code. To generate images:
    mmdc -i input.md -o output.png
    ```
 
-Phases
-┌─────────────────────────────────────────────────────────────────┐
-│                     1. REQUIREMENTS PHASE                       │
-├─────────────────────────────────────────────────────────────────┤
-│  • Requirements Document                                        │
-│  • User Stories                                                 │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                     2. ANALYSIS PHASE                           │
-├─────────────────────────────────────────────────────────────────┤
-│  • Use Case Diagram (what users can do)                         │
-│  • Use Case Descriptions                                        │
-│  • System Context Diagram (system boundaries)                   │
-│  • Flowchart / Activity Diagram (business process)              │
-│  • BPMN / Swimlane Diagram (cross-actor workflows)              │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                  3. HIGH-LEVEL DESIGN PHASE                     │
-├─────────────────────────────────────────────────────────────────┤
-│  • System Sequence Diagram (black-box interactions)             │
-│  • Domain Model (key entities & relationships)                  │
-│  • Data Flow Diagram (how data moves)                           │
-│  • High-Level Architecture Diagram (major components)           │
-│  • C4 Context & Container Diagram                               │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                  4. DETAILED DESIGN PHASE                       │
-├─────────────────────────────────────────────────────────────────┤
-│  • Class Diagram (detailed classes, methods, attributes)        │
-│  • Sequence Diagram (internal object interactions)              │
-│  • State Machine Diagram (object state transitions)             │
-│  • ERD / Database Schema (tables, relationships)                │
-│  • Component Diagram (software modules)                         │
-│  • API Design / Integration Diagram                             │
-│  • C4 Component Diagram                                         │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                  5. INFRASTRUCTURE PHASE                        │
-├─────────────────────────────────────────────────────────────────┤
-│  • Deployment Diagram (software to hardware mapping)            │
-│  • Network / Infrastructure Diagram                             │
-│  • Cloud Architecture Diagram (AWS/GCP/Azure)                   │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                     6. IMPLEMENTATION                           │
-├─────────────────────────────────────────────────────────────────┤
-│  • Implementation Guidelines                                    │
-│  • C4 Code Diagram (optional, class-level)                      │
-└─────────────────────────────────────────────────────────────────┘
+## Phase Workflow
+
+```mermaid
+flowchart TD
+    R["**1. Requirements**
+    • Requirements Document
+    • User Stories"]
+
+    A["**2. Analysis**
+    • Use Case Diagram
+    • Use Case Descriptions
+    • System Context Diagram
+    • Activity Diagrams
+    • Swimlane Diagrams"]
+
+    H["**3. High-Level Design**
+    • System Sequence Diagrams
+    • Domain Model
+    • Data Flow Diagrams
+    • Architecture Diagram
+    • C4 Context & Container"]
+
+    D["**4. Detailed Design**
+    • Class Diagrams
+    • Sequence Diagrams
+    • State Machine Diagrams
+    • ERD / Database Schema
+    • Component Diagrams
+    • API Design
+    • C4 Component Diagram"]
+
+    I["**5. Infrastructure**
+    • Deployment Diagram
+    • Network Infrastructure
+    • Cloud Architecture"]
+
+    M["**6. Implementation**
+    • Implementation Guidelines
+    • C4 Code Diagram"]
+
+    R --> A --> H --> D --> I --> M
+```

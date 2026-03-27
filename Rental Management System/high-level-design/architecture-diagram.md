@@ -1,7 +1,7 @@
 # High-Level Architecture Diagram
 
 ## Overview
-The house rental management platform is designed as a modular API application. Each domain module (assets, bookings, agreements, payments, maintenance) is independently testable and can be extracted to a separate service if scale demands it.
+The rental management platform is designed as a modular API application. Each domain module (assets, bookings, agreements, payments, maintenance) is independently testable and can be extracted to a separate service if scale demands it.
 
 ---
 
