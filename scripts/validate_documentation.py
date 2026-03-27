@@ -64,6 +64,9 @@ PLURAL_TEMPLATE = {
         "system-context-diagram.md",
         "activity-diagrams.md",
         "swimlane-diagrams.md",
+        "data-dictionary.md",
+        "business-rules.md",
+        "event-catalog.md",
     ],
     "high-level-design": [
         "system-sequence-diagrams.md",
@@ -251,6 +254,16 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             *PLURAL_TEMPLATE["detailed-design"],
             "recommendation-engine.md",
         ],
+        "edge-cases": [
+            "README.md",
+            "cart-checkout-and-payment-failures.md",
+            "inventory-allocation-and-oversell.md",
+            "shipping-and-delivery-exceptions.md",
+            "returns-refunds-and-vendor-reconciliation.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
     },
     "Content Management System": {
         **PLURAL_TEMPLATE,
@@ -332,6 +345,16 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
         "detailed-design": [
             *PLURAL_TEMPLATE["detailed-design"],
             "lifecycle-orchestration.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "reservation-and-allocation-conflicts.md",
+            "checkout-checkin-and-condition-disputes.md",
+            "lifecycle-state-sync-and-overdue-recovery.md",
+            "settlement-and-incident-resolution.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
         ],
     },
 }

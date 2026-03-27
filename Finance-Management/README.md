@@ -12,6 +12,7 @@
 | 4 | [detailed-design](./detailed-design/) | Class, sequence, state diagrams, ERD, API design, compliance |
 | 5 | [infrastructure](./infrastructure/) | Deployment, network, cloud architecture |
 | 6 | [implementation](./implementation/) | Implementation guidelines, C4 code diagram, backend status matrix |
+| 7 | [edge-cases](./edge-cases/) | Failure scenarios, detection signals, and recovery/mitigation runbooks |
 
 ## System Overview
 
@@ -108,9 +109,11 @@ Phases
 
 1. Start with `requirements/` to align scope and priorities.
 2. Review `analysis/` and `high-level-design/` for behavior and architecture context.
-3. Use `detailed-design/` + `implementation/` to plan build and rollout.
+3. Review `edge-cases/` before implementation to align failure handling and operational guardrails.
+4. Use `detailed-design/` + `implementation/` to plan build and rollout.
 
 ## Documentation Status
 
-- ✅ Core documentation set is available.
-- ⏳ Keep this project aligned with repository QA standards as files evolve.
+- ✅ Core documentation set is available across all seven phases.
+- ✅ Analysis coverage includes activity flow, swimlane/BPMN, data dictionary, business rules, and event catalog.
+- ✅ Edge-case pack includes operational, security/compliance, interface-surface, and domain scenario coverage.
