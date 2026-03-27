@@ -340,6 +340,143 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "operations.md",
         ],
     },
+
+    "Customer Relationship Management Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "lead-scoring-and-deduplication.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "dedupe-merge-conflicts.md",
+            "territory-reassignment.md",
+            "forecast-integrity.md",
+            "email-calendar-sync.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Subscription Billing and Entitlements Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "usage-metering-and-entitlements.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "proration.md",
+            "dunning-retries.md",
+            "credit-notes.md",
+            "tax-jurisdiction-rules.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Payment Orchestration and Wallet Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "ledger-and-settlement.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "idempotency-double-charge-protection.md",
+            "refunds-chargebacks.md",
+            "kyc-onboarding.md",
+            "payout-reconciliation.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Warehouse Management System": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "inventory-allocation-and-wave-planning.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "bin-conflicts.md",
+            "partial-picks-backorders.md",
+            "cycle-count-adjustments.md",
+            "offline-scanner-sync.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Hospital Information System": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "clinical-records-and-care-workflows.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "patient-identity-merge.md",
+            "clinical-order-correction.md",
+            "consent-sensitive-data-access.md",
+            "downtime-mode.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Customer Support and Contact Center Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "routing-and-workforce-management.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "thread-deduplication.md",
+            "sla-escalation.md",
+            "bot-human-handoff.md",
+            "retention-redaction.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Identity and Access Management Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "policy-engine-and-federation.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "token-revocation.md",
+            "federation-scim-drift.md",
+            "entitlement-conflicts.md",
+            "break-glass-recovery.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Messaging and Notification Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "delivery-orchestration-and-template-system.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "provider-failover.md",
+            "opt-out-compliance.md",
+            "rate-limiting.md",
+            "delayed-deduplicated-delivery.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
     "Resource Lifecycle Management Platform": {
         **PLURAL_TEMPLATE,
         "detailed-design": [

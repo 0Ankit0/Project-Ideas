@@ -7,6 +7,14 @@ This repository contains production-grade project blueprints with end-to-end doc
 - Anomaly Detection System
 - Backend as a Service Platform
 - Content Management System
+- Customer Relationship Management Platform
+- Subscription Billing and Entitlements Platform
+- Payment Orchestration and Wallet Platform
+- Warehouse Management System
+- Hospital Information System
+- Customer Support and Contact Center Platform
+- Identity and Access Management Platform
+- Messaging and Notification Platform
 - Document Intelligence System
 - E-Commerce Platform
 - Employee Management System
