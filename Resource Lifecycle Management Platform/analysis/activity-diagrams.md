@@ -1,15 +1,23 @@
 # Activity Diagrams
 
-## Lifecycle Activity
-1. Search resource and availability.
-2. Place hold and validate policy constraints.
-3. Confirm reservation and generate fulfillment plan.
-4. Execute fulfillment and track in-use status.
-5. Process return/closure evidence.
-6. Compute settlement and post ledger entries.
-7. Close lifecycle or route to dispute handling.
+## Provisioning Flow
+```mermaid
+flowchart TD
+  A[Request submitted] --> B[Policy validation]
+  B --> C{Approval required?}
+  C -- Yes --> D[Approval workflow]
+  C -- No --> E[Create provisioning job]
+  D --> E
+  E --> F[Provision in target environment]
+  F --> G[Register resource in CMDB]
+```
 
-## Decision Points
-- Conflict detected during hold confirmation.
-- Cancellation window and fee policy checks.
-- Damage/incident threshold crossing for manual review.
+## Decommission Flow
+```mermaid
+flowchart TD
+  A[Decommission requested] --> B[Dependency check]
+  B --> C[Backup/export data]
+  C --> D[Revoke access/secrets]
+  D --> E[Terminate resource]
+  E --> F[Archive metadata and audit]
+```

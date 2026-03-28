@@ -1,25 +1,45 @@
 # State Machine Diagrams
 
-## Purpose
-Define the state machine diagrams artifacts for the **Hospital Information System** with implementation-ready detail.
+## Appointment Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Requested
+    Requested --> Confirmed
+    Confirmed --> CheckedIn
+    CheckedIn --> InProgress
+    InProgress --> Completed
+    Requested --> Cancelled
+    Confirmed --> Cancelled
+    Confirmed --> NoShow
+    Completed --> [*]
+    Cancelled --> [*]
+    NoShow --> [*]
+```
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+## Admission Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Planned
+    Planned --> Admitted
+    Admitted --> Transferred
+    Transferred --> Admitted
+    Admitted --> Discharged
+    Admitted --> Expired
+    Discharged --> [*]
+    Expired --> [*]
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+## Claim Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Submitted
+    Submitted --> Accepted
+    Submitted --> Rejected
+    Accepted --> Paid
+    Accepted --> PartiallyPaid
+    Accepted --> Denied
+    Rejected --> Draft
+    Paid --> [*]
+    Denied --> [*]
+```

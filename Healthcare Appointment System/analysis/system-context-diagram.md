@@ -1,17 +1,11 @@
 # System Context Diagram
 
-## Objective
-
-This document captures system context diagram guidance for the **Healthcare Appointment System**.
-
-## Scope
-
-- System: Healthcare Appointment System
-- Goal: Digital-first appointment scheduling, provider management, payments, and reminders for healthcare organizations.
-- Primary actors: Patients, Providers, Clinic Admin, Support Staff
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+flowchart LR
+  Patient --> HAS[Healthcare Appointment System]
+  Provider --> HAS
+  Reception --> HAS
+  HAS --> EHR[Electronic Health Record]
+  HAS --> SMS[Reminder Service]
+  HAS --> Billing
+```

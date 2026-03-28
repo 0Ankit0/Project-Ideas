@@ -1,25 +1,35 @@
 # System Sequence Diagrams
 
-## Purpose
-Define the system sequence diagrams artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+## System Sequence: Agent Resolves Ticket
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Agent
+    participant UI as Agent Console
+    participant API as Ticket API
+    participant T as Ticket Service
+    participant SLA as SLA Service
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
+    Agent->>UI: resolve ticket
+    UI->>API: POST /v1/tickets/{id}/resolve
+    API->>T: validate + apply resolution
+    T->>SLA: stop SLA clocks
+    T-->>API: resolved state
+    API-->>UI: success
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## System Sequence: Supervisor Escalation
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Sup as Supervisor
+    participant UI as Supervisor Console
+    participant API as Escalation API
+    participant ESC as Escalation Service
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    Sup->>UI: escalate ticket
+    UI->>API: POST /v1/tickets/{id}/escalations
+    API->>ESC: create escalation case
+    ESC-->>API: escalation opened
+    API-->>UI: case id
+```

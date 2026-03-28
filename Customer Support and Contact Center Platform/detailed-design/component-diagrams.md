@@ -1,25 +1,57 @@
 # Component Diagrams
 
-## Purpose
-Define the component diagrams artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+```mermaid
+flowchart LR
+    subgraph API
+      Gateway[Gateway/BFF]
+      TicketAPI[Ticket API]
+      SessionAPI[Session API]
+    end
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
+    subgraph Core
+      TicketSvc[Ticket Service]
+      RoutingSvc[Routing Engine]
+      SessionSvc[Conversation Session Service]
+      SlaSvc[SLA Service]
+      EscSvc[Escalation Service]
+      QASvc[QA/Scoring Service]
+      KBSvc[Knowledge Service]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Integrations
+      CRM[CRM Adapter]
+      Voice[Telephony Adapter]
+      Chat[Chat Adapter]
+      Notify[Notification Adapter]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Data
+      DB[(PostgreSQL)]
+      MQ[(Event Bus)]
+      Search[(Search Index)]
+      Cache[(Redis)]
+    end
 
+    Gateway --> TicketAPI --> TicketSvc
+    Gateway --> SessionAPI --> SessionSvc
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    TicketSvc --> RoutingSvc
+    TicketSvc --> SlaSvc
+    TicketSvc --> EscSvc
+    SessionSvc --> Voice
+    SessionSvc --> Chat
+    TicketSvc --> CRM
+
+    TicketSvc --> DB
+    SessionSvc --> DB
+    SlaSvc --> DB
+    QASvc --> DB
+    KBSvc --> DB
+
+    TicketSvc --> MQ
+    SessionSvc --> MQ
+    SlaSvc --> MQ
+    MQ --> Notify
+    MQ --> Search
+    RoutingSvc --> Cache
+```

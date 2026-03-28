@@ -1,25 +1,40 @@
 # Deployment Diagram
 
-## Purpose
-Define the deployment diagram artifacts for the **Hospital Information System** with implementation-ready detail.
+## Production Topology
+```mermaid
+flowchart TB
+    Internet[(Internet/VPN)] --> WAF[WAF]
+    WAF --> LB[Public Load Balancer]
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+    subgraph VPC[Hospital Cloud VPC]
+      subgraph App[Private App Subnets]
+        API[HIS API Pods]
+        Worker[HIS Worker Pods]
+      end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+      subgraph Data[Private Data Subnets]
+        DB[(PostgreSQL HA)]
+        Redis[(Redis)]
+        MQ[(Managed MQ)]
+      end
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    LB --> API
+    API --> DB
+    API --> Redis
+    API --> MQ
+    Worker --> DB
+    Worker --> MQ
 
+    API --> Observability[Logging/Tracing]
+    Worker --> Observability
+    DB --> Backup[Encrypted Backup Vault]
+```
 
-## Infrastructure Emphasis
-- Multi-environment topology (dev/stage/prod) with promotion gates.
-- Network segmentation, private service communication, and WAF boundaries.
-- Backup, disaster recovery, and key rotation procedures.
+## Environment Promotion
+```mermaid
+flowchart LR
+    Dev --> Stage --> Prod
+    Stage --> Gate[QA + Security Gate]
+    Gate --> Prod
+```

@@ -1,25 +1,48 @@
 # Architecture Diagram
 
-## Purpose
-Define the architecture diagram artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    Channels[Checkout API, Mobile Wallet, Merchant Console] --> Edge[API Gateway]
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+    subgraph Services[Payment Domain Services]
+      Orchestration[Payment Orchestration]
+      Wallet[Wallet Service]
+      Risk[Risk Engine]
+      Routing[PSP Routing]
+      Refunds[Refunds/Disputes]
+      Reconciliation[Settlement Reconciliation]
+      Ledger[Ledger Service]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    Edge --> Orchestration
+    Edge --> Wallet
+    Edge --> Refunds
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Orchestration --> Risk
+    Orchestration --> Routing
+    Wallet --> Ledger
+    Refunds --> Ledger
 
+    subgraph Shared
+      Audit[Audit]
+      Notify[Notification]
+      Jobs[Async Workers]
+    end
 
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    Services --> Audit
+    Reconciliation --> Jobs
+
+    subgraph DataInfra
+      DB[(PostgreSQL)]
+      MQ[(Event Bus)]
+      Cache[(Redis)]
+      PSP[(PSP/Bank Adapters)]
+      GL[(General Ledger)]
+    end
+
+    Services --> DB
+    Services --> MQ
+    Routing --> PSP
+    Reconciliation --> GL
+    Risk --> Cache
+```

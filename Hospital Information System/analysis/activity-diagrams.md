@@ -1,25 +1,46 @@
 # Activity Diagrams
 
-## Purpose
-Define the activity diagrams artifacts for the **Hospital Information System** with implementation-ready detail.
+## Patient Registration and Appointment
+```mermaid
+flowchart TD
+    A[Patient Arrives / Calls] --> B[Search Existing Patient]
+    B --> C{Record Found?}
+    C -- No --> D[Create Patient Profile]
+    C -- Yes --> E[Verify Demographics/Insurance]
+    D --> E
+    E --> F[Check Provider Availability]
+    F --> G{Slot Available?}
+    G -- No --> H[Offer Alternate Date/Provider]
+    G -- Yes --> I[Book Appointment]
+    H --> I
+    I --> J[Send Confirmation + Reminder]
+```
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+## Encounter and Orders
+```mermaid
+flowchart TD
+    A[Patient Checked In] --> B[Triage Vitals]
+    B --> C[Doctor Encounter]
+    C --> D{Labs/Imaging Needed?}
+    D -- No --> E[Diagnosis + Care Plan]
+    D -- Yes --> F[Create Orders]
+    F --> G[Receive Results]
+    G --> E
+    E --> H[Prescribe Medication]
+    H --> I[Complete Encounter Documentation]
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Analysis Notes
-- Capture alternate/error flows for: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: clinical workstation, mobile nursing app, integration HL7/FHIR.
+## Claim Submission
+```mermaid
+flowchart TD
+    A[Encounter Closed] --> B[Generate Charge Items]
+    B --> C[Code Validation]
+    C --> D{Coding Complete?}
+    D -- No --> E[Coder Review Queue]
+    E --> C
+    D -- Yes --> F[Create Claim]
+    F --> G[Submit to Payer]
+    G --> H{Accepted?}
+    H -- No --> I[Denial Work Queue]
+    H -- Yes --> J[Post Acknowledgement]
+```

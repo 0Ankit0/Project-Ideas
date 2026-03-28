@@ -1,25 +1,25 @@
 # Data Flow Diagrams
 
-## Purpose
-Define the data flow diagrams artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+## Subscription and Billing Data Flow
+```mermaid
+flowchart LR
+    Checkout[Checkout Request] --> SubSvc[Subscription Service]
+    SubSvc --> PlanRead[Plan Catalog]
+    SubSvc --> InvoiceSvc[Invoice Service]
+    InvoiceSvc --> InvoiceStore[(Invoice Tables)]
+    InvoiceSvc --> PaymentSvc[Payment Service]
+    PaymentSvc --> PSP[PSP Gateway]
+    PaymentSvc --> Ledger[(Payment Attempt Tables)]
+    SubSvc --> EntSvc[Entitlement Service]
+    EntSvc --> EntStore[(Entitlement Tables)]
+```
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
-
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+## Revenue Reporting Flow
+```mermaid
+flowchart LR
+    OLTP[(Billing OLTP)] --> CDC[CDC/Event Publisher]
+    CDC --> Bus[(Event Bus)]
+    Bus --> ETL[Finance ETL]
+    ETL --> WH[(Data Warehouse)]
+    WH --> FinanceDash[Finance Dashboards]
+```

@@ -1,25 +1,33 @@
 # System Sequence Diagrams
 
-## Purpose
-Define the system sequence diagrams artifacts for the **Warehouse Management System** with implementation-ready detail.
+## System Sequence: Receive Pallet
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Picker
+    participant Scanner
+    participant API as Receiving API
+    participant INV as Inventory Service
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+    Picker->>Scanner: scan pallet + qty
+    Scanner->>API: POST /v1/receipts
+    API->>INV: post receipt
+    INV-->>API: stock updated
+    API-->>Scanner: receipt accepted
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## System Sequence: Complete Pick Task
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Picker
+    participant Scanner
+    participant API as Task API
+    participant Task as Task Service
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    Picker->>Scanner: confirm picked qty
+    Scanner->>API: POST /v1/tasks/{id}/complete
+    API->>Task: validate + complete task
+    Task-->>API: next task suggestion
+    API-->>Scanner: success
+```

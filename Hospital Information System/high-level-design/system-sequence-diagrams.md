@@ -1,25 +1,38 @@
 # System Sequence Diagrams
 
-## Purpose
-Define the system sequence diagrams artifacts for the **Hospital Information System** with implementation-ready detail.
+## Admit Patient
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Clerk as Front Desk
+    participant UI as ADT UI
+    participant API as Admission API
+    participant Bed as Bed Service
+    participant DB as DB
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+    Clerk->>UI: Start admission
+    UI->>API: POST /v1/admissions
+    API->>Bed: allocate bed
+    Bed-->>API: bed assigned
+    API->>DB: persist admission
+    API-->>UI: admission confirmed
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Submit Insurance Claim
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Bill as Billing Staff
+    participant UI as Billing UI
+    participant API as Claims API
+    participant CLM as Claims Service
+    participant Payer as Payer Gateway
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    Bill->>UI: submit claim
+    UI->>API: POST /v1/claims/{id}/submit
+    API->>CLM: validate and package claim
+    CLM->>Payer: transmit claim
+    Payer-->>CLM: ack
+    CLM-->>API: status submitted
+    API-->>UI: 200 submitted
+```

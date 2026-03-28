@@ -1,13 +1,14 @@
 # Class Diagrams
 
-## Core Classes
-- `Resource`
-- `Reservation`
-- `Fulfillment`
-- `Settlement`
-- `IncidentClaim`
-
-## Important Associations
-- `Reservation` references one or many `Resource` units.
-- `Fulfillment` references one `Reservation` and emits lifecycle events.
-- `Settlement` composes charges, adjustments, and reconciliation records.
+```mermaid
+classDiagram
+  class Resource {+id +type +status +provision() +retire()}
+  class ResourceRequest {+id +requester +state}
+  class LifecyclePolicy {+id +rule +evaluate()}
+  class ApprovalRecord {+id +approver +decision}
+  class ResourceCost {+id +period +amount}
+  ResourceRequest --> Resource
+  Resource --> LifecyclePolicy
+  Resource --> ResourceCost
+  ResourceRequest --> ApprovalRecord
+```

@@ -1,25 +1,44 @@
 # State Machine Diagrams
 
-## Purpose
-Define the state machine diagrams artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+## Lead Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> New
+    New --> Working: owner assigned
+    Working --> Qualified: qualification met
+    Working --> Nurturing: not ready
+    Working --> Disqualified: invalid / out of scope
+    Nurturing --> Working: re-engaged
+    Qualified --> Converted: convert to account/contact/opportunity
+    Qualified --> Disqualified: later rejected
+    Converted --> [*]
+    Disqualified --> [*]
+```
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+## Opportunity Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Prospecting
+    Prospecting --> Qualification
+    Qualification --> Proposal
+    Proposal --> Negotiation
+    Negotiation --> ClosedWon
+    Negotiation --> ClosedLost
+    Prospecting --> ClosedLost
+    Qualification --> ClosedLost
+    Proposal --> ClosedLost
+    ClosedWon --> [*]
+    ClosedLost --> [*]
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+## Forecast Snapshot Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Submitted: submit()
+    Submitted --> Approved: manager approves
+    Submitted --> Returned: manager requests changes
+    Returned --> Submitted: resubmit
+    Approved --> Locked: close period
+    Locked --> [*]
+```

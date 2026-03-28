@@ -1,25 +1,52 @@
 # C4 Code Diagram
 
-## Purpose
-Define the c4 code diagram artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    subgraph Interface
+      AuthController
+      UserController
+      RoleController
+      TokenController
+    end
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+    subgraph Application
+      AuthAppService
+      UserAppService
+      RoleAppService
+      TokenAppService
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Domain
+      IdentityAggregate
+      RoleAggregate
+      TokenAggregate
+      PolicyRules
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Infrastructure
+      UserRepository
+      RoleRepository
+      TokenRepository
+      CryptoProvider
+      EventPublisher
+      AuditAdapter
+    end
 
+    AuthController --> AuthAppService --> IdentityAggregate
+    UserController --> UserAppService --> IdentityAggregate
+    RoleController --> RoleAppService --> RoleAggregate
+    TokenController --> TokenAppService --> TokenAggregate
 
-## Delivery Emphasis
-- Milestones mapped to slices that are testable end-to-end.
-- CI quality gates include lint, unit/integration tests, and contract checks.
-- Backend status matrix tracks readiness by capability and release wave.
+    AuthAppService --> PolicyRules
+    RoleAppService --> PolicyRules
+
+    AuthAppService --> UserRepository
+    UserAppService --> UserRepository
+    RoleAppService --> RoleRepository
+    TokenAppService --> TokenRepository
+
+    TokenAppService --> CryptoProvider
+    AuthAppService --> EventPublisher
+    UserAppService --> EventPublisher
+    RoleAppService --> AuditAdapter
+```

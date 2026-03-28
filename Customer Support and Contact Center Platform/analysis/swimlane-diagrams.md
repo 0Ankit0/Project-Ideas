@@ -1,25 +1,49 @@
 # Swimlane Diagrams
 
-## Purpose
-Define the swimlane diagrams artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+## Ticket Resolution Swimlane
+```mermaid
+flowchart LR
+    subgraph Customer
+      A[Submit issue]
+      B[Respond to clarification]
+    end
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
+    subgraph Platform
+      C[Create and classify ticket]
+      D[Route to queue]
+      E[Track SLA]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Agent
+      F[Investigate and respond]
+      G[Resolve ticket]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Supervisor
+      H[Intervene on escalation]
+    end
 
+    A --> C --> D --> F --> B --> F --> G
+    E --> H --> F
+```
 
-## Analysis Notes
-- Capture alternate/error flows for: intake across channels, skill-based routing and assignment, SLA monitoring and escalation.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: chat, email, voice, social.
+## QA Evaluation Swimlane
+```mermaid
+flowchart LR
+    subgraph Platform
+      A[Sample interactions]
+      B[Prepare QA scorecard]
+    end
+
+    subgraph QA
+      C[Review transcript/call]
+      D[Score criteria]
+    end
+
+    subgraph Supervisor
+      E[Coach agent]
+      F[Track improvement]
+    end
+
+    A --> B --> C --> D --> E --> F
+```

@@ -1,25 +1,52 @@
 # C4 Code Diagram
 
-## Purpose
-Define the c4 code diagram artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    subgraph Interface
+      PaymentController
+      WalletController
+      RefundController
+      ReconciliationController
+    end
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+    subgraph Application
+      PaymentAppService
+      WalletAppService
+      RefundAppService
+      ReconciliationAppService
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Domain
+      PaymentAggregate
+      WalletAggregate
+      RefundAggregate
+      LedgerEntryEntity
+      RoutingPolicy
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Infrastructure
+      PaymentRepository
+      WalletRepository
+      PSPGatewayAdapter
+      LedgerAdapter
+      EventPublisher
+      AuditAdapter
+    end
 
+    PaymentController --> PaymentAppService --> PaymentAggregate
+    WalletController --> WalletAppService --> WalletAggregate
+    RefundController --> RefundAppService --> RefundAggregate
+    ReconciliationController --> ReconciliationAppService --> LedgerEntryEntity
 
-## Delivery Emphasis
-- Milestones mapped to slices that are testable end-to-end.
-- CI quality gates include lint, unit/integration tests, and contract checks.
-- Backend status matrix tracks readiness by capability and release wave.
+    PaymentAppService --> RoutingPolicy
+    RefundAppService --> RoutingPolicy
+
+    PaymentAppService --> PaymentRepository
+    WalletAppService --> WalletRepository
+    PaymentAppService --> PSPGatewayAdapter
+    ReconciliationAppService --> LedgerAdapter
+
+    PaymentAppService --> EventPublisher
+    WalletAppService --> EventPublisher
+    RefundAppService --> AuditAdapter
+```

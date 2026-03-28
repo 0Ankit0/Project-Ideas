@@ -1,25 +1,27 @@
 # Data Flow Diagrams
 
-## Purpose
-Define the data flow diagrams artifacts for the **Hospital Information System** with implementation-ready detail.
+## Clinical Data Flow
+```mermaid
+flowchart LR
+    Intake[Registration/Portal] --> PatientAPI[Patient API]
+    PatientAPI --> PatientStore[(Patient Master)]
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+    ClinicalUI[Clinician UI] --> EncounterAPI[Encounter API]
+    EncounterAPI --> EncounterStore[(Encounter Records)]
+    EncounterAPI --> OrdersAPI[Orders API]
+    OrdersAPI --> OrderStore[(Order Tables)]
+    OrdersAPI --> ExternalLab[Lab/Radiology]
+    ExternalLab --> ResultsIngest[Results Ingestion]
+    ResultsIngest --> EncounterStore
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+## Revenue Cycle Data Flow
+```mermaid
+flowchart LR
+    EncounterStore[(Encounter Records)] --> ChargeEngine[Charge Generation]
+    ChargeEngine --> Coding[Medical Coding]
+    Coding --> Claims[Claim Builder]
+    Claims --> PayerGateway[Payer Gateway]
+    PayerGateway --> Remit[Remittance/Denials]
+    Remit --> AR[(Accounts Receivable)]
+```

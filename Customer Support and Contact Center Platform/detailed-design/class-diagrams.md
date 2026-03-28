@@ -1,25 +1,79 @@
 # Class Diagrams
 
-## Purpose
-Define the class diagrams artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+```mermaid
+classDiagram
+    class CustomerProfile {
+      +UUID id
+      +String email
+      +String phone
+      +String segment
+      +updateContactInfo()
+    }
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
+    class Ticket {
+      +UUID id
+      +UUID customerId
+      +TicketStatus status
+      +Priority priority
+      +String category
+      +DateTime createdAt
+      +assign(queueId)
+      +escalate(reason)
+      +resolve(code)
+      +close()
+    }
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    class InteractionSession {
+      +UUID id
+      +UUID ticketId
+      +ChannelType channel
+      +SessionStatus status
+      +start()
+      +hold()
+      +transfer(queueId)
+      +end()
+    }
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    class SLAClock {
+      +UUID id
+      +UUID ticketId
+      +Duration target
+      +DateTime dueAt
+      +start()
+      +pause()
+      +breach()
+    }
 
+    class Queue {
+      +UUID id
+      +String name
+      +String skillRule
+      +enqueue(ticketId)
+      +dequeue()
+    }
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    class Escalation {
+      +UUID id
+      +UUID ticketId
+      +EscalationLevel level
+      +String reason
+      +open()
+      +close()
+    }
+
+    class KnowledgeArticle {
+      +UUID id
+      +String title
+      +String topic
+      +ArticleStatus status
+      +publish()
+      +archive()
+    }
+
+    CustomerProfile "1" --> "many" Ticket
+    Ticket "1" --> "many" InteractionSession
+    Ticket "1" --> "1" SLAClock
+    Queue "1" --> "many" Ticket
+    Ticket "0..many" --> "0..many" Escalation
+    Ticket "0..many" --> "0..many" KnowledgeArticle : references
+```

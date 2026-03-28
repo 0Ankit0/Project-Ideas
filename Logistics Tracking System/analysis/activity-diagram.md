@@ -1,17 +1,13 @@
 # Activity Diagram
 
-## Objective
-
-This document captures activity diagram guidance for the **Logistics Tracking System**.
-
-## Scope
-
-- System: Logistics Tracking System
-- Goal: End-to-end shipment lifecycle tracking across hubs, fleets, drivers, and customer notifications.
-- Primary actors: Shippers, Customers, Dispatchers, Operations Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+flowchart TD
+  A[Shipment created] --> B[Assign route]
+  B --> C[Pickup]
+  C --> D[In-transit updates]
+  D --> E{Delay detected?}
+  E -- Yes --> F[Re-route + notify]
+  E -- No --> G[Continue route]
+  F --> H[Deliver]
+  G --> H[Deliver]
+```

@@ -1,25 +1,66 @@
 # Class Diagrams
 
-## Purpose
-Define the class diagrams artifacts for the **Warehouse Management System** with implementation-ready detail.
+```mermaid
+classDiagram
+    class Warehouse {
+      +UUID id
+      +String code
+      +String timezone
+    }
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+    class Location {
+      +UUID id
+      +UUID warehouseId
+      +String aisle
+      +String bin
+      +LocationType type
+    }
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    class InventoryItem {
+      +UUID id
+      +String sku
+      +String lot
+      +Date expiryDate
+    }
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    class StockBalance {
+      +UUID id
+      +UUID itemId
+      +UUID locationId
+      +Decimal quantity
+      +reserve(qty)
+      +release(qty)
+      +adjust(qty)
+    }
 
+    class Order {
+      +UUID id
+      +String orderNo
+      +OrderStatus status
+      +allocate()
+      +ship()
+    }
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    class Shipment {
+      +UUID id
+      +UUID orderId
+      +String carrier
+      +String trackingNo
+      +manifest()
+    }
+
+    class Task {
+      +UUID id
+      +TaskType type
+      +TaskStatus status
+      +assign(userId)
+      +complete()
+    }
+
+    Warehouse "1" --> "many" Location
+    InventoryItem "1" --> "many" StockBalance
+    Location "1" --> "many" StockBalance
+    Order "1" --> "many" Task
+    Order "1" --> "0..1" Shipment
+    Task "many" --> "many" InventoryItem : moves
+```
