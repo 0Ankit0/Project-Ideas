@@ -1,31 +1,35 @@
-# Business Rules - Learning Management System
+# Business Rules
 
-## Tenant and Access Rules
-- Users may access only tenant-scoped data unless they hold platform-level administrative permissions.
-- Course visibility depends on publication state, audience targeting, and enrollment policy.
-- Privileged actions such as grading overrides, certificate revocation, and policy changes require audit logging.
+This document defines enforceable policy rules for **Learning Management System** so command processing, asynchronous jobs, and operational actions behave consistently under normal and exceptional conditions.
 
-## Enrollment and Access Rules
-- Learners may not access restricted content until prerequisite lessons or enrollments are satisfied.
-- Cohort-based courses may enforce start and end dates, whereas self-paced courses may use rolling availability windows.
-- Dropped or expired enrollments retain historical progress and grading data but lose active-learning access unless policy states otherwise.
+## Context
+- Domain focus: learning management workflows.
+- Rule categories: lifecycle transitions, authorization, compliance, and resilience.
+- Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
 
-## Assessment and Grading Rules
+## Enforceable Rules
+1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
+2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
+3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
+4. Manual overrides must include approver identity, rationale, and expiration timestamp.
+5. Retries and compensations must be idempotent and must not create duplicate business effects.
 
-| Rule Area | Baseline Rule |
-|-----------|---------------|
-| Attempt limits | Defined per assessment and enforced before new attempt creation |
-| Auto-graded items | Published immediately or after review depending on policy |
-| Manual grading | Requires authorized reviewer or instructor |
-| Passing logic | Based on configured score thresholds and required items |
-| Grade override | Must retain original score, override reason, actor, and timestamp |
+## Rule Evaluation Pipeline
+```mermaid
+flowchart TD
+    A[Incoming Command] --> B[Validate Payload]
+    B --> C{Authorized Actor?}
+    C -- No --> C1[Reject + Security Audit]
+    C -- Yes --> D{Business Rules Pass?}
+    D -- No --> D1[Reject + Rule Violation Event]
+    D -- Yes --> E{State Transition Allowed?}
+    E -- No --> E1[Return Conflict]
+    E -- Yes --> F[Commit Transaction]
+    F --> G[Publish Domain Event]
+    G --> H[Update Read Models and Alerts]
+```
 
-## Completion and Certification Rules
-- Course completion may require lesson completion, assessment thresholds, attendance, and mandatory acknowledgments.
-- Certificates may be issued only after all required completion rules are satisfied.
-- Certificate revocation or reissue must retain auditable history.
-
-## Content Governance Rules
-- Published course versions must remain stable for enrolled learners unless tenant policy allows in-flight updates.
-- Draft content cannot be learner-visible.
-- Deleting content with learner history should archive or deactivate rather than hard-delete when records are required for reporting.
+## Exception and Override Handling
+- Overrides are restricted to approved exception classes and require dual logging (business + security audit).
+- Override windows automatically expire and trigger follow-up verification tasks.
+- Repeated override patterns are reviewed for policy redesign and automation improvements.

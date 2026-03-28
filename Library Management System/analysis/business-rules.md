@@ -1,31 +1,35 @@
-# Business Rules - Library Management System
+# Business Rules
 
-## Membership and Eligibility
-- Patrons with expired memberships cannot initiate new checkouts or holds until renewed.
-- Borrowing limits vary by patron category, item format, and branch policy.
-- Staff override actions require explicit reason capture and audit logging.
+This document defines enforceable policy rules for **Library Management System** so command processing, asynchronous jobs, and operational actions behave consistently under normal and exceptional conditions.
 
-## Circulation Rules
+## Context
+- Domain focus: library management workflows.
+- Rule categories: lifecycle transitions, authorization, compliance, and resilience.
+- Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
 
-| Policy Area | Baseline Rule |
-|-------------|---------------|
-| Standard loan period | Configurable by patron category and item type |
-| Renewal eligibility | Allowed only if no active hold exists and max-renewal count not exceeded |
-| Overdue handling | Fines or blocks apply after grace period based on policy |
-| Claimed returned | Item enters exception review; account restrictions may be partial or full |
-| Lost or damaged | Replacement fee or workflow decision required before item is closed out |
+## Enforceable Rules
+1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
+2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
+3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
+4. Manual overrides must include approver identity, rationale, and expiration timestamp.
+5. Retries and compensations must be idempotent and must not create duplicate business effects.
 
-## Hold and Waitlist Rules
-- Hold queues are ordered by policy priority, request time, and patron eligibility.
-- A returned item with an active hold cannot be reshelved as generally available inventory.
-- Hold pickup windows expire automatically according to branch policy.
+## Rule Evaluation Pipeline
+```mermaid
+flowchart TD
+    A[Incoming Command] --> B[Validate Payload]
+    B --> C{Authorized Actor?}
+    C -- No --> C1[Reject + Security Audit]
+    C -- Yes --> D{Business Rules Pass?}
+    D -- No --> D1[Reject + Rule Violation Event]
+    D -- Yes --> E{State Transition Allowed?}
+    E -- No --> E1[Return Conflict]
+    E -- Yes --> F[Commit Transaction]
+    F --> G[Publish Domain Event]
+    G --> H[Update Read Models and Alerts]
+```
 
-## Cataloging Rules
-- Duplicate bibliographic records should be merged when a canonical record is confirmed.
-- Item-copy barcodes must be unique across all branches.
-- Non-circulating and reference materials must not enter standard loan workflows.
-
-## Inventory and Acquisition Rules
-- Received quantities must reconcile with purchase orders or create discrepancy records.
-- Transfers must maintain chain-of-custody states from source branch to destination branch.
-- Inventory write-offs, waivers, and repairs require auditable approval flows.
+## Exception and Override Handling
+- Overrides are restricted to approved exception classes and require dual logging (business + security audit).
+- Override windows automatically expire and trigger follow-up verification tasks.
+- Repeated override patterns are reviewed for policy redesign and automation improvements.

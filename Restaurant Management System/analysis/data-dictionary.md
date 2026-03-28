@@ -1,27 +1,41 @@
-# Data Dictionary - Restaurant Management System
+# Data Dictionary
 
-| Entity | Key Fields | Description |
-|--------|------------|-------------|
-| Branch | id, name, code, status, timezone | Restaurant branch or outlet |
-| ServiceZone | id, branchId, name, type | Section or service area within branch |
-| Table | id, branchId, zoneId, code, capacity, status | Physical dine-in table or table group |
-| Reservation | id, branchId, guestName, partySize, slotTime, status | Guest reservation record |
-| WaitlistEntry | id, branchId, guestName, partySize, queuePosition, status | Walk-in waitlist entry |
-| StaffUser | id, branchId, role, status | Operational user account |
-| Shift | id, branchId, roleType, startsAt, endsAt, status | Published staff shift |
-| AttendanceRecord | id, shiftId, staffUserId, checkInAt, checkOutAt, status | Attendance or shift presence record |
-| MenuItem | id, branchId, categoryId, name, price, status | Sellable menu item |
-| ModifierGroup | id, menuItemId, name, selectionRules | Item customization rule set |
-| Recipe | id, menuItemId, version, status | Ingredient usage definition |
-| Ingredient | id, branchId, name, unit, currentStock, reorderLevel | Inventory ingredient |
-| StockLedgerEntry | id, ingredientId, movementType, quantity, reason, recordedAt | Inventory movement history |
-| PurchaseOrder | id, branchId, vendorId, status, orderedAt, receivedAt | Procurement order |
-| GoodsReceipt | id, purchaseOrderId, recordedBy, varianceState | Receipt of purchased goods |
-| Order | id, branchId, orderSource, tableId, status, waiterId, openedAt | Restaurant order container |
-| OrderItem | id, orderId, menuItemId, quantity, notes, courseNo, status | Individual ordered line item |
-| KitchenTicket | id, orderItemId, station, priority, status | Kitchen execution unit |
-| Bill | id, orderId, subtotal, taxTotal, discountTotal, grandTotal, status | Bill generated from order |
-| Settlement | id, billId, paymentMethod, amount, status, settledAt | Payment or split payment record |
-| CashDrawerSession | id, branchId, cashierId, openedAt, closedAt, status | Cash session or drawer state |
-| AccountingExport | id, branchId, periodRef, exportType, status | Operational accounting handoff |
-| AuditLog | id, actorId, action, entityType, entityId, createdAt | Immutable operational history |
+This data dictionary is the canonical reference for **Restaurant Management System**. It defines shared terminology, entity semantics, and governance controls required to keep restaurant management workflows consistent across teams and services.
+
+## Scope and Goals
+- Establish a stable vocabulary for architecture, API, analytics, and operations teams.
+- Define minimum required fields for core entities and expected relationship boundaries.
+- Document data quality and retention controls needed for production readiness.
+
+## Core Entities
+| Entity | Description | Required Attributes |
+|---|---|---|
+| TenantOrOrganization | Top-level ownership boundary for data segregation | `org_id, name, status, region, created_at` |
+| UserOrActor | Human/system principal that performs actions | `actor_id, org_id, role, status, last_active_at` |
+| PrimaryRecord | Main lifecycle object handled by the platform | `record_id, org_id, state, owner_id, created_at, updated_at` |
+| ChildTransaction | Operational transaction or sub-step linked to primary record | `txn_id, record_id, txn_type, amount_or_value, occurred_at` |
+| PolicyOrRule | Versioned policy configuration that influences decisions | `policy_id, scope, version, effective_from, effective_to` |
+| AuditEvent | Append-only evidence for state changes and controls | `audit_id, record_id, actor_id, action, reason_code, occurred_at` |
+
+## Canonical Relationship Diagram
+```mermaid
+erDiagram
+    TENANTORORGANIZATION ||--o{ USERORACTOR : owns
+    TENANTORORGANIZATION ||--o{ PRIMARYRECORD : contains
+    PRIMARYRECORD ||--o{ CHILDTRANSACTION : has
+    POLICYORRULE ||--o{ PRIMARYRECORD : governs
+    PRIMARYRECORD ||--o{ AUDITEVENT : audited_by
+    USERORACTOR ||--o{ AUDITEVENT : performs
+```
+
+## Data Quality Controls
+1. All write paths enforce required-field validation and referential integrity for mandatory foreign keys.
+2. External imports must include provenance metadata (`source_system`, `source_ref`, `ingested_at`).
+3. Status/state fields use controlled vocabularies and reject unknown values.
+4. Duplicate detection runs on natural keys where business identity collisions are likely.
+5. Sensitive fields carry classification tags to drive masking, encryption, and export behavior.
+
+## Retention and Audit
+- Operational records remain online for active workflow windows and support forensic queries.
+- Historical records move to archive tiers by policy without breaking traceability.
+- Audit events are immutable and linked through correlation ids for incident analysis.

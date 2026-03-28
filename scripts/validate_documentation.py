@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Dict, List
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,58 @@ README_MUST_INCLUDE = [
     "Getting Started",
     "Documentation Status",
 ]
+
+ANALYSIS_QUALITY_GATES = {
+    "data-dictionary.md": {
+        "required_headings": [
+            "## Core Entities",
+            "## Canonical Relationship Diagram",
+            "## Data Quality Controls",
+        ],
+        "required_mermaid_hint": "erDiagram",
+        "minimum_lines": 25,
+        "minimum_table_rows": 6,
+    },
+    "business-rules.md": {
+        "required_headings": [
+            "## Enforceable Rules",
+            "## Rule Evaluation Pipeline",
+            "## Exception and Override Handling",
+        ],
+        "required_mermaid_hint": "flowchart",
+        "minimum_lines": 20,
+        "minimum_numbered_rules": 5,
+    },
+    "event-catalog.md": {
+        "required_headings": [
+            "## Contract Conventions",
+            "## Domain Events",
+            "## Publish and Consumption Sequence",
+            "## Operational SLOs",
+        ],
+        "required_mermaid_hint": "sequenceDiagram",
+        "minimum_lines": 30,
+        "minimum_table_rows": 6,
+    },
+}
+
+PLACEHOLDER_PATTERNS = [
+    r"\bTODO\b",
+    r"\bTBD\b",
+    r"\bplaceholder\b",
+    r"\blorem ipsum\b",
+]
+
+QUALITY_ENFORCED_PROJECTS = {
+    "Customer Relationship Management Platform",
+    "Subscription Billing and Entitlements Platform",
+    "Payment Orchestration and Wallet Platform",
+    "Warehouse Management System",
+    "Hospital Information System",
+    "Customer Support and Contact Center Platform",
+    "Identity and Access Management Platform",
+    "Messaging and Notification Platform",
+}
 
 SINGULAR_TEMPLATE = {
     "requirements": ["requirements-document.md", "user-stories.md"],
@@ -503,6 +556,75 @@ class ValidationError:
     issue: str
 
 
+def _validate_analysis_quality(
+    project_name: str, file_path: Path, filename: str, errors: List[ValidationError]
+) -> None:
+    gate = ANALYSIS_QUALITY_GATES.get(filename)
+    if gate is None:
+        return
+
+    text = file_path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+
+    if len(lines) < gate["minimum_lines"]:
+        errors.append(
+            ValidationError(
+                project_name,
+                f"{file_path.parent.name}/{filename} is too short "
+                f"({len(lines)} lines, expected at least {gate['minimum_lines']})",
+            )
+        )
+
+    for heading in gate["required_headings"]:
+        if heading not in text:
+            errors.append(
+                ValidationError(
+                    project_name,
+                    f"{file_path.parent.name}/{filename} missing heading: '{heading}'",
+                )
+            )
+
+    if "```mermaid" not in text or gate["required_mermaid_hint"] not in text:
+        errors.append(
+            ValidationError(
+                project_name,
+                f"{file_path.parent.name}/{filename} must include Mermaid "
+                f"'{gate['required_mermaid_hint']}' diagram",
+            )
+        )
+
+    for pattern in PLACEHOLDER_PATTERNS:
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            errors.append(
+                ValidationError(
+                    project_name,
+                    f"{file_path.parent.name}/{filename} contains placeholder text matching '{pattern}'",
+                )
+            )
+
+    if "minimum_table_rows" in gate:
+        table_rows = sum(1 for line in lines if line.startswith("| ") and not line.startswith("|---"))
+        if table_rows < gate["minimum_table_rows"]:
+            errors.append(
+                ValidationError(
+                    project_name,
+                    f"{file_path.parent.name}/{filename} has insufficient table rows "
+                    f"({table_rows}, expected at least {gate['minimum_table_rows']})",
+                )
+            )
+
+    if "minimum_numbered_rules" in gate:
+        numbered_rules = sum(1 for line in lines if re.match(r"^\d+\.\s", line))
+        if numbered_rules < gate["minimum_numbered_rules"]:
+            errors.append(
+                ValidationError(
+                    project_name,
+                    f"{file_path.parent.name}/{filename} has insufficient numbered rules "
+                    f"({numbered_rules}, expected at least {gate['minimum_numbered_rules']})",
+                )
+            )
+
+
 def validate() -> List[ValidationError]:
     errors: List[ValidationError] = []
 
@@ -547,6 +669,10 @@ def validate() -> List[ValidationError]:
                     errors.append(
                         ValidationError(project_name, f"Empty file: {folder}/{filename}")
                     )
+                    continue
+
+                if folder == "analysis" and project_name in QUALITY_ENFORCED_PROJECTS:
+                    _validate_analysis_quality(project_name, file_path, filename, errors)
 
     return errors
 
