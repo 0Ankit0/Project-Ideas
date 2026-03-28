@@ -1,25 +1,45 @@
 # Swimlane Diagrams
 
-## Purpose
-Define the swimlane diagrams artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+## Payment Authorization Swimlane
+```mermaid
+flowchart LR
+    subgraph Merchant
+      A[Create checkout payment]
+    end
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+    subgraph Platform[Orchestration Platform]
+      B[Risk + routing]
+      C[Build auth request]
+      D[Persist transaction]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph PSP
+      E[Authorize transaction]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Ledger
+      F[Post accounting entries]
+    end
 
+    A --> B --> C --> E --> D --> F
+```
 
-## Analysis Notes
-- Capture alternate/error flows for: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: checkout API, webhooks, ops console.
+## Wallet Transfer Swimlane
+```mermaid
+flowchart LR
+    subgraph Sender
+      A[Initiate transfer]
+    end
+
+    subgraph Wallet[Wallet Service]
+      B[Validate balance/limits]
+      C[Debit sender wallet]
+      D[Credit receiver wallet]
+    end
+
+    subgraph Receiver
+      E[Receive funds notification]
+    end
+
+    A --> B --> C --> D --> E
+```

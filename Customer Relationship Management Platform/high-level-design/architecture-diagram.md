@@ -1,25 +1,60 @@
 # Architecture Diagram
 
-## Purpose
-Define the architecture diagram artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+## High-Level Architecture
+```mermaid
+flowchart TB
+    CH[Channels\nWeb, Mobile, Integrations] --> EDGE[API Gateway / BFF]
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+    subgraph Domain[CRM Domain Services]
+      Lead[Lead Service]
+      Account[Account & Contact Service]
+      Opp[Opportunity Service]
+      Activity[Activity Service]
+      Forecast[Forecast Service]
+      Territory[Territory Service]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    EDGE --> Lead
+    EDGE --> Account
+    EDGE --> Opp
+    EDGE --> Activity
+    EDGE --> Forecast
+    EDGE --> Territory
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Platform[Platform Services]
+      Auth[AuthN/AuthZ]
+      Audit[Audit/Compliance]
+      Notify[Notifications]
+      Workflow[Workflow/Jobs]
+    end
 
+    Lead --> Workflow
+    Opp --> Workflow
+    Forecast --> Workflow
+    Territory --> Workflow
 
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    EDGE --> Auth
+    Opp --> Audit
+    Forecast --> Audit
+
+    subgraph Data[Data Layer]
+      OLTP[(OLTP DB)]
+      Cache[(Redis)]
+      Bus[(Event Bus)]
+      Search[(Search)]
+      WH[(Warehouse)]
+    end
+
+    Lead --> OLTP
+    Account --> OLTP
+    Opp --> OLTP
+    Activity --> OLTP
+    Forecast --> OLTP
+    Territory --> OLTP
+
+    Workflow --> Bus
+    Bus --> Notify
+    Bus --> Search
+    Bus --> WH
+    Auth --> Cache
+```

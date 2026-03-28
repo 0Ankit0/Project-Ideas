@@ -1,13 +1,11 @@
 # System Context Diagram
 
-## External Systems
-- Identity Provider (authentication and authorization context)
-- Payment Gateway (authorization, capture, refunds)
-- Notification Providers (email, SMS, push)
-- ERP/Accounting Platform (journal export and close)
-- BI/Warehouse (analytics and forecasting)
-- Compliance Archive (immutable retention policies)
-
-## Context Boundary
-The platform owns lifecycle orchestration and domain state;
-external systems are integrated through adapter interfaces and event contracts.
+```mermaid
+flowchart LR
+  Requestor[Requestor] --> RLMP[Resource Lifecycle Management Platform]
+  Operator[Platform Operator] --> RLMP
+  RLMP --> Cloud[Cloud Providers]
+  RLMP --> CMDB[CMDB/Asset Registry]
+  RLMP --> IAM[Identity Platform]
+  RLMP --> FinOps[Cost/FinOps]
+```

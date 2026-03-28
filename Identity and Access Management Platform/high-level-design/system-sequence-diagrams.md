@@ -1,25 +1,36 @@
 # System Sequence Diagrams
 
-## Purpose
-Define the system sequence diagrams artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+## System Sequence: User Login
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant App as Client App
+    participant IAM as IAM Auth API
+    participant MFA as MFA Service
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+    U->>App: initiate login
+    App->>IAM: authorize request
+    IAM-->>U: prompt credentials
+    U->>IAM: submit credentials
+    IAM->>MFA: trigger challenge
+    U->>MFA: complete factor
+    MFA-->>IAM: verified
+    IAM-->>App: code/token response
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## System Sequence: Admin Role Assignment
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Tenant Admin
+    participant UI as Admin Console
+    participant API as IAM Admin API
+    participant POL as Policy Service
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    A->>UI: assign role to user
+    UI->>API: POST /users/{id}/roles
+    API->>POL: validate policy constraints
+    POL-->>API: allowed
+    API-->>UI: assignment created
+```

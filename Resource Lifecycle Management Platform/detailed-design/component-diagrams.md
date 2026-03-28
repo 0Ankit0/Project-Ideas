@@ -1,18 +1,12 @@
 # Component Diagrams
 
-## Reservation Service Components
-- Command API
-- Conflict Resolver
-- Policy Adapter
-- Outbox Publisher
-
-## Settlement Service Components
-- Charge Calculator
-- Adjustment Engine
-- Ledger Poster
-- Reconciliation Worker
-
-## Shared Components
-- Audit Writer
-- Idempotency Store
-- Observability Instrumentation
+```mermaid
+flowchart LR
+  API --> RequestSvc[Request Service]
+  API --> LifecycleSvc[Lifecycle Service]
+  LifecycleSvc --> PolicySvc[Policy Engine]
+  LifecycleSvc --> Workflow[Workflow Engine]
+  Workflow --> CloudAdapter[Cloud Adapter]
+  Workflow --> CMDBAdapter[CMDB Adapter]
+  LifecycleSvc --> DB[(DB)]
+```

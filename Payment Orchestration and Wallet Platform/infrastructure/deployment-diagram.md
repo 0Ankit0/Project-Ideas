@@ -1,25 +1,40 @@
 # Deployment Diagram
 
-## Purpose
-Define the deployment diagram artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+## Production Deployment
+```mermaid
+flowchart TB
+    Internet[(Internet)] --> WAF[WAF/CDN]
+    WAF --> LB[Load Balancer]
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+    subgraph VPC[Payments VPC]
+      subgraph AppSubnets[Private App Subnets]
+        API[Payments API Pods]
+        Worker[Settlement/Reconciliation Workers]
+      end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+      subgraph DataSubnets[Private Data Subnets]
+        DB[(PostgreSQL HA)]
+        MQ[(Managed MQ)]
+        Redis[(Redis)]
+      end
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    LB --> API
+    API --> DB
+    API --> MQ
+    API --> Redis
+    Worker --> DB
+    Worker --> MQ
 
+    API --> Obs[Observability Stack]
+    Worker --> Obs
+    DB --> Backup[Encrypted Backups]
+```
 
-## Infrastructure Emphasis
-- Multi-environment topology (dev/stage/prod) with promotion gates.
-- Network segmentation, private service communication, and WAF boundaries.
-- Backup, disaster recovery, and key rotation procedures.
+## Environment Promotion
+```mermaid
+flowchart LR
+    Dev --> Stage --> Prod
+    Stage --> Gate[Risk + Finance Approval Gate]
+    Gate --> Prod
+```

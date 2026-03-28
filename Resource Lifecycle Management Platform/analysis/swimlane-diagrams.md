@@ -1,12 +1,20 @@
 # Swimlane Diagrams
 
-## Lanes
-- **Customer Lane:** discovery, reservation actions, cancellation requests.
-- **Operations Lane:** fulfillment, return processing, evidence capture.
-- **Finance Lane:** charge computation, reconciliation, exceptions.
-- **Platform Lane:** policy checks, orchestration, audit event emission.
-
-## Handoffs
-- Customer -> Platform on reservation command.
-- Platform -> Operations on fulfillment readiness.
-- Operations -> Finance on return/incident outcomes.
+```mermaid
+flowchart LR
+  subgraph Requestor
+    A[Submit request]
+  end
+  subgraph Platform
+    B[Policy + template validation]
+    C[Provision workflow]
+  end
+  subgraph Ops
+    D[Approve exceptions]
+  end
+  subgraph Cloud
+    E[Create resource]
+  end
+  A --> B --> C --> E
+  B --> D --> C
+```

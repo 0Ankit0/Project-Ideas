@@ -1,25 +1,42 @@
 # Activity Diagrams
 
-## Purpose
-Define the activity diagrams artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+## Login with MFA
+```mermaid
+flowchart TD
+    A[User submits credentials] --> B[Validate username/password]
+    B --> C{Valid?}
+    C -- No --> D[Increment failure counter]
+    D --> E{Threshold reached?}
+    E -- Yes --> F[Lock account + alert]
+    E -- No --> Z[Return auth failed]
+    C -- Yes --> G{MFA required?}
+    G -- No --> H[Issue session/token]
+    G -- Yes --> I[Challenge second factor]
+    I --> J{Factor verified?}
+    J -- No --> Z
+    J -- Yes --> H
+```
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+## User Provisioning
+```mermaid
+flowchart TD
+    A[Provisioning request] --> B[Validate tenant policy]
+    B --> C{Policy pass?}
+    C -- No --> D[Reject request]
+    C -- Yes --> E[Create identity record]
+    E --> F[Assign default roles/groups]
+    F --> G[Send activation invite]
+    G --> H[Publish UserProvisioned event]
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Analysis Notes
-- Capture alternate/error flows for: authentication and session lifecycle, token issuance and revocation, federation login.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: OIDC/SAML, admin console, policy API.
+## Access Review and Revocation
+```mermaid
+flowchart TD
+    A[Periodic access review starts] --> B[Generate entitlement report]
+    B --> C[Manager reviews entitlements]
+    C --> D{Revoke access?}
+    D -- No --> E[Mark review complete]
+    D -- Yes --> F[Disable roles/groups]
+    F --> G[Invalidate active sessions/tokens]
+    G --> H[Publish AccessRevoked event]
+```

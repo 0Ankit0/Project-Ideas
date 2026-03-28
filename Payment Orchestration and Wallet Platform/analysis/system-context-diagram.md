@@ -1,25 +1,34 @@
 # System Context Diagram
 
-## Purpose
-Define the system context diagram artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+```mermaid
+flowchart LR
+    subgraph Actors
+      Customer
+      MerchantOps[Merchant Ops]
+      RiskAnalyst[Risk Analyst]
+      FinanceOps[Finance Ops]
+    end
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+    POWP[Payment Orchestration and Wallet Platform]
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph External
+      PSP[PSP/Acquirer]
+      Bank[Banking Rails]
+      Card[Card Network]
+      KYC[KYC/AML Provider]
+      Ledger[General Ledger]
+      Notify[Notification Service]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Customer --> POWP
+    MerchantOps --> POWP
+    RiskAnalyst --> POWP
+    FinanceOps --> POWP
 
-
-## Analysis Notes
-- Capture alternate/error flows for: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: checkout API, webhooks, ops console.
+    POWP <--> PSP
+    POWP <--> Bank
+    POWP <--> Card
+    POWP --> KYC
+    POWP --> Ledger
+    POWP --> Notify
+```

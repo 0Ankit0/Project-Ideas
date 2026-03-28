@@ -1,25 +1,15 @@
 # Component Diagrams
 
-## Purpose
-Define the component diagrams artifacts for the **Messaging and Notification Platform** with implementation-ready detail.
-
-## Domain Context
-- Domain: Messaging
-- Core entities: Message Request, Template, Provider Route, Consent Record, Delivery Attempt, Suppression List, Campaign
-- Primary workflows: template rendering and localization, channel/provider routing, delivery retries and failover, consent enforcement and suppression, delivery analytics and feedback ingestion
-
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+```mermaid
+flowchart LR
+  API[API Layer] --> Orchestrator[Dispatch Orchestrator]
+  Orchestrator --> Tmpl[Template Service]
+  Orchestrator --> Pref[Preference Service]
+  Orchestrator --> Queue[(Queue)]
+  Queue --> Email[Email Worker]
+  Queue --> SMS[SMS Worker]
+  Queue --> Push[Push Worker]
+  Email --> Metrics[Metrics Service]
+  SMS --> Metrics
+  Push --> Metrics
+```

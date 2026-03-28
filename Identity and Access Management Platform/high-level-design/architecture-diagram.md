@@ -1,25 +1,43 @@
 # Architecture Diagram
 
-## Purpose
-Define the architecture diagram artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    Channels[Web Apps, Mobile Apps, APIs, Admin Console] --> Edge[API Gateway]
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+    subgraph IAMCore[IAM Core Services]
+      Identity[Identity Lifecycle]
+      Authentication[Authentication]
+      Authorization[Authorization]
+      Token[OAuth/OIDC Token Service]
+      Provisioning[Provisioning/SCIM]
+      Audit[Audit & Compliance]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    Edge --> Identity
+    Edge --> Authentication
+    Edge --> Authorization
+    Edge --> Token
+    Edge --> Provisioning
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Shared[Shared Services]
+      Risk[Risk/Adaptive Policy]
+      Notify[Notification Service]
+      Jobs[Async Workers]
+    end
 
+    Authentication --> Risk
+    Authentication --> Notify
+    Provisioning --> Jobs
 
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    subgraph Data[Data Layer]
+      DB[(Identity Store)]
+      Cache[(Policy Cache)]
+      MQ[(Event Bus)]
+      SIEM[(SIEM Export)]
+    end
+
+    IAMCore --> DB
+    Authorization --> Cache
+    IAMCore --> MQ
+    MQ --> SIEM
+```

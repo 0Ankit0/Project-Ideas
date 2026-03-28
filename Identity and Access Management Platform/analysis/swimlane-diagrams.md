@@ -1,25 +1,52 @@
 # Swimlane Diagrams
 
-## Purpose
-Define the swimlane diagrams artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+## Federated Sign-in Swimlane
+```mermaid
+flowchart LR
+    subgraph User[User]
+      A[Open application]
+      B[Authenticate at IdP]
+    end
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+    subgraph App[Client Application]
+      C[Redirect to IAM authorize endpoint]
+      D[Receive auth code]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph IAM[IAM Platform]
+      E[Validate federation assertion]
+      F[Apply policy + MFA]
+      G[Issue tokens]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph IdP[Enterprise IdP]
+      H[Perform primary authentication]
+    end
 
+    A --> C --> H --> B --> E --> F --> G --> D
+```
 
-## Analysis Notes
-- Capture alternate/error flows for: authentication and session lifecycle, token issuance and revocation, federation login.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: OIDC/SAML, admin console, policy API.
+## Joiner-Mover-Leaver Swimlane
+```mermaid
+flowchart LR
+    subgraph HR[HR System]
+      A[Employee status change]
+    end
+
+    subgraph IAM[IAM]
+      B[Ingest event]
+      C[Map to identity lifecycle action]
+      D[Provision/update/deprovision account]
+    end
+
+    subgraph Admin[Tenant Admin]
+      E[Review exceptional cases]
+    end
+
+    subgraph Apps[Connected Apps]
+      F[Apply entitlement updates]
+    end
+
+    A --> B --> C --> D --> F
+    C --> E --> D
+```

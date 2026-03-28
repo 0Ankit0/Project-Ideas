@@ -1,25 +1,56 @@
 # Swimlane Diagrams
 
-## Purpose
-Define the swimlane diagrams artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+## Lead-to-Opportunity Swimlane
+```mermaid
+flowchart LR
+    subgraph SalesRep[Sales Rep]
+      A[Review assigned lead]
+      B[Contact and qualify]
+      C[Convert lead]
+    end
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+    subgraph CRM[CRM System]
+      D[Score lead]
+      E[Check duplicate candidates]
+      F[Create account/contact/opportunity]
+      G[Emit conversion event]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph RevOps[Revenue Operations]
+      H[Resolve dedupe/merge case]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    A --> D
+    D --> E
+    E -->|Duplicate| H
+    H --> B
+    E -->|No duplicate| B
+    B --> C
+    C --> F
+    F --> G
+```
 
+## Forecast Submission Swimlane
+```mermaid
+flowchart LR
+    subgraph Rep[Sales Rep]
+      A[Update pipeline]
+      B[Submit forecast]
+    end
 
-## Analysis Notes
-- Capture alternate/error flows for: lead capture and qualification, deduplication and merge review, opportunity stage progression.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: web, email, calendar, mobile.
+    subgraph CRM[CRM System]
+      C[Roll up amounts]
+      D[Validate required fields]
+      E[Create snapshot]
+      F[Notify manager]
+    end
+
+    subgraph Manager[Sales Manager]
+      G[Review forecast]
+      H[Approve / return]
+    end
+
+    A --> C --> D --> E
+    B --> E
+    E --> F --> G --> H
+```

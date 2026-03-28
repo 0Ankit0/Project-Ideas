@@ -1,25 +1,35 @@
 # System Context Diagram
 
-## Purpose
-Define the system context diagram artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+```mermaid
+flowchart LR
+    subgraph Actors
+      Customer[Customer]
+      Support[Support Agent]
+      Finance[Finance Analyst]
+      Admin[Billing Admin]
+    end
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    SBEP[Subscription Billing and Entitlements Platform]
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph External
+      PSP[Payment Service Provider]
+      Tax[Tax Engine]
+      CRM[CRM]
+      GL[General Ledger/ERP]
+      Notify[Email Notification Service]
+      Fraud[Fraud/Risk Service]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Customer --> SBEP
+    Support --> SBEP
+    Finance --> SBEP
+    Admin --> SBEP
 
-
-## Analysis Notes
-- Capture alternate/error flows for: subscription creation and renewal, usage ingestion and rating, invoice generation and collection.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: API, web admin, event bus.
+    SBEP --> PSP
+    PSP --> SBEP
+    SBEP --> Tax
+    SBEP --> CRM
+    SBEP --> GL
+    SBEP --> Notify
+    SBEP --> Fraud
+```

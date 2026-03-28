@@ -1,25 +1,39 @@
 # Sequence Diagrams
 
-## Purpose
-Define the sequence diagrams artifacts for the **Warehouse Management System** with implementation-ready detail.
+## Wave Creation and Task Dispatch
+```mermaid
+sequenceDiagram
+    autonumber
+    participant OMS as OMS
+    participant API as WMS API
+    participant ALLOC as Allocation Service
+    participant WAVE as Wave Service
+    participant TASK as Task Service
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+    OMS->>API: push released orders
+    API->>ALLOC: reserve inventory
+    ALLOC->>WAVE: create wave plan
+    WAVE->>TASK: generate pick tasks
+    TASK-->>API: task ids + queue
+    API-->>OMS: wave accepted
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Goods Receipt with Discrepancy
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Scanner
+    participant API as Receiving API
+    participant REC as Receiving Service
+    participant INV as Inventory Service
+    participant QA as Exception Queue
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    Scanner->>API: receive pallet scan
+    API->>REC: validate ASN line
+    alt mismatch
+      REC->>QA: create discrepancy case
+    end
+    REC->>INV: post received quantity
+    INV-->>API: updated stock
+    API-->>Scanner: receipt confirmation
+```

@@ -1,25 +1,35 @@
 # C4 Diagrams
 
-## Purpose
-Define the c4 diagrams artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+## C1: System Context
+```mermaid
+flowchart LR
+    User[Sales User] --> CRM[CRM Platform]
+    Manager[Manager] --> CRM
+    Ops[RevOps] --> CRM
+    CRM <--> MAP[Marketing Automation]
+    CRM <--> ERP[ERP/Billing]
+    CRM <--> Mail[Email/Calendar]
+    CRM --> BI[Analytics Warehouse]
+    SSO[Identity Provider] --> CRM
+```
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+## C2: Container View
+```mermaid
+flowchart TB
+    UI[Web/Mobile UI]
+    API[API/BFF Container]
+    Core[Domain Services Container]
+    Jobs[Async Worker Container]
+    DB[(Transactional DB)]
+    Bus[(Event Bus)]
+    Search[(Search Index)]
+    WH[(Data Warehouse)]
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    UI --> API --> Core
+    Core --> DB
+    Core --> Bus
+    Jobs --> DB
+    Jobs --> Bus
+    Jobs --> Search
+    Jobs --> WH
+```

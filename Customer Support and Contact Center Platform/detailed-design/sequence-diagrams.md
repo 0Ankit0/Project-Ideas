@@ -1,25 +1,38 @@
 # Sequence Diagrams
 
-## Purpose
-Define the sequence diagrams artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+## Ticket Creation and Routing
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Customer Channel
+    participant API as Support API
+    participant T as Ticket Service
+    participant R as Routing Engine
+    participant Q as Queue Service
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
+    C->>API: POST /v1/tickets
+    API->>T: validate + create ticket
+    T->>R: classify and route
+    R->>Q: assign queue + priority
+    Q-->>T: assignment result
+    T-->>API: ticket created
+    API-->>C: 201 + ticketId
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Escalation Workflow
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as L1 Agent UI
+    participant API as Support API
+    participant E as Escalation Service
+    participant S as Specialist Queue
+    participant N as Notification Service
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    A->>API: escalate ticket
+    API->>E: validate escalation policy
+    E->>S: move ticket to specialist queue
+    E->>N: notify specialist + supervisor
+    E-->>API: escalation accepted
+    API-->>A: updated ticket state
+```

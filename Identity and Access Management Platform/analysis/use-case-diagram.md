@@ -1,25 +1,29 @@
 # Use Case Diagram
 
-## Purpose
-Define the use case diagram artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+```mermaid
+flowchart LR
+    User[End User]
+    Admin[Tenant Admin]
+    SecOps[SecOps]
+    Dev[App Developer]
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+    UC1((Sign Up / Sign In))
+    UC2((MFA Enrollment))
+    UC3((Password Reset))
+    UC4((Manage Roles & Permissions))
+    UC5((Provision/Deprovision User))
+    UC6((Issue OAuth Tokens))
+    UC7((Review Audit Events))
+    UC8((Configure SSO Federation))
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    User --> UC1
+    User --> UC2
+    User --> UC3
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Admin --> UC4
+    Admin --> UC5
+    Admin --> UC8
 
-
-## Analysis Notes
-- Capture alternate/error flows for: authentication and session lifecycle, token issuance and revocation, federation login.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: OIDC/SAML, admin console, policy API.
+    Dev --> UC6
+    SecOps --> UC7
+```

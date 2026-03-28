@@ -1,25 +1,66 @@
 # C4 Code Diagram
 
-## Purpose
-Define the c4 code diagram artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+This code-level view maps key modules inside the CRM backend service.
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+```mermaid
+flowchart TB
+    subgraph Interface[Interface Layer]
+      CtrlLead[LeadController]
+      CtrlOpp[OpportunityController]
+      CtrlForecast[ForecastController]
+      CtrlTerritory[TerritoryController]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph App[Application Layer]
+      LeadApp[LeadApplicationService]
+      OppApp[OpportunityApplicationService]
+      ForecastApp[ForecastApplicationService]
+      TerritoryApp[TerritoryApplicationService]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Domain[Domain Layer]
+      LeadAgg[Lead Aggregate]
+      OppAgg[Opportunity Aggregate]
+      ForecastAgg[ForecastSnapshot Aggregate]
+      TerritoryAgg[Territory Aggregate]
+      Rules[Policy/Domain Rules]
+    end
 
+    subgraph Infra[Infrastructure Layer]
+      Repo[Repositories]
+      Outbox[Outbox Publisher]
+      Audit[AuditWriter]
+      Authz[AuthzAdapter]
+    end
 
-## Delivery Emphasis
-- Milestones mapped to slices that are testable end-to-end.
-- CI quality gates include lint, unit/integration tests, and contract checks.
-- Backend status matrix tracks readiness by capability and release wave.
+    CtrlLead --> LeadApp
+    CtrlOpp --> OppApp
+    CtrlForecast --> ForecastApp
+    CtrlTerritory --> TerritoryApp
+
+    LeadApp --> LeadAgg
+    OppApp --> OppAgg
+    ForecastApp --> ForecastAgg
+    TerritoryApp --> TerritoryAgg
+
+    LeadApp --> Rules
+    OppApp --> Rules
+    ForecastApp --> Rules
+    TerritoryApp --> Rules
+
+    LeadApp --> Repo
+    OppApp --> Repo
+    ForecastApp --> Repo
+    TerritoryApp --> Repo
+
+    LeadApp --> Outbox
+    OppApp --> Outbox
+    ForecastApp --> Outbox
+    TerritoryApp --> Outbox
+
+    OppApp --> Audit
+    ForecastApp --> Audit
+    TerritoryApp --> Audit
+    LeadApp --> Authz
+    OppApp --> Authz
+```

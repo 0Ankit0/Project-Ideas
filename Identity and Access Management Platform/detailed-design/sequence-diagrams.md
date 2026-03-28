@@ -1,25 +1,40 @@
 # Sequence Diagrams
 
-## Purpose
-Define the sequence diagrams artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+## OAuth Authorization Code + PKCE
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User Agent
+    participant C as Client App
+    participant AS as IAM Authorization Server
+    participant RS as Resource Server
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+    U->>C: Start login
+    C->>AS: /authorize (PKCE challenge)
+    AS-->>U: login + consent
+    U->>AS: credentials + MFA
+    AS-->>C: authorization code
+    C->>AS: /token (code + verifier)
+    AS-->>C: access token + refresh token
+    C->>RS: API request with access token
+    RS->>AS: introspect/JWKS validate
+    RS-->>C: protected resource
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Password Reset
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant API as IAM API
+    participant ID as Identity Service
+    participant MSG as Email/SMS Provider
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    U->>API: request password reset
+    API->>ID: create one-time reset token
+    ID->>MSG: send reset link/OTP
+    U->>API: submit new password + token
+    API->>ID: verify token + policy checks
+    ID-->>API: password updated
+    API-->>U: reset successful
+```

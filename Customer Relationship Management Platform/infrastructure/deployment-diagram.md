@@ -1,25 +1,48 @@
 # Deployment Diagram
 
-## Purpose
-Define the deployment diagram artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+## Production Deployment Topology
+```mermaid
+flowchart TB
+    Internet[(Internet)] --> WAF[WAF + CDN]
+    WAF --> ALB[Public Load Balancer]
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+    subgraph VPC[Production VPC]
+      subgraph Public[Public Subnet]
+        ALB
+      end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+      subgraph PrivateApp[Private App Subnets]
+        API[API Pods]
+        Worker[Async Worker Pods]
+      end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+      subgraph PrivateData[Private Data Subnets]
+        RDS[(PostgreSQL - Primary/Replica)]
+        Redis[(Redis Cluster)]
+        MQ[(Managed Message Broker)]
+        Search[(Search Cluster)]
+      end
+    end
 
+    ALB --> API
+    API --> RDS
+    API --> Redis
+    API --> MQ
 
-## Infrastructure Emphasis
-- Multi-environment topology (dev/stage/prod) with promotion gates.
-- Network segmentation, private service communication, and WAF boundaries.
-- Backup, disaster recovery, and key rotation procedures.
+    Worker --> RDS
+    Worker --> MQ
+    Worker --> Search
+
+    API --> Logs[Centralized Logs/Tracing]
+    Worker --> Logs
+    RDS --> Backup[Encrypted Backups]
+```
+
+## Environment Promotion
+```mermaid
+flowchart LR
+    Dev[Dev] --> Stage[Stage]
+    Stage --> Prod[Prod]
+    Stage -->|Smoke + Contract Tests| Gate1[Release Gate]
+    Gate1 --> Prod
+```

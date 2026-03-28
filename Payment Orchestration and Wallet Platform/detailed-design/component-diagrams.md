@@ -1,25 +1,57 @@
 # Component Diagrams
 
-## Purpose
-Define the component diagrams artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+```mermaid
+flowchart LR
+    subgraph API
+      Gateway
+      PaymentsAPI
+      WalletAPI
+      DisputesAPI
+    end
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+    subgraph Core
+      OrchestrationSvc
+      RoutingSvc
+      RiskSvc
+      WalletSvc
+      RefundSvc
+      DisputeSvc
+      ReconciliationSvc
+      LedgerSvc
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Integrations
+      PSPAdapter
+      BankAdapter
+      KYCAdapter
+      NotifyAdapter
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Data
+      DB[(PostgreSQL)]
+      MQ[(Event Bus)]
+      Cache[(Redis)]
+    end
 
+    Gateway --> PaymentsAPI --> OrchestrationSvc
+    Gateway --> WalletAPI --> WalletSvc
+    Gateway --> DisputesAPI --> DisputeSvc
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    OrchestrationSvc --> RoutingSvc
+    OrchestrationSvc --> RiskSvc
+    OrchestrationSvc --> PSPAdapter
+    WalletSvc --> LedgerSvc
+    RefundSvc --> PSPAdapter
+    DisputeSvc --> PSPAdapter
+
+    OrchestrationSvc --> DB
+    WalletSvc --> DB
+    RefundSvc --> DB
+    DisputeSvc --> DB
+    LedgerSvc --> DB
+
+    Core --> MQ
+    RiskSvc --> Cache
+    WalletSvc --> KYCAdapter
+    Core --> NotifyAdapter
+```

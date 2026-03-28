@@ -1,25 +1,42 @@
 # System Context Diagram
 
-## Purpose
-Define the system context diagram artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+This diagram shows the CRM system boundary, primary users, and external systems.
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+```mermaid
+flowchart LR
+    subgraph Actors[Internal Actors]
+      Rep[Sales Rep]
+      Mgr[Sales Manager]
+      Ops[Revenue Operations]
+      Admin[CRM Admin]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    CRM[Customer Relationship Management Platform]
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph External[External Systems]
+      MAP[Marketing Automation]
+      Mail[Email Provider]
+      Cal[Calendar Provider]
+      ERP[ERP / Billing]
+      SSO[Identity Provider]
+      BI[BI & Data Warehouse]
+    end
 
+    Rep --> CRM
+    Mgr --> CRM
+    Ops --> CRM
+    Admin --> CRM
 
-## Analysis Notes
-- Capture alternate/error flows for: lead capture and qualification, deduplication and merge review, opportunity stage progression.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: web, email, calendar, mobile.
+    MAP --> CRM
+    CRM --> MAP
+    CRM --> Mail
+    CRM --> Cal
+    CRM --> ERP
+    CRM --> BI
+    SSO --> CRM
+```
+
+## Notes
+- CRM is the source of truth for lead, account, contact, and opportunity lifecycle state.
+- Identity and access are delegated to enterprise SSO/IdP.
+- Downstream analytics consume event/data exports from CRM.

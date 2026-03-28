@@ -1,25 +1,69 @@
 # C4 Code Diagram
 
-## Purpose
-Define the c4 code diagram artifacts for the **Messaging and Notification Platform** with implementation-ready detail.
+This implementation view details the notification dispatch pipeline and reliability boundaries.
 
-## Domain Context
-- Domain: Messaging
-- Core entities: Message Request, Template, Provider Route, Consent Record, Delivery Attempt, Suppression List, Campaign
-- Primary workflows: template rendering and localization, channel/provider routing, delivery retries and failover, consent enforcement and suppression, delivery analytics and feedback ingestion
+## Code-Level Structure
+```mermaid
+flowchart TB
+  subgraph Interface
+    NotificationController
+    TemplateController
+    PreferenceController
+  end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+  subgraph Application
+    NotificationAppService
+    TemplateAppService
+    PreferenceAppService
+    DispatchWorkerService
+  end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+  subgraph Domain
+    NotificationAggregate
+    TemplateEntity
+    RecipientPreference
+    DeliveryPolicy
+  end
 
+  subgraph Infrastructure
+    NotificationRepository
+    TemplateRepository
+    QueueAdapter
+    ChannelAdapter
+    MetricsAdapter
+    EventPublisher
+  end
 
-## Delivery Emphasis
-- Milestones mapped to slices that are testable end-to-end.
-- CI quality gates include lint, unit/integration tests, and contract checks.
-- Backend status matrix tracks readiness by capability and release wave.
+  NotificationController --> NotificationAppService --> NotificationAggregate
+  TemplateController --> TemplateAppService --> TemplateEntity
+  PreferenceController --> PreferenceAppService --> RecipientPreference
+  NotificationAppService --> DispatchWorkerService --> DeliveryPolicy
+  NotificationAppService --> NotificationRepository
+  TemplateAppService --> TemplateRepository
+  DispatchWorkerService --> QueueAdapter
+  DispatchWorkerService --> ChannelAdapter
+  DispatchWorkerService --> MetricsAdapter
+  NotificationAppService --> EventPublisher
+```
+
+## Critical Runtime Sequence: Notification Dispatch
+```mermaid
+sequenceDiagram
+  autonumber
+  participant API as NotificationController
+  participant APP as NotificationAppService
+  participant Q as QueueAdapter
+  participant W as DispatchWorkerService
+  participant CH as ChannelAdapter
+
+  API->>APP: create notification
+  APP->>Q: enqueue job
+  Q->>W: deliver queued job
+  W->>CH: send via channel provider
+  CH-->>W: delivery response
+  W-->>APP: outcome recorded
+```
+
+## Notes
+- Use idempotent delivery keys for retry safety.
+- Separate synchronous acceptance path from asynchronous channel dispatch.

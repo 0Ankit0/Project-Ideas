@@ -1,17 +1,16 @@
-# Bpmn Swimlane Diagram
+# BPMN Swimlane Diagram
 
-## Objective
-
-This document captures bpmn swimlane diagram guidance for the **Healthcare Appointment System**.
-
-## Scope
-
-- System: Healthcare Appointment System
-- Goal: Digital-first appointment scheduling, provider management, payments, and reminders for healthcare organizations.
-- Primary actors: Patients, Providers, Clinic Admin, Support Staff
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+flowchart LR
+  subgraph Patient
+    A[Request appointment]
+  end
+  subgraph System
+    B[Validate and schedule]
+    C[Send reminders]
+  end
+  subgraph Provider
+    D[Conduct visit]
+  end
+  A --> B --> C --> D
+```

@@ -1,25 +1,33 @@
 # C4 Diagrams
 
-## Purpose
-Define the c4 diagrams artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+## C1 Context
+```mermaid
+flowchart LR
+    User[User] --> IAM[IAM Platform]
+    Admin[Admin] --> IAM
+    Apps[Client Apps] <--> IAM
+    HR[HR/Directory] --> IAM
+    IAM --> SIEM[SIEM]
+    IdP[External IdP] --> IAM
+```
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+## C2 Containers
+```mermaid
+flowchart TB
+    Console[Admin Console]
+    AS[Auth Server API]
+    Mgmt[Identity Management API]
+    Worker[Provisioning Worker]
+    DB[(Identity DB)]
+    Cache[(Redis)]
+    MQ[(Event Bus)]
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    Console --> Mgmt
+    Apps[Client Apps] --> AS
+    AS --> DB
+    Mgmt --> DB
+    AS --> Cache
+    Mgmt --> MQ
+    Worker --> MQ
+    Worker --> DB
+```

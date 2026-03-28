@@ -1,25 +1,42 @@
 # System Sequence Diagrams
 
-## Purpose
-Define the system sequence diagrams artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+## System Sequence: Submit Forecast
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Rep as Sales Rep
+    participant UI as CRM UI
+    participant API as Forecast API
+    participant Svc as Forecast Service
+    participant DB as DB
+    participant Mgr as Manager Queue
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+    Rep->>UI: Submit monthly forecast
+    UI->>API: POST /v1/forecasts/snapshots/{id}/submit
+    API->>Svc: submit(snapshotId, actor)
+    Svc->>DB: persist status=Submitted
+    Svc->>Mgr: notify manager for review
+    Svc-->>API: submission accepted
+    API-->>UI: 200 OK + submitted status
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## System Sequence: Territory Reassignment
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Ops as RevOps
+    participant UI as Admin UI
+    participant API as Territory API
+    participant Job as Reassignment Worker
+    participant DB as DB
+    participant Bus as Event Bus
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    Ops->>UI: Request territory reassignment
+    UI->>API: POST /v1/territories/reassignments
+    API->>DB: create reassignment job
+    API->>Job: start async execution
+    Job->>DB: reassign accounts + opportunities
+    Job->>Bus: publish TerritoryReassignmentCompleted
+    Job-->>API: done
+    API-->>UI: job status completed
+```

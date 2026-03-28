@@ -1,17 +1,17 @@
-# Bpmn Swimlane Diagram
+# BPMN Swimlane Diagram
 
-## Objective
-
-This document captures bpmn swimlane diagram guidance for the **Logistics Tracking System**.
-
-## Scope
-
-- System: Logistics Tracking System
-- Goal: End-to-end shipment lifecycle tracking across hubs, fleets, drivers, and customer notifications.
-- Primary actors: Shippers, Customers, Dispatchers, Operations Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+flowchart LR
+  subgraph Dispatcher
+    A[Create shipment]
+  end
+  subgraph Carrier
+    B[Pickup parcel]
+    C[Move between hubs]
+    D[Final-mile delivery]
+  end
+  subgraph Customer
+    E[Receive delivery updates]
+  end
+  A --> B --> C --> D --> E
+```

@@ -1,25 +1,41 @@
 # Activity Diagrams
 
-## Purpose
-Define the activity diagrams artifacts for the **Warehouse Management System** with implementation-ready detail.
+## Inbound Receiving and Putaway
+```mermaid
+flowchart TD
+    A[Inbound truck arrives] --> B[Scan ASN/PO]
+    B --> C{Matches expected?}
+    C -- No --> D[Create discrepancy case]
+    C -- Yes --> E[Receive inventory]
+    D --> E
+    E --> F[Quality check]
+    F --> G{Pass QC?}
+    G -- No --> H[Move to hold area]
+    G -- Yes --> I[Generate putaway tasks]
+    I --> J[Confirm bin location]
+```
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+## Order Fulfillment
+```mermaid
+flowchart TD
+    A[Orders imported from OMS] --> B[Run allocation rules]
+    B --> C[Generate wave]
+    C --> D[Dispatch pick tasks]
+    D --> E[Pick confirmation via scanner]
+    E --> F[Pack and label]
+    F --> G[Ship manifest to carrier]
+    G --> H[Post shipment confirmation]
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Analysis Notes
-- Capture alternate/error flows for: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: scanner app, ops dashboard, integration API.
+## Cycle Count Adjustment
+```mermaid
+flowchart TD
+    A[Cycle count scheduled] --> B[Assign count tasks]
+    B --> C[Count location]
+    C --> D{Variance detected?}
+    D -- No --> E[Close task]
+    D -- Yes --> F[Supervisor recount]
+    F --> G{Confirmed variance?}
+    G -- No --> E
+    G -- Yes --> H[Adjust inventory + audit]
+```

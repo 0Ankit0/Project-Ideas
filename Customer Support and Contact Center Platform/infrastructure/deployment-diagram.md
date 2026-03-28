@@ -1,25 +1,42 @@
 # Deployment Diagram
 
-## Purpose
-Define the deployment diagram artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+## Production Deployment
+```mermaid
+flowchart TB
+    Internet[(Internet/PSTN)] --> Edge[WAF + Channel Edge]
+    Edge --> LB[Public Load Balancer]
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
+    subgraph VPC[Contact Center VPC]
+      subgraph AppSubnets[Private App Subnets]
+        API[Support API Pods]
+        Worker[SLA/QA Worker Pods]
+      end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+      subgraph DataSubnets[Private Data Subnets]
+        DB[(PostgreSQL HA)]
+        MQ[(Managed MQ)]
+        Search[(Search Cluster)]
+        Redis[(Redis)]
+      end
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    LB --> API
+    API --> DB
+    API --> MQ
+    API --> Redis
+    Worker --> DB
+    Worker --> MQ
+    Worker --> Search
 
+    API --> Obs[Observability Stack]
+    Worker --> Obs
+    DB --> Backup[Encrypted Backups]
+```
 
-## Infrastructure Emphasis
-- Multi-environment topology (dev/stage/prod) with promotion gates.
-- Network segmentation, private service communication, and WAF boundaries.
-- Backup, disaster recovery, and key rotation procedures.
+## Environment Promotion
+```mermaid
+flowchart LR
+    Dev --> Stage --> Prod
+    Stage --> Gate[Load + SLA Validation Gate]
+    Gate --> Prod
+```

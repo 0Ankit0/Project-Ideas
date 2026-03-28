@@ -1,25 +1,53 @@
 # Component Diagrams
 
-## Purpose
-Define the component diagrams artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+```mermaid
+flowchart LR
+    subgraph API[API Layer]
+      GW[Gateway]
+      AuthAPI[Auth API]
+      AdminAPI[Admin API]
+    end
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+    subgraph Core[IAM Core]
+      IdentitySvc[Identity Service]
+      AuthSvc[Authentication Service]
+      TokenSvc[Token Service]
+      PolicySvc[Authorization Policy Service]
+      ProvisionSvc[Provisioning Service]
+      AuditSvc[Audit Service]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Integrations[Integrations]
+      Federation[Federation Adapter]
+      Notify[Email/SMS Adapter]
+      SIEM[SIEM Exporter]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Data[Data]
+      DB[(PostgreSQL)]
+      Cache[(Redis)]
+      KMS[(KMS/HSM)]
+      Bus[(Event Bus)]
+    end
 
+    GW --> AuthAPI --> AuthSvc
+    GW --> AdminAPI --> IdentitySvc
+    AuthSvc --> TokenSvc
+    AuthSvc --> PolicySvc
+    IdentitySvc --> ProvisionSvc
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    IdentitySvc --> DB
+    AuthSvc --> DB
+    TokenSvc --> DB
+    PolicySvc --> Cache
+    TokenSvc --> KMS
+
+    AuthSvc --> Notify
+    ProvisionSvc --> Federation
+    AuditSvc --> SIEM
+
+    IdentitySvc --> Bus
+    AuthSvc --> Bus
+    TokenSvc --> Bus
+    Bus --> AuditSvc
+```

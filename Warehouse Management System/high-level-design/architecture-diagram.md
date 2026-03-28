@@ -1,25 +1,46 @@
 # Architecture Diagram
 
-## Purpose
-Define the architecture diagram artifacts for the **Warehouse Management System** with implementation-ready detail.
+```mermaid
+flowchart TB
+    Channels[RF Scanners, Web UI, OMS/ERP Integrations] --> Edge[API Gateway]
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+    subgraph Services[WMS Domain Services]
+      Receiving
+      Inventory
+      Allocation
+      WavePlanning
+      TaskExecution
+      Shipping
+      Returns
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    Edge --> Receiving
+    Edge --> Inventory
+    Edge --> Allocation
+    Edge --> TaskExecution
+    Edge --> Shipping
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Shared
+      Auth[AuthZ]
+      Audit[Audit Logging]
+      Jobs[Async Workers]
+      Rules[Slotting/Allocation Rules]
+    end
 
+    Edge --> Auth
+    Allocation --> Rules
+    Services --> Audit
+    Shipping --> Jobs
 
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    subgraph DataInfra
+      DB[(PostgreSQL)]
+      MQ[(Event Bus)]
+      Cache[(Redis)]
+      BI[(Analytics Warehouse)]
+    end
+
+    Services --> DB
+    Services --> MQ
+    Services --> Cache
+    MQ --> BI
+```

@@ -1,25 +1,35 @@
 # System Sequence Diagrams
 
-## Purpose
-Define the system sequence diagrams artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+## System Sequence: Create Payment
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Merchant
+    participant API as Payments API
+    participant ORCH as Orchestration Service
+    participant PSP as PSP Adapter
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+    Merchant->>API: create payment
+    API->>ORCH: validate and orchestrate
+    ORCH->>PSP: authorize + capture
+    PSP-->>ORCH: result
+    ORCH-->>API: payment status
+    API-->>Merchant: response
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## System Sequence: Wallet Top-up
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant API as Wallet API
+    participant WAL as Wallet Service
+    participant LEDGER as Ledger Service
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    User->>API: top-up wallet
+    API->>WAL: execute top-up
+    WAL->>LEDGER: post entries
+    LEDGER-->>WAL: committed
+    WAL-->>API: success
+    API-->>User: updated balance
+```
