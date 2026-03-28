@@ -1,24 +1,35 @@
-# Business Rules - Anomaly Detection System
+# Business Rules
 
-## Severity Mapping
-- If score $\ge 0.95$ → **critical**
-- If score 0.90–0.95 → **high**
-- If score 0.75–0.90 → **medium**
-- Else → **low**
+This document defines enforceable policy rules for **Anomaly Detection System** so command processing, asynchronous jobs, and operational actions behave consistently under normal and exceptional conditions.
 
-## Alert Deduplication
-- Duplicate alerts are suppressed within a configurable window (default 10 minutes) for the same source, metric, and severity.
+## Context
+- Domain focus: anomaly detection workflows.
+- Rule categories: lifecycle transitions, authorization, compliance, and resilience.
+- Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
 
-## Suppression Rules
-- Quiet hours are applied per tenant.
-- Suppressed alerts are still stored for auditing.
+## Enforceable Rules
+1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
+2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
+3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
+4. Manual overrides must include approver identity, rationale, and expiration timestamp.
+5. Retries and compensations must be idempotent and must not create duplicate business effects.
 
-## Model Eligibility
-- A model must meet minimum precision and recall thresholds before deployment.
+## Rule Evaluation Pipeline
+```mermaid
+flowchart TD
+    A[Incoming Command] --> B[Validate Payload]
+    B --> C{Authorized Actor?}
+    C -- No --> C1[Reject + Security Audit]
+    C -- Yes --> D{Business Rules Pass?}
+    D -- No --> D1[Reject + Rule Violation Event]
+    D -- Yes --> E{State Transition Allowed?}
+    E -- No --> E1[Return Conflict]
+    E -- Yes --> F[Commit Transaction]
+    F --> G[Publish Domain Event]
+    G --> H[Update Read Models and Alerts]
+```
 
-## Feedback Handling
-- Feedback labels are required before closing high or critical alerts.
-
-## Retention Policy
-- Raw data retention default: 90 days.
-- Aggregated features retention default: 12 months.
+## Exception and Override Handling
+- Overrides are restricted to approved exception classes and require dual logging (business + security audit).
+- Override windows automatically expire and trigger follow-up verification tasks.
+- Repeated override patterns are reviewed for policy redesign and automation improvements.

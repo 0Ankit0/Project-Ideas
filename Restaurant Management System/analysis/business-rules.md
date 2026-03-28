@@ -1,34 +1,35 @@
-# Business Rules - Restaurant Management System
+# Business Rules
 
-## Reservation and Table Rules
-- A reservation may hold a table window only within configured grace and no-show periods.
-- A table cannot be assigned to more than one active party unless explicitly merged by authorized staff.
-- Waitlist promotion should consider party size, table fit, and reservation priority rules.
+This document defines enforceable policy rules for **Restaurant Management System** so command processing, asynchronous jobs, and operational actions behave consistently under normal and exceptional conditions.
 
-## Order and Service Rules
-- Orders may be edited before kitchen fire without elevated approval, but post-fire changes require policy-driven control.
-- Discounts, voids, or complimentary items above configured thresholds require manager approval.
-- Seat-level or course-level ordering must preserve guest-level service context for billing and kitchen routing.
+## Context
+- Domain focus: restaurant management workflows.
+- Rule categories: lifecycle transitions, authorization, compliance, and resilience.
+- Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
 
-## Kitchen Rules
+## Enforceable Rules
+1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
+2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
+3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
+4. Manual overrides must include approver identity, rationale, and expiration timestamp.
+5. Retries and compensations must be idempotent and must not create duplicate business effects.
 
-| Rule Area | Baseline Rule |
-|-----------|---------------|
-| Station routing | Each order item routes to one or more stations based on menu and recipe configuration |
-| Ticket priority | Driven by service type, course timing, and branch policy |
-| Stock shortage | Shortage must surface before or during prep with an auditable exception path |
-| Refire | Refire events require cause capture and do not silently overwrite original preparation history |
+## Rule Evaluation Pipeline
+```mermaid
+flowchart TD
+    A[Incoming Command] --> B[Validate Payload]
+    B --> C{Authorized Actor?}
+    C -- No --> C1[Reject + Security Audit]
+    C -- Yes --> D{Business Rules Pass?}
+    D -- No --> D1[Reject + Rule Violation Event]
+    D -- Yes --> E{State Transition Allowed?}
+    E -- No --> E1[Return Conflict]
+    E -- Yes --> F[Commit Transaction]
+    F --> G[Publish Domain Event]
+    G --> H[Update Read Models and Alerts]
+```
 
-## Inventory and Procurement Rules
-- Ingredient stock must remain traceable through receipt, usage, wastage, transfer, and adjustment events.
-- Negative stock should be blocked or escalated according to branch policy.
-- Goods receipts that differ from purchase orders must remain auditable and visible for reconciliation.
-
-## Billing and Accounting Rules
-- Bill closure requires tax and payment totals to reconcile to order value after valid discounts and adjustments.
-- Refunds, post-close voids, and reconciliation overrides require role-based approval and audit logs.
-- Operational accounting exports must preserve traceability back to bills, settlements, and drawer sessions.
-
-## Workforce Rules
-- Shift schedules do not imply payroll but must support staffing visibility and attendance completeness.
-- Day close should surface unresolved open shifts, unsettled orders, or unbalanced drawer sessions before final approval.
+## Exception and Override Handling
+- Overrides are restricted to approved exception classes and require dual logging (business + security audit).
+- Override windows automatically expire and trigger follow-up verification tasks.
+- Repeated override patterns are reviewed for policy redesign and automation improvements.

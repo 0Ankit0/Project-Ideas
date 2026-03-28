@@ -1,27 +1,41 @@
 # Data Dictionary
 
-This data dictionary defines the core entities and data semantics for Student Information System. It focuses on enrollment, attendance, grading, transcripts, and fee operations.
+This data dictionary is the canonical reference for **Student Information System**. It defines shared terminology, entity semantics, and governance controls required to keep student information workflows consistent across teams and services.
 
-## Core Domains
-- Identity and access (users, roles, tenants/departments)
-- Transactions and lifecycle records
-- Financial and audit traces
-- Notification and integration payloads
+## Scope and Goals
+- Establish a stable vocabulary for architecture, API, analytics, and operations teams.
+- Define minimum required fields for core entities and expected relationship boundaries.
+- Document data quality and retention controls needed for production readiness.
 
-## Key Data Quality Rules
-- Use immutable identifiers and created/updated timestamps on all top-level entities.
-- Record actor/source metadata for every state-changing event.
-- Keep monetary values and units explicit (currency, tax mode, rounding policy).
-- Store status fields as controlled vocabularies, not free text.
-
-## Critical Entities
-| Entity | Purpose | Required Fields |
+## Core Entities
+| Entity | Description | Required Attributes |
 |---|---|---|
-| Account/User | Actor identity and authorization context | `id`, `status`, `role`, `created_at` |
-| Primary Record | Central business object for lifecycle tracking | `id`, `state`, `owner_id`, `effective_at` |
-| Transaction/Event | Immutable activity journal entry | `event_id`, `entity_id`, `event_type`, `occurred_at` |
-| Settlement/Outcome | Financial or operational closure details | `reference_id`, `amount`, `result`, `closed_at` |
+| TenantOrOrganization | Top-level ownership boundary for data segregation | `org_id, name, status, region, created_at` |
+| UserOrActor | Human/system principal that performs actions | `actor_id, org_id, role, status, last_active_at` |
+| PrimaryRecord | Main lifecycle object handled by the platform | `record_id, org_id, state, owner_id, created_at, updated_at` |
+| ChildTransaction | Operational transaction or sub-step linked to primary record | `txn_id, record_id, txn_type, amount_or_value, occurred_at` |
+| PolicyOrRule | Versioned policy configuration that influences decisions | `policy_id, scope, version, effective_from, effective_to` |
+| AuditEvent | Append-only evidence for state changes and controls | `audit_id, record_id, actor_id, action, reason_code, occurred_at` |
 
-## Retention and Audit Notes
-- Preserve business and compliance records according to policy windows.
-- Ensure audit logs are append-only and queryable by actor, entity, and date range.
+## Canonical Relationship Diagram
+```mermaid
+erDiagram
+    TENANTORORGANIZATION ||--o{ USERORACTOR : owns
+    TENANTORORGANIZATION ||--o{ PRIMARYRECORD : contains
+    PRIMARYRECORD ||--o{ CHILDTRANSACTION : has
+    POLICYORRULE ||--o{ PRIMARYRECORD : governs
+    PRIMARYRECORD ||--o{ AUDITEVENT : audited_by
+    USERORACTOR ||--o{ AUDITEVENT : performs
+```
+
+## Data Quality Controls
+1. All write paths enforce required-field validation and referential integrity for mandatory foreign keys.
+2. External imports must include provenance metadata (`source_system`, `source_ref`, `ingested_at`).
+3. Status/state fields use controlled vocabularies and reject unknown values.
+4. Duplicate detection runs on natural keys where business identity collisions are likely.
+5. Sensitive fields carry classification tags to drive masking, encryption, and export behavior.
+
+## Retention and Audit
+- Operational records remain online for active workflow windows and support forensic queries.
+- Historical records move to archive tiers by policy without breaking traceability.
+- Audit events are immutable and linked through correlation ids for incident analysis.

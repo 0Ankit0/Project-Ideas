@@ -1,18 +1,35 @@
 # Business Rules
 
-These rules govern policy enforcement and exception handling for Rental Management System.
+This document defines enforceable policy rules for **Rental Management System** so command processing, asynchronous jobs, and operational actions behave consistently under normal and exceptional conditions.
 
-## Lifecycle and State Rules
-1. State transitions must follow approved workflow paths and be validated server-side.
-2. Any terminal-state reversal requires elevated authorization and an auditable reason code.
-3. Conflicting operations on the same active record must use optimistic locking or queue serialization.
+## Context
+- Domain focus: rental management workflows.
+- Rule categories: lifecycle transitions, authorization, compliance, and resilience.
+- Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
 
-## Financial and Compliance Rules
-1. Amount calculations must be deterministic and reproducible from source inputs.
-2. Policy-sensitive actions (refunds, overrides, waivers, manual adjustments) require dual logging: business event + audit event.
-3. PII-relevant operations must enforce least-privilege access and export redaction controls.
+## Enforceable Rules
+1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
+2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
+3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
+4. Manual overrides must include approver identity, rationale, and expiration timestamp.
+5. Retries and compensations must be idempotent and must not create duplicate business effects.
 
-## Operational Rules
-1. Every failed asynchronous integration must emit retry metadata and escalation thresholds.
-2. Critical workflow deadlines must generate alerts before SLA breach windows.
-3. Manual interventions must attach operator notes and remediation outcomes.
+## Rule Evaluation Pipeline
+```mermaid
+flowchart TD
+    A[Incoming Command] --> B[Validate Payload]
+    B --> C{Authorized Actor?}
+    C -- No --> C1[Reject + Security Audit]
+    C -- Yes --> D{Business Rules Pass?}
+    D -- No --> D1[Reject + Rule Violation Event]
+    D -- Yes --> E{State Transition Allowed?}
+    E -- No --> E1[Return Conflict]
+    E -- Yes --> F[Commit Transaction]
+    F --> G[Publish Domain Event]
+    G --> H[Update Read Models and Alerts]
+```
+
+## Exception and Override Handling
+- Overrides are restricted to approved exception classes and require dual logging (business + security audit).
+- Override windows automatically expire and trigger follow-up verification tasks.
+- Repeated override patterns are reviewed for policy redesign and automation improvements.

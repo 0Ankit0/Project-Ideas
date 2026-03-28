@@ -1,19 +1,42 @@
-# Event Catalog - Ticketing and Project Management System
+# Event Catalog
 
-| Event | Producer | Consumers | Description |
-|-------|----------|-----------|-------------|
-| ticket.created | Client Portal / API | Triage Queue, Notification Service | New issue reported |
-| attachment.scanned | Attachment Service | Ticket Service | Evidence upload completed or quarantined |
-| ticket.triaged | Triage Service | Assignment Engine, Reporting | Category, priority, and SLA set |
-| ticket.assigned | Assignment Engine | Notification Service, Work Queue | Ownership updated |
-| ticket.blocked | Developer Workflow | Project Service, Reporting | Work blocked and risk exposed |
-| ticket.ready_for_qa | Ticket Service | QA Queue | Development completed |
-| ticket.reopened | QA Workflow | Developer Queue, Notification Service | Fix failed verification |
-| ticket.closed | QA Workflow | Client Portal, Reporting | Verification passed and work finished |
-| project.created | Project Service | Reporting, Notification Service | New delivery initiative started |
-| milestone.baselined | Project Service | Reporting, Dashboard | Planned checkpoint approved |
-| milestone.forecast_changed | Project Service | PM Dashboard, Notification Service | Delivery date moved |
-| change_request.created | Ticket or Project Service | PM Approval Queue | Scope change requires review |
-| release.planned | Release Service | QA Queue, Notification Service | Deployment scheduled |
-| release.deployed | Release Service | Ticket Service, Reporting | Release completed |
-| admin.policy_changed | Admin Service | Audit Service | Workflow or SLA rule changed |
+This catalog defines stable event contracts for **Ticketing and Project Management System** to support event-driven integrations, auditability, and analytics across ticketing and project management workflows.
+
+## Contract Conventions
+- Event naming: `<domain>.<aggregate>.<action>.v1`.
+- Required metadata: `event_id`, `occurred_at`, `correlation_id`, `producer`, `schema_version`, `tenant_context`.
+- Delivery mode: at-least-once with mandatory consumer idempotency.
+- Ordering guarantee: per aggregate key; no global ordering assumption.
+
+## Domain Events
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `domain.record.created.v1` | record_id, actor_id, initial_state, occurred_at | orchestration, analytics |
+| `domain.record.state_changed.v1` | record_id, old_state, new_state, reason_code | notifications, reporting |
+| `domain.record.validation_failed.v1` | record_id, violated_rules, correlation_id | operations, quality dashboards |
+| `domain.record.override_applied.v1` | record_id, override_type, approver_id, expires_at | compliance, audit |
+| `domain.record.closed.v1` | record_id, terminal_state, closed_at | billing/settlement, archives |
+
+## Publish and Consumption Sequence
+```mermaid
+sequenceDiagram
+    participant API as Command Service
+    participant DB as Transaction Store
+    participant Outbox as Outbox Relay
+    participant Bus as Event Bus
+    participant Consumer as Downstream Consumer
+    API->>DB: Persist state change + outbox row
+    Outbox->>DB: Poll committed rows
+    Outbox->>Bus: Publish event
+    Bus-->>Consumer: Deliver event
+    Consumer->>Consumer: Idempotency check + process
+    alt Consumer failure
+        Consumer->>Bus: NACK
+        Bus-->>Consumer: Retry then DLQ
+    end
+```
+
+## Operational SLOs
+- P95 commit-to-publish latency below 5 seconds for tier-1 events.
+- DLQ triage acknowledgement within 15 minutes for production incidents.
+- Schema changes remain backward compatible within the same major version.

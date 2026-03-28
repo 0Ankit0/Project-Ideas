@@ -1,20 +1,42 @@
-# Event Catalog - Restaurant Management System
+# Event Catalog
 
-| Event | Producer | Consumers | Description |
-|-------|----------|-----------|-------------|
-| reservation.created | Reservation Service | Notification, Host Dashboard | New reservation captured |
-| waitlist.promoted | Seating Service | Host Console, Guest Touchpoint | Waitlist entry moved toward seating |
-| table.seated | Seating Service | POS, Reporting | Guest party seated |
-| order.opened | POS Service | Kitchen Routing, Reporting | Service order started |
-| order.item_added | POS Service | Kitchen Routing, Inventory Projection | Item added to order |
-| kitchen.ticket_fired | Kitchen Service | KDS, Waiter Console | Item sent to preparation |
-| kitchen.ticket_ready | Kitchen Service | Waiter Console, Reporting | Item ready for service |
-| inventory.stock_low | Inventory Service | Branch Manager, Procurement | Stock threshold crossed |
-| goods.received | Procurement Service | Inventory Ledger, Reporting | Purchase order receipt recorded |
-| bill.closed | Billing Service | Settlement, Reporting | Bill finalized |
-| settlement.completed | Settlement Service | Drawer Session, Accounting Export | Payment accepted and recorded |
-| drawer.closed | Cashier Service | Reconciliation, Reporting | Cash session closed |
-| accounting.export_generated | Accounting Export Service | External Accounting System | Export package prepared |
-| shift.started | Workforce Service | Branch Dashboard | Staff shift in progress |
-| shift.closed | Workforce Service | Day-Close Checks | Shift ended |
-| admin.policy_changed | Admin Service | Audit, Rule Engines | Policy or config updated |
+This catalog defines stable event contracts for **Restaurant Management System** to support event-driven integrations, auditability, and analytics across restaurant management workflows.
+
+## Contract Conventions
+- Event naming: `<domain>.<aggregate>.<action>.v1`.
+- Required metadata: `event_id`, `occurred_at`, `correlation_id`, `producer`, `schema_version`, `tenant_context`.
+- Delivery mode: at-least-once with mandatory consumer idempotency.
+- Ordering guarantee: per aggregate key; no global ordering assumption.
+
+## Domain Events
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `domain.record.created.v1` | record_id, actor_id, initial_state, occurred_at | orchestration, analytics |
+| `domain.record.state_changed.v1` | record_id, old_state, new_state, reason_code | notifications, reporting |
+| `domain.record.validation_failed.v1` | record_id, violated_rules, correlation_id | operations, quality dashboards |
+| `domain.record.override_applied.v1` | record_id, override_type, approver_id, expires_at | compliance, audit |
+| `domain.record.closed.v1` | record_id, terminal_state, closed_at | billing/settlement, archives |
+
+## Publish and Consumption Sequence
+```mermaid
+sequenceDiagram
+    participant API as Command Service
+    participant DB as Transaction Store
+    participant Outbox as Outbox Relay
+    participant Bus as Event Bus
+    participant Consumer as Downstream Consumer
+    API->>DB: Persist state change + outbox row
+    Outbox->>DB: Poll committed rows
+    Outbox->>Bus: Publish event
+    Bus-->>Consumer: Deliver event
+    Consumer->>Consumer: Idempotency check + process
+    alt Consumer failure
+        Consumer->>Bus: NACK
+        Bus-->>Consumer: Retry then DLQ
+    end
+```
+
+## Operational SLOs
+- P95 commit-to-publish latency below 5 seconds for tier-1 events.
+- DLQ triage acknowledgement within 15 minutes for production incidents.
+- Schema changes remain backward compatible within the same major version.

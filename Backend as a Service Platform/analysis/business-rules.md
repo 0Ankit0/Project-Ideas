@@ -1,31 +1,35 @@
-# Business Rules - Backend as a Service Platform
+# Business Rules
 
-## Postgres Core Rules
-- PostgreSQL is mandatory for platform metadata and the v1 data API model.
-- Projects cannot activate data capabilities without a valid Postgres environment and schema metadata.
-- Schema migrations must be recorded and associated with environment and actor context.
+This document defines enforceable policy rules for **Backend as a Service Platform** so command processing, asynchronous jobs, and operational actions behave consistently under normal and exceptional conditions.
 
-## Adapter and Binding Rules
-- Only certified adapter versions may be bound to production environments.
-- An environment may have only one active provider binding per capability type at a time.
-- Provider switchovers must pass compatibility checks before cutover begins.
+## Context
+- Domain focus: backend as a service workflows.
+- Rule categories: lifecycle transitions, authorization, compliance, and resilience.
+- Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
 
-## Migration Rules
+## Enforceable Rules
+1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
+2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
+3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
+4. Manual overrides must include approver identity, rationale, and expiration timestamp.
+5. Retries and compensations must be idempotent and must not create duplicate business effects.
 
-| Rule Area | Baseline Rule |
-|-----------|---------------|
-| Switchover planning | Every provider change requires a tracked switchover plan |
-| Secret readiness | Target provider secrets must validate before migration can start |
-| Cutover | Cutover must be explicit and auditable |
-| Rollback | Rollback path must be defined before activating production switchover |
-| Deprecation | Old bindings may remain readable until retirement policy is satisfied |
+## Rule Evaluation Pipeline
+```mermaid
+flowchart TD
+    A[Incoming Command] --> B[Validate Payload]
+    B --> C{Authorized Actor?}
+    C -- No --> C1[Reject + Security Audit]
+    C -- Yes --> D{Business Rules Pass?}
+    D -- No --> D1[Reject + Rule Violation Event]
+    D -- Yes --> E{State Transition Allowed?}
+    E -- No --> E1[Return Conflict]
+    E -- Yes --> F[Commit Transaction]
+    F --> G[Publish Domain Event]
+    G --> H[Update Read Models and Alerts]
+```
 
-## Tenant and Security Rules
-- Tenant boundaries must be enforced for every project, environment, secret, and capability record.
-- Secret material must never be returned directly through normal operational APIs.
-- Privileged actions such as provider changes, schema changes, and certificate updates require audit logs.
-
-## SDK and Facade Rules
-- Stable facade semantics must be preserved even if providers differ in optional behavior.
-- Provider-specific behavior may surface only through documented capability flags or compatibility notes.
-- Unsupported provider-specific custom logic must not silently bypass facade contracts.
+## Exception and Override Handling
+- Overrides are restricted to approved exception classes and require dual logging (business + security audit).
+- Override windows automatically expire and trigger follow-up verification tasks.
+- Repeated override patterns are reviewed for policy redesign and automation improvements.

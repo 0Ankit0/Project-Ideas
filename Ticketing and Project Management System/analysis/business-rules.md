@@ -1,35 +1,35 @@
-# Business Rules - Ticketing and Project Management System
+# Business Rules
 
-## Access and Data Isolation
-- Client users may only view tickets and project summaries for their own organization.
-- Internal users require explicit project membership or elevated operational roles to access delivery records.
-- Admin-only actions such as policy edits and audit exports require privileged roles and logging.
+This document defines enforceable policy rules for **Ticketing and Project Management System** so command processing, asynchronous jobs, and operational actions behave consistently under normal and exceptional conditions.
 
-## Priority and SLA Matrix
+## Context
+- Domain focus: ticketing and project management workflows.
+- Rule categories: lifecycle transitions, authorization, compliance, and resilience.
+- Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
 
-| Priority | Typical Meaning | First Response Target | Resolution Target |
-|----------|-----------------|-----------------------|-------------------|
-| P1 | Service outage / critical blocker | 15 minutes | 4 hours or approved workaround |
-| P2 | Major function degraded | 1 hour | 1 business day |
-| P3 | Normal defect / planned fix | 4 business hours | 5 business days |
-| P4 | Minor improvement / low impact | 1 business day | Managed through backlog or next milestone |
+## Enforceable Rules
+1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
+2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
+3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
+4. Manual overrides must include approver identity, rationale, and expiration timestamp.
+5. Retries and compensations must be idempotent and must not create duplicate business effects.
 
-## Assignment Rules
-- Every open ticket must have either a named assignee or an accountable queue.
-- Reassignment must preserve prior ownership history.
-- Tickets linked to committed milestones require PM notification when ownership changes.
+## Rule Evaluation Pipeline
+```mermaid
+flowchart TD
+    A[Incoming Command] --> B[Validate Payload]
+    B --> C{Authorized Actor?}
+    C -- No --> C1[Reject + Security Audit]
+    C -- Yes --> D{Business Rules Pass?}
+    D -- No --> D1[Reject + Rule Violation Event]
+    D -- Yes --> E{State Transition Allowed?}
+    E -- No --> E1[Return Conflict]
+    E -- Yes --> F[Commit Transaction]
+    F --> G[Publish Domain Event]
+    G --> H[Update Read Models and Alerts]
+```
 
-## Milestone Governance
-- A milestone cannot be marked complete while linked blocking tickets remain open.
-- Scope additions after milestone approval require change-request tracking.
-- Forecast dates may change, but baseline dates must remain historically visible.
-
-## Closure and Reopen Rules
-- Only QA reviewers, project managers, or authorized support agents may close tickets.
-- Reopened tickets inherit the prior history and create a new verification cycle.
-- Ticket closure requires either client confirmation or documented internal acceptance criteria.
-
-## Attachment Controls
-- Unsupported file types are rejected before storage.
-- Malware-positive uploads remain quarantined and inaccessible to other users.
-- Attachment metadata must include uploader, timestamp, and scan outcome.
+## Exception and Override Handling
+- Overrides are restricted to approved exception classes and require dual logging (business + security audit).
+- Override windows automatically expire and trigger follow-up verification tasks.
+- Repeated override patterns are reviewed for policy redesign and automation improvements.
