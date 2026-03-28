@@ -1,25 +1,82 @@
 # Class Diagrams
 
-## Purpose
-Define the class diagrams artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+```mermaid
+classDiagram
+    class Identity {
+      +UUID id
+      +UUID tenantId
+      +String username
+      +String email
+      +IdentityStatus status
+      +activate()
+      +suspend()
+      +deprovision()
+    }
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+    class Credential {
+      +UUID id
+      +UUID identityId
+      +CredentialType type
+      +String hash
+      +DateTime expiresAt
+      +rotate()
+    }
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    class Factor {
+      +UUID id
+      +UUID identityId
+      +FactorType type
+      +FactorStatus status
+      +enroll()
+      +verify()
+      +disable()
+    }
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    class Role {
+      +UUID id
+      +UUID tenantId
+      +String name
+      +assignTo(identityId)
+      +removeFrom(identityId)
+    }
 
+    class Permission {
+      +UUID id
+      +String resource
+      +String action
+    }
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    class ClientApplication {
+      +UUID id
+      +UUID tenantId
+      +String clientId
+      +String redirectUris
+      +issueToken()
+      +rotateSecret()
+    }
+
+    class Token {
+      +UUID id
+      +UUID identityId
+      +UUID clientId
+      +TokenType type
+      +TokenStatus status
+      +revoke()
+    }
+
+    class AuditEvent {
+      +UUID id
+      +String category
+      +String actor
+      +String outcome
+      +DateTime occurredAt
+    }
+
+    Identity "1" --> "many" Credential
+    Identity "1" --> "many" Factor
+    Identity "many" --> "many" Role
+    Role "many" --> "many" Permission
+    ClientApplication "1" --> "many" Token
+    Identity "1" --> "many" Token
+    Identity "1" --> "many" AuditEvent
+```

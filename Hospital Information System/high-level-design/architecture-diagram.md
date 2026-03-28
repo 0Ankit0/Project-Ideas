@@ -1,25 +1,49 @@
 # Architecture Diagram
 
-## Purpose
-Define the architecture diagram artifacts for the **Hospital Information System** with implementation-ready detail.
+```mermaid
+flowchart TB
+    Channels[Clinician UI, Patient Portal, Integrations] --> Edge[API Gateway]
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+    subgraph Services[Core HIS Services]
+      Patient[Patient Registry]
+      Scheduling[Scheduling]
+      Clinical[Clinical Documentation]
+      Orders[Orders & Results]
+      Admission[ADT/Bed Management]
+      Billing[Revenue Cycle]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    Edge --> Patient
+    Edge --> Scheduling
+    Edge --> Clinical
+    Edge --> Orders
+    Edge --> Admission
+    Edge --> Billing
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Shared[Shared Platform]
+      Auth[Identity/AuthZ]
+      Audit[Audit Logging]
+      Jobs[Workflow/Async Jobs]
+      Notify[Notifications]
+    end
 
+    Edge --> Auth
+    Clinical --> Audit
+    Billing --> Audit
 
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    subgraph Storage[Storage & Messaging]
+      DB[(OLTP Database)]
+      MQ[(Event Bus)]
+      Search[(Search)]
+      WH[(Warehouse)]
+    end
+
+    Services --> DB
+    Clinical --> MQ
+    Orders --> MQ
+    Billing --> MQ
+    MQ --> Jobs
+    MQ --> Search
+    MQ --> WH
+    Jobs --> Notify
+```

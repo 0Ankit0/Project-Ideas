@@ -1,25 +1,40 @@
 # Sequence Diagrams
 
-## Purpose
-Define the sequence diagrams artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+## Auth + Capture with Orchestration
+```mermaid
+sequenceDiagram
+    autonumber
+    participant M as Merchant
+    participant API as Payments API
+    participant ORCH as Orchestration Service
+    participant RISK as Risk Engine
+    participant PSP as PSP Adapter
+    participant LEDGER as Ledger Service
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+    M->>API: POST /v1/payments
+    API->>ORCH: create payment intent
+    ORCH->>RISK: evaluate transaction
+    RISK-->>ORCH: approve
+    ORCH->>PSP: authorize + capture
+    PSP-->>ORCH: success
+    ORCH->>LEDGER: post entries
+    ORCH-->>API: payment succeeded
+    API-->>M: 201 + status
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Wallet Transfer
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User App
+    participant API as Wallet API
+    participant WAL as Wallet Service
+    participant LEDGER as Ledger
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    U->>API: POST /v1/wallet/transfers
+    API->>WAL: validate + transfer
+    WAL->>LEDGER: post double-entry movement
+    LEDGER-->>WAL: committed
+    WAL-->>API: transfer complete
+    API-->>U: success
+```

@@ -1,25 +1,40 @@
 # Deployment Diagram
 
-## Purpose
-Define the deployment diagram artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+## Production Deployment
+```mermaid
+flowchart TB
+    Internet[(Internet)] --> Edge[CDN/WAF]
+    Edge --> LB[Public Load Balancer]
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    subgraph VPC[Billing VPC]
+      subgraph App[Private App Subnets]
+        API[Billing API Pods]
+        Worker[Dunning/Reconciliation Workers]
+      end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+      subgraph Data[Private Data Subnets]
+        DB[(PostgreSQL HA)]
+        Redis[(Redis)]
+        MQ[(Managed MQ)]
+      end
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    LB --> API
+    API --> DB
+    API --> Redis
+    API --> MQ
+    Worker --> DB
+    Worker --> MQ
 
+    API --> Obs[Centralized Logs/Tracing]
+    Worker --> Obs
+    DB --> Backup[Encrypted Backup Storage]
+```
 
-## Infrastructure Emphasis
-- Multi-environment topology (dev/stage/prod) with promotion gates.
-- Network segmentation, private service communication, and WAF boundaries.
-- Backup, disaster recovery, and key rotation procedures.
+## Environment Promotion
+```mermaid
+flowchart LR
+    Dev --> Stage --> Prod
+    Stage --> Gate[UAT + Finance Signoff]
+    Gate --> Prod
+```

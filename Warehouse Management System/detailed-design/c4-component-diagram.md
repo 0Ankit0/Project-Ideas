@@ -1,25 +1,51 @@
 # C4 Component Diagram
 
-## Purpose
-Define the c4 component diagram artifacts for the **Warehouse Management System** with implementation-ready detail.
+```mermaid
+flowchart TB
+    subgraph Users
+      Picker
+      Supervisor
+      Planner
+      CarrierUser
+    end
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+    subgraph WMS[WMS App Container]
+      UIBFF[Warehouse UI + BFF]
+      ReceivingCmp[Receiving Component]
+      InventoryCmp[Inventory Component]
+      AllocationCmp[Allocation/Wave Component]
+      TaskCmp[Task Execution Component]
+      ShippingCmp[Shipping Component]
+      ExceptionCmp[Exception Management]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Infra
+      OLTP[(WMS DB)]
+      Bus[(Event Bus)]
+      Cache[(Redis)]
+      Search[(Search)]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Picker --> UIBFF
+    Supervisor --> UIBFF
+    Planner --> UIBFF
+    CarrierUser --> ShippingCmp
 
+    UIBFF --> ReceivingCmp
+    UIBFF --> InventoryCmp
+    UIBFF --> AllocationCmp
+    UIBFF --> TaskCmp
+    UIBFF --> ExceptionCmp
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    ReceivingCmp --> OLTP
+    InventoryCmp --> OLTP
+    AllocationCmp --> OLTP
+    TaskCmp --> OLTP
+    ShippingCmp --> OLTP
+
+    ReceivingCmp --> Bus
+    AllocationCmp --> Bus
+    ShippingCmp --> Bus
+    Bus --> Search
+    AllocationCmp --> Cache
+```

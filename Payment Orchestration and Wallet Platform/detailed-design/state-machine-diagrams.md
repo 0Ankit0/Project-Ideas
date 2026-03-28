@@ -1,25 +1,41 @@
 # State Machine Diagrams
 
-## Purpose
-Define the state machine diagrams artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+## Payment Transaction Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Created
+    Created --> Authorized
+    Authorized --> Captured
+    Authorized --> Voided
+    Captured --> Settled
+    Captured --> Refunded
+    Authorized --> Failed
+    Created --> Failed
+    Settled --> [*]
+    Refunded --> [*]
+```
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+## Wallet Transfer Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Initiated
+    Initiated --> PendingValidation
+    PendingValidation --> Posted
+    PendingValidation --> Rejected
+    Posted --> Completed
+    Rejected --> [*]
+    Completed --> [*]
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+## Chargeback Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Opened
+    Opened --> UnderReview
+    UnderReview --> Won
+    UnderReview --> Lost
+    Lost --> Settled
+    Won --> Closed
+    Settled --> Closed
+    Closed --> [*]
+```

@@ -1,25 +1,52 @@
 # C4 Code Diagram
 
-## Purpose
-Define the c4 code diagram artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    subgraph Interface
+      SubscriptionController
+      InvoiceController
+      PaymentController
+      EntitlementController
+    end
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    subgraph Application
+      SubscriptionAppService
+      InvoiceAppService
+      PaymentAppService
+      EntitlementAppService
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Domain
+      SubscriptionAggregate
+      InvoiceAggregate
+      PaymentAttemptEntity
+      EntitlementAggregate
+      PricingPolicy
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Infrastructure
+      SubscriptionRepository
+      InvoiceRepository
+      PaymentGatewayAdapter
+      TaxAdapter
+      EventPublisher
+      AuditAdapter
+    end
 
+    SubscriptionController --> SubscriptionAppService --> SubscriptionAggregate
+    InvoiceController --> InvoiceAppService --> InvoiceAggregate
+    PaymentController --> PaymentAppService --> PaymentAttemptEntity
+    EntitlementController --> EntitlementAppService --> EntitlementAggregate
 
-## Delivery Emphasis
-- Milestones mapped to slices that are testable end-to-end.
-- CI quality gates include lint, unit/integration tests, and contract checks.
-- Backend status matrix tracks readiness by capability and release wave.
+    SubscriptionAppService --> PricingPolicy
+    InvoiceAppService --> PricingPolicy
+
+    SubscriptionAppService --> SubscriptionRepository
+    InvoiceAppService --> InvoiceRepository
+    PaymentAppService --> PaymentGatewayAdapter
+    SubscriptionAppService --> TaxAdapter
+
+    SubscriptionAppService --> EventPublisher
+    PaymentAppService --> EventPublisher
+    InvoiceAppService --> AuditAdapter
+```

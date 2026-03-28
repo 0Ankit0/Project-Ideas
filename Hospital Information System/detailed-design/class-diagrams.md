@@ -1,25 +1,78 @@
 # Class Diagrams
 
-## Purpose
-Define the class diagrams artifacts for the **Hospital Information System** with implementation-ready detail.
+```mermaid
+classDiagram
+    class Patient {
+      +UUID id
+      +String mrn
+      +String fullName
+      +Date dob
+      +String gender
+      +updateDemographics()
+    }
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+    class Appointment {
+      +UUID id
+      +UUID patientId
+      +UUID providerId
+      +DateTime startsAt
+      +AppointmentStatus status
+      +confirm()
+      +cancel(reason)
+      +checkIn()
+    }
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    class Encounter {
+      +UUID id
+      +UUID patientId
+      +UUID appointmentId
+      +DateTime startedAt
+      +DateTime endedAt
+      +close()
+    }
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    class Admission {
+      +UUID id
+      +UUID patientId
+      +UUID bedId
+      +AdmissionStatus status
+      +admit()
+      +transfer(newBedId)
+      +discharge()
+    }
 
+    class LabOrder {
+      +UUID id
+      +UUID encounterId
+      +String testCode
+      +OrderStatus status
+      +place()
+      +result()
+    }
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    class Claim {
+      +UUID id
+      +UUID encounterId
+      +Money amount
+      +ClaimStatus status
+      +submit()
+      +postRemittance()
+    }
+
+    class MedicationOrder {
+      +UUID id
+      +UUID encounterId
+      +String drugCode
+      +String dose
+      +sign()
+      +discontinue()
+    }
+
+    Patient "1" --> "many" Appointment
+    Patient "1" --> "many" Encounter
+    Patient "1" --> "many" Admission
+    Appointment "0..1" --> "1" Encounter
+    Encounter "1" --> "many" LabOrder
+    Encounter "1" --> "many" MedicationOrder
+    Encounter "1" --> "many" Claim
+```

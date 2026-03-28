@@ -1,25 +1,40 @@
 # System Context Diagram
 
-## Purpose
-Define the system context diagram artifacts for the **Hospital Information System** with implementation-ready detail.
+This diagram shows the Hospital Information System (HIS) boundary and external actors/systems.
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+```mermaid
+flowchart LR
+    subgraph ClinicalActors[Clinical Actors]
+      Doc[Doctor]
+      Nurse[Nurse]
+      Clerk[Front Desk Clerk]
+      Billing[Billing Staff]
+      Admin[Hospital Admin]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    HIS[Hospital Information System]
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph ExternalSystems[External Systems]
+      LIS[Lab Information System]
+      PACS[Radiology/PACS]
+      Payer[Insurance/Payer Gateway]
+      Pharm[Pharmacy System]
+      HIE[Health Information Exchange]
+      IdP[Enterprise IdP/SSO]
+    end
 
+    Doc --> HIS
+    Nurse --> HIS
+    Clerk --> HIS
+    Billing --> HIS
+    Admin --> HIS
 
-## Analysis Notes
-- Capture alternate/error flows for: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: clinical workstation, mobile nursing app, integration HL7/FHIR.
+    HIS --> LIS
+    LIS --> HIS
+    HIS --> PACS
+    PACS --> HIS
+    HIS --> Payer
+    HIS --> Pharm
+    HIS --> HIE
+    IdP --> HIS
+```

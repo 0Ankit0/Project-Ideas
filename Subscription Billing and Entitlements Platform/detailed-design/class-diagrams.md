@@ -1,25 +1,74 @@
 # Class Diagrams
 
-## Purpose
-Define the class diagrams artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+```mermaid
+classDiagram
+    class CustomerAccount {
+      +UUID id
+      +String email
+      +AccountStatus status
+      +updateBillingProfile()
+    }
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    class Plan {
+      +UUID id
+      +String code
+      +BillingCadence cadence
+      +Money basePrice
+      +isActive()
+    }
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    class Subscription {
+      +UUID id
+      +UUID accountId
+      +UUID planId
+      +SubscriptionStatus status
+      +DateTime currentPeriodStart
+      +DateTime currentPeriodEnd
+      +activate()
+      +changePlan()
+      +cancel()
+    }
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    class Invoice {
+      +UUID id
+      +UUID subscriptionId
+      +Money subtotal
+      +Money tax
+      +Money total
+      +InvoiceStatus status
+      +finalize()
+      +markPaid()
+    }
 
+    class PaymentAttempt {
+      +UUID id
+      +UUID invoiceId
+      +PaymentStatus status
+      +String failureCode
+      +recordAttempt()
+    }
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    class EntitlementGrant {
+      +UUID id
+      +UUID subscriptionId
+      +String featureKey
+      +EntitlementStatus status
+      +grant()
+      +revoke()
+    }
+
+    class Coupon {
+      +UUID id
+      +String code
+      +DiscountType type
+      +Decimal amountOrPercent
+      +isValid()
+    }
+
+    CustomerAccount "1" --> "many" Subscription
+    Plan "1" --> "many" Subscription
+    Subscription "1" --> "many" Invoice
+    Invoice "1" --> "many" PaymentAttempt
+    Subscription "1" --> "many" EntitlementGrant
+    Coupon "0..many" --> "many" Subscription : applies to
+```

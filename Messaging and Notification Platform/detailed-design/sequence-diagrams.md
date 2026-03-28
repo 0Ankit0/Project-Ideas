@@ -1,25 +1,18 @@
 # Sequence Diagrams
 
-## Purpose
-Define the sequence diagrams artifacts for the **Messaging and Notification Platform** with implementation-ready detail.
+```mermaid
+sequenceDiagram
+  autonumber
+  participant App as Producer App
+  participant API as Notification API
+  participant Svc as Dispatch Service
+  participant MQ as Queue
+  participant Ch as Channel Adapter
 
-## Domain Context
-- Domain: Messaging
-- Core entities: Message Request, Template, Provider Route, Consent Record, Delivery Attempt, Suppression List, Campaign
-- Primary workflows: template rendering and localization, channel/provider routing, delivery retries and failover, consent enforcement and suppression, delivery analytics and feedback ingestion
-
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+  App->>API: POST /v1/notifications
+  API->>Svc: validate + enqueue
+  Svc->>MQ: publish message job
+  MQ->>Ch: consume job
+  Ch-->>Svc: delivery result
+  Svc-->>API: accepted
+```

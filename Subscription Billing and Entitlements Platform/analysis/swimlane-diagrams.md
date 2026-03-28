@@ -1,25 +1,44 @@
 # Swimlane Diagrams
 
-## Purpose
-Define the swimlane diagrams artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+## Subscription Signup Swimlane
+```mermaid
+flowchart LR
+    subgraph Customer
+      A[Choose plan]
+      B[Enter payment method]
+    end
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    subgraph Billing[Billing Platform]
+      C[Price + tax calculation]
+      D[Create subscription]
+      E[Generate invoice]
+      F[Grant entitlement]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph PSP[Payment Provider]
+      G[Authorize card]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    A --> C --> B --> D --> G --> E --> F
+```
 
+## Dunning Swimlane
+```mermaid
+flowchart LR
+    subgraph Billing[Billing Platform]
+      A[Invoice unpaid]
+      B[Retry schedule]
+      C[Suspend service]
+    end
 
-## Analysis Notes
-- Capture alternate/error flows for: subscription creation and renewal, usage ingestion and rating, invoice generation and collection.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: API, web admin, event bus.
+    subgraph Notify[Notification Service]
+      D[Send reminder sequence]
+    end
+
+    subgraph Customer
+      E[Update payment method]
+    end
+
+    A --> B --> D --> E --> B
+    B --> C
+```

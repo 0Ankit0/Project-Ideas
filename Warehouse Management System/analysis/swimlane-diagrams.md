@@ -1,25 +1,51 @@
 # Swimlane Diagrams
 
-## Purpose
-Define the swimlane diagrams artifacts for the **Warehouse Management System** with implementation-ready detail.
+## Pick-Pack-Ship Swimlane
+```mermaid
+flowchart LR
+    subgraph OMS
+      A[Release order]
+    end
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+    subgraph WMS
+      B[Allocate inventory]
+      C[Create pick tasks]
+      D[Create shipment]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Picker
+      E[Pick items]
+      F[Confirm picks]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Packing
+      G[Pack and label]
+    end
 
+    subgraph Carrier
+      H[Pickup and scan]
+    end
 
-## Analysis Notes
-- Capture alternate/error flows for: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: scanner app, ops dashboard, integration API.
+    A --> B --> C --> E --> F --> G --> D --> H
+```
+
+## Replenishment Swimlane
+```mermaid
+flowchart LR
+    subgraph WMS
+      A[Detect low pick face stock]
+      B[Generate replenishment task]
+    end
+
+    subgraph Forklift
+      C[Move pallet from reserve]
+      D[Confirm destination bin]
+    end
+
+    subgraph Supervisor
+      E[Review exceptions]
+    end
+
+    A --> B --> C --> D
+    D --> E
+```

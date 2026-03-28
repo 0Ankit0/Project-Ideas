@@ -1,25 +1,50 @@
 # Swimlane Diagrams
 
-## Purpose
-Define the swimlane diagrams artifacts for the **Hospital Information System** with implementation-ready detail.
+## Outpatient Visit Swimlane
+```mermaid
+flowchart LR
+    subgraph FrontDesk[Front Desk]
+      A[Register/check-in patient]
+      B[Collect consent & insurance]
+    end
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+    subgraph Nursing[Nursing]
+      C[Triage and vitals]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Physician[Physician]
+      D[Assess patient]
+      E[Create diagnosis/orders]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph HIS[HIS]
+      F[Persist encounter]
+      G[Send orders to lab/radiology]
+    end
 
+    A --> B --> C --> D --> E --> F --> G
+```
 
-## Analysis Notes
-- Capture alternate/error flows for: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: clinical workstation, mobile nursing app, integration HL7/FHIR.
+## Billing Swimlane
+```mermaid
+flowchart LR
+    subgraph Clinical[Clinical Team]
+      A[Finalize encounter]
+    end
+
+    subgraph Coding[Coding Team]
+      B[Assign ICD/CPT]
+      C[Resolve coding edits]
+    end
+
+    subgraph Billing[Billing Team]
+      D[Create & submit claim]
+      E[Process remittance/denial]
+    end
+
+    subgraph Payer[Payer]
+      F[Adjudicate claim]
+    end
+
+    A --> B --> C --> D --> F --> E
+```

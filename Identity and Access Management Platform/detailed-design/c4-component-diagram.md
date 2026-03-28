@@ -1,25 +1,50 @@
 # C4 Component Diagram
 
-## Purpose
-Define the c4 component diagram artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    subgraph Users
+      EndUser
+      TenantAdmin
+      SecurityAnalyst
+    end
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+    subgraph IAM[IAM Application Container]
+      UIBFF[Admin Console + BFF]
+      AuthCmp[Authentication Component]
+      AuthzCmp[Authorization Component]
+      IdentityCmp[Identity Lifecycle Component]
+      TokenCmp[Token Issuance Component]
+      FederationCmp[Federation Component]
+      AuditCmp[Audit/Compliance Component]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Infra[Infra Containers]
+      OLTP[(IAM DB)]
+      Cache[(Redis)]
+      Bus[(Event Bus)]
+      SIEM[(SIEM)]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    EndUser --> AuthCmp
+    TenantAdmin --> UIBFF
+    SecurityAnalyst --> AuditCmp
 
+    UIBFF --> IdentityCmp
+    UIBFF --> AuthzCmp
+    UIBFF --> FederationCmp
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    AuthCmp --> TokenCmp
+    AuthCmp --> AuthzCmp
+
+    IdentityCmp --> OLTP
+    AuthCmp --> OLTP
+    TokenCmp --> OLTP
+    AuthzCmp --> Cache
+
+    IdentityCmp --> Bus
+    AuthCmp --> Bus
+    TokenCmp --> Bus
+
+    AuditCmp --> OLTP
+    AuditCmp --> SIEM
+```

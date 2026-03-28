@@ -1,25 +1,23 @@
 # Data Flow Diagrams
 
-## Purpose
-Define the data flow diagrams artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+## Ticket and Session Data Flow
+```mermaid
+flowchart LR
+    Channel[Voice/Chat/Email Inbound] --> Intake[Ticket Intake API]
+    Intake --> Classify[Classification + Priority]
+    Classify --> TicketStore[(Ticket Tables)]
+    Classify --> Routing[Routing Engine]
+    Routing --> Queue[Agent Queue]
+    Queue --> Session[Session Service]
+    Session --> SessionStore[(Session Tables)]
+```
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
-
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+## SLA and Reporting Flow
+```mermaid
+flowchart LR
+    TicketStore[(Ticket Tables)] --> SlaCalc[SLA Calculator]
+    SlaCalc --> Events[(Event Bus)]
+    Events --> Alerts[Supervisor Alerts]
+    Events --> ETL[Analytics ETL]
+    ETL --> WH[(Data Warehouse)]
+```

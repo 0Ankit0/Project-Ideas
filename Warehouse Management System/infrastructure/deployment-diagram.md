@@ -1,25 +1,40 @@
 # Deployment Diagram
 
-## Purpose
-Define the deployment diagram artifacts for the **Warehouse Management System** with implementation-ready detail.
+## Production Deployment
+```mermaid
+flowchart TB
+    Edge[(Corporate Network / Internet)] --> WAF[WAF]
+    WAF --> LB[Load Balancer]
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+    subgraph VPC[Warehouse Cloud VPC]
+      subgraph App[Private App Subnets]
+        API[WMS API Pods]
+        Worker[Wave/Replenishment Workers]
+      end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+      subgraph Data[Private Data Subnets]
+        DB[(PostgreSQL HA)]
+        MQ[(Managed MQ)]
+        Redis[(Redis)]
+      end
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    LB --> API
+    API --> DB
+    API --> MQ
+    API --> Redis
+    Worker --> DB
+    Worker --> MQ
 
+    API --> Obs[Logs/Tracing]
+    Worker --> Obs
+    DB --> Backup[Encrypted Backups]
+```
 
-## Infrastructure Emphasis
-- Multi-environment topology (dev/stage/prod) with promotion gates.
-- Network segmentation, private service communication, and WAF boundaries.
-- Backup, disaster recovery, and key rotation procedures.
+## Environment Promotion
+```mermaid
+flowchart LR
+    Dev --> Stage --> Prod
+    Stage --> Gate[Operational Readiness Gate]
+    Gate --> Prod
+```

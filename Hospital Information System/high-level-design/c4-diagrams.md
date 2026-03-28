@@ -1,25 +1,32 @@
 # C4 Diagrams
 
-## Purpose
-Define the c4 diagrams artifacts for the **Hospital Information System** with implementation-ready detail.
+## C1: Context
+```mermaid
+flowchart LR
+    Clinician[Clinician] --> HIS[Hospital Information System]
+    FrontDesk[Front Desk] --> HIS
+    BillingTeam[Billing Team] --> HIS
+    HIS <--> Lab[Lab System]
+    HIS <--> Radiology[Radiology System]
+    HIS --> Payer[Payer Gateway]
+    IdP[SSO/IdP] --> HIS
+```
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+## C2: Containers
+```mermaid
+flowchart TB
+    UI[Web/Portal]
+    API[API/BFF]
+    Core[Core Clinical Services]
+    Worker[Async Worker]
+    DB[(OLTP DB)]
+    MQ[(Event Bus)]
+    WH[(Warehouse)]
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    UI --> API --> Core
+    Core --> DB
+    Core --> MQ
+    Worker --> DB
+    Worker --> MQ
+    Worker --> WH
+```

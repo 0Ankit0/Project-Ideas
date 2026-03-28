@@ -1,25 +1,28 @@
 # Use Case Diagram
 
-## Purpose
-Define the use case diagram artifacts for the **Warehouse Management System** with implementation-ready detail.
+```mermaid
+flowchart LR
+    Picker
+    Supervisor
+    Planner
+    Carrier
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+    UC1((Receive Inbound ASN))
+    UC2((Putaway Inventory))
+    UC3((Allocate and Wave Orders))
+    UC4((Pick/Pack/Ship))
+    UC5((Cycle Count))
+    UC6((Replenish Pick Faces))
+    UC7((Handle Returns))
+    UC8((Manage Slotting Rules))
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Analysis Notes
-- Capture alternate/error flows for: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: scanner app, ops dashboard, integration API.
+    Supervisor --> UC1
+    Picker --> UC2
+    Planner --> UC3
+    Picker --> UC4
+    Planner --> UC5
+    Picker --> UC6
+    Supervisor --> UC7
+    Planner --> UC8
+    Carrier --> UC4
+```

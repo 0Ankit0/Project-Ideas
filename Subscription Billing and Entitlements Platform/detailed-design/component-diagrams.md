@@ -1,25 +1,58 @@
 # Component Diagrams
 
-## Purpose
-Define the component diagrams artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+```mermaid
+flowchart LR
+    subgraph API
+      GW[Gateway/BFF]
+      BillingAPI[Billing API]
+      EntAPI[Entitlements API]
+    end
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    subgraph Core
+      Catalog[Plan Catalog]
+      SubSvc[Subscription Service]
+      InvoiceSvc[Invoice Service]
+      PaymentSvc[Payment Orchestration]
+      DunningSvc[Dunning Service]
+      EntSvc[Entitlement Service]
+      PromoSvc[Promotion Service]
+      TaxSvc[Tax Integration]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph External
+      PSP[Payment Provider]
+      Tax[Tax Engine]
+      ERP[ERP/GL]
+      Notify[Notification Service]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Data
+      DB[(PostgreSQL)]
+      MQ[(Event Bus)]
+      Cache[(Redis)]
+    end
 
+    GW --> BillingAPI --> SubSvc
+    GW --> EntAPI --> EntSvc
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    SubSvc --> Catalog
+    SubSvc --> InvoiceSvc
+    InvoiceSvc --> PaymentSvc
+    PaymentSvc --> PSP
+    InvoiceSvc --> DunningSvc
+    SubSvc --> PromoSvc
+    SubSvc --> TaxSvc
+    TaxSvc --> Tax
+
+    SubSvc --> DB
+    InvoiceSvc --> DB
+    PaymentSvc --> DB
+    EntSvc --> DB
+
+    SubSvc --> MQ
+    InvoiceSvc --> MQ
+    PaymentSvc --> MQ
+    MQ --> Notify
+    MQ --> ERP
+    PaymentSvc --> Cache
+```

@@ -1,25 +1,48 @@
 # Architecture Diagram
 
-## Purpose
-Define the architecture diagram artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    Channels[Checkout, Customer Portal, Admin Console, API] --> Edge[API Gateway]
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    subgraph Services[Billing Domain Services]
+      Catalog[Plan Catalog]
+      Subscription[Subscription Management]
+      Billing[Invoicing]
+      Payment[Payment Orchestration]
+      Entitlement[Entitlement Management]
+      Dunning[Dunning & Collections]
+      Reconciliation[Reconciliation]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    Edge --> Catalog
+    Edge --> Subscription
+    Edge --> Billing
+    Edge --> Payment
+    Edge --> Entitlement
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph CrossCutting[Cross-Cutting]
+      Audit[Audit Logging]
+      Notify[Notifications]
+      Jobs[Async Workers]
+      Policy[Policy/Rules]
+    end
 
+    Billing --> Jobs
+    Payment --> Jobs
+    Dunning --> Notify
+    Subscription --> Policy
 
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    subgraph DataInfra[Data + Integrations]
+      DB[(PostgreSQL)]
+      Bus[(Event Bus)]
+      ERP[(ERP/GL)]
+      PSP[(Payment Provider)]
+      Tax[(Tax Service)]
+    end
+
+    Services --> DB
+    Services --> Bus
+    Payment --> PSP
+    Billing --> Tax
+    Reconciliation --> ERP
+```

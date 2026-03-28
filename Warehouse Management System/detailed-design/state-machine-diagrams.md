@@ -1,25 +1,42 @@
 # State Machine Diagrams
 
-## Purpose
-Define the state machine diagrams artifacts for the **Warehouse Management System** with implementation-ready detail.
+## Order Fulfillment Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Released
+    Released --> Allocated
+    Allocated --> Waved
+    Waved --> Picking
+    Picking --> Packed
+    Packed --> Shipped
+    Released --> Backordered
+    Backordered --> Allocated
+    Shipped --> [*]
+```
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+## Inventory Unit Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Received
+    Received --> PutawayPending
+    PutawayPending --> Stored
+    Stored --> Reserved
+    Reserved --> Picked
+    Picked --> Shipped
+    Stored --> Quarantined
+    Quarantined --> Stored
+    Shipped --> [*]
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+## Task Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Created
+    Created --> Assigned
+    Assigned --> InProgress
+    InProgress --> Completed
+    InProgress --> Failed
+    Failed --> Reassigned
+    Reassigned --> InProgress
+    Completed --> [*]
+```

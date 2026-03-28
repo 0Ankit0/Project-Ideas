@@ -1,25 +1,45 @@
 # Sequence Diagrams
 
-## Purpose
-Define the sequence diagrams artifacts for the **Hospital Information System** with implementation-ready detail.
+## Appointment Booking
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as Patient Portal
+    participant API as Scheduling API
+    participant SCH as Scheduling Service
+    participant DB as DB
+    participant N as Notification Service
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+    P->>API: POST /v1/appointments
+    API->>SCH: validate request
+    SCH->>DB: check slot + provider constraints
+    alt Slot unavailable
+      SCH-->>API: conflict alternatives
+      API-->>P: 409 with alternatives
+    else Slot available
+      SCH->>DB: create appointment
+      SCH->>N: send confirmation
+      SCH-->>API: appointment created
+      API-->>P: 201 Created
+    end
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Claim Submission
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Bill as Billing UI
+    participant API as Billing API
+    participant CLM as Claims Service
+    participant DB as DB
+    participant PAY as Payer Gateway
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    Bill->>API: submit claim batch
+    API->>CLM: validate coding + coverage
+    CLM->>DB: persist claim
+    CLM->>PAY: transmit EDI payload
+    PAY-->>CLM: ack/reject
+    CLM->>DB: update claim status
+    CLM-->>API: result summary
+    API-->>Bill: status response
+```

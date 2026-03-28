@@ -1,25 +1,41 @@
 # Use Case Diagram
 
-## Purpose
-Define the use case diagram artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+This diagram captures key user goals and supporting CRM capabilities.
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+```mermaid
+flowchart LR
+    Rep[Sales Rep]
+    Mgr[Sales Manager]
+    Ops[RevOps]
+    Admin[CRM Admin]
+    Int[Integration System]
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    UC1((Capture & Qualify Lead))
+    UC2((Merge Duplicate Records))
+    UC3((Manage Opportunity Pipeline))
+    UC4((Log Activities & Follow-ups))
+    UC5((Submit Forecast))
+    UC6((Approve Forecast))
+    UC7((Reassign Territory))
+    UC8((Configure Roles & Policies))
+    UC9((Sync External Data))
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Rep --> UC1
+    Rep --> UC3
+    Rep --> UC4
+    Rep --> UC5
 
+    Mgr --> UC3
+    Mgr --> UC6
 
-## Analysis Notes
-- Capture alternate/error flows for: lead capture and qualification, deduplication and merge review, opportunity stage progression.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: web, email, calendar, mobile.
+    Ops --> UC2
+    Ops --> UC7
+
+    Admin --> UC8
+
+    Int --> UC9
+```
+
+## Notes
+- Forecast and territory actions are managerial/operations controlled.
+- Deduplication is explicit to prevent accidental irreversible merges.

@@ -1,25 +1,35 @@
 # System Sequence Diagrams
 
-## Purpose
-Define the system sequence diagrams artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+## System Sequence: Upgrade Plan
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Customer
+    participant UI as Portal
+    participant API as Billing API
+    participant SUB as Subscription Service
+    participant INV as Invoice Service
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    C->>UI: request upgrade
+    UI->>API: PATCH /v1/subscriptions/{id}
+    API->>SUB: change plan
+    SUB->>INV: create proration invoice
+    INV-->>SUB: invoice issued
+    SUB-->>API: updated subscription
+    API-->>UI: success response
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## System Sequence: Entitlement Revocation on Failed Dunning
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Job as Dunning Worker
+    participant INV as Invoice Service
+    participant ENT as Entitlement Service
+    participant Notify as Notification Service
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    Job->>INV: evaluate overdue invoice
+    INV-->>Job: terminal failure
+    Job->>ENT: revoke entitlements
+    Job->>Notify: send suspension notice
+```

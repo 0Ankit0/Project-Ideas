@@ -1,25 +1,32 @@
 # Use Case Diagram
 
-## Purpose
-Define the use case diagram artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+```mermaid
+flowchart LR
+    Customer[Customer]
+    Admin[Billing Admin]
+    Support[Support]
+    Finance[Finance]
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    UC1((Start Trial/Subscription))
+    UC2((Upgrade or Downgrade Plan))
+    UC3((Cancel Subscription))
+    UC4((Apply Coupon/Promotion))
+    UC5((Generate Invoice))
+    UC6((Process Payment Retry))
+    UC7((Grant/Revoke Entitlements))
+    UC8((Reconcile Payouts))
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    Customer --> UC1
+    Customer --> UC2
+    Customer --> UC3
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Admin --> UC4
+    Admin --> UC7
 
+    Support --> UC2
+    Support --> UC3
 
-## Analysis Notes
-- Capture alternate/error flows for: subscription creation and renewal, usage ingestion and rating, invoice generation and collection.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: API, web admin, event bus.
+    Finance --> UC5
+    Finance --> UC6
+    Finance --> UC8
+```

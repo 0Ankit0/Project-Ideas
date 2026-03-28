@@ -1,25 +1,42 @@
 # Activity Diagrams
 
-## Purpose
-Define the activity diagrams artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+## Ticket Intake and Routing
+```mermaid
+flowchart TD
+    A[Customer submits issue] --> B[Validate channel payload]
+    B --> C[Classify intent and priority]
+    C --> D{Known customer/account?}
+    D -- No --> E[Create provisional profile]
+    D -- Yes --> F[Attach account context]
+    E --> G[Create ticket]
+    F --> G
+    G --> H[Run routing rules]
+    H --> I[Assign queue/agent]
+    I --> J[Start SLA timers]
+```
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
+## Live Interaction Handling
+```mermaid
+flowchart TD
+    A[Session connected] --> B[Authenticate customer]
+    B --> C[Fetch customer history]
+    C --> D{Can resolve in L1?}
+    D -- Yes --> E[Provide resolution]
+    D -- No --> F[Escalate to specialist]
+    F --> G[Transfer context and transcript]
+    G --> H[Specialist resolves]
+    E --> I[Capture disposition]
+    H --> I
+    I --> J[Close session/ticket]
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Analysis Notes
-- Capture alternate/error flows for: intake across channels, skill-based routing and assignment, SLA monitoring and escalation.
-- Distinguish synchronous decision points vs asynchronous compensation.
-- Track external dependencies through channels: chat, email, voice, social.
+## SLA Breach Management
+```mermaid
+flowchart TD
+    A[SLA monitor tick] --> B[Find at-risk tickets]
+    B --> C{Breach imminent?}
+    C -- No --> D[No action]
+    C -- Yes --> E[Notify supervisor]
+    E --> F[Re-prioritize queue]
+    F --> G[Reassign to available agent]
+```

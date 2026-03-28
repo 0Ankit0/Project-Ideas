@@ -1,25 +1,61 @@
 # C4 Component Diagram
 
-## Purpose
-Define the c4 component diagram artifacts for the **Hospital Information System** with implementation-ready detail.
+## HIS Application Container - Components
+```mermaid
+flowchart TB
+    subgraph Users[Users]
+      Doctor
+      Nurse
+      Clerk
+      Biller
+    end
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+    subgraph HIS[HIS App Container]
+      UIBFF[Web UI + BFF]
+      PatientCmp[Patient Registry]
+      ScheduleCmp[Scheduling]
+      EncounterCmp[Encounter Management]
+      OrdersCmp[Lab/Radiology Orders]
+      AdmissionCmp[Admission/Bed Management]
+      BillingCmp[Revenue Cycle]
+      PolicyCmp[Clinical Policy + Auth]
+      AuditCmp[Audit Component]
+      IntegrCmp[Integration Orchestrator]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Infra[Infra Containers]
+      OLTP[(HIS OLTP DB)]
+      Bus[(Event Bus)]
+      Cache[(Redis)]
+      DWH[(Analytics Warehouse)]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Doctor --> UIBFF
+    Nurse --> UIBFF
+    Clerk --> UIBFF
+    Biller --> UIBFF
 
+    UIBFF --> PatientCmp
+    UIBFF --> ScheduleCmp
+    UIBFF --> EncounterCmp
+    UIBFF --> OrdersCmp
+    UIBFF --> AdmissionCmp
+    UIBFF --> BillingCmp
+    UIBFF --> PolicyCmp
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    PatientCmp --> OLTP
+    ScheduleCmp --> OLTP
+    EncounterCmp --> OLTP
+    OrdersCmp --> OLTP
+    AdmissionCmp --> OLTP
+    BillingCmp --> OLTP
+
+    EncounterCmp --> Bus
+    OrdersCmp --> Bus
+    BillingCmp --> Bus
+
+    IntegrCmp --> Bus
+    IntegrCmp --> DWH
+    PolicyCmp --> Cache
+    AuditCmp --> OLTP
+```

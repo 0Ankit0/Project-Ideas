@@ -1,25 +1,51 @@
 # C4 Component Diagram
 
-## Purpose
-Define the c4 component diagram artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    subgraph Users
+      Customer
+      MerchantOps
+      FinanceOps
+      RiskAnalyst
+    end
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+    subgraph POWP[Payment Orchestration App Container]
+      UIBFF[Merchant Console + BFF]
+      PayCmp[Payment Orchestration]
+      WalletCmp[Wallet Management]
+      RiskCmp[Risk/Decisioning]
+      RouteCmp[Smart Routing]
+      RefundCmp[Refund/Dispute]
+      ReconCmp[Settlement Reconciliation]
+      AuditCmp[Audit Component]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Infra
+      OLTP[(Payments DB)]
+      Bus[(Event Bus)]
+      Cache[(Redis)]
+      DWH[(Finance Warehouse)]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Customer --> PayCmp
+    MerchantOps --> UIBFF
+    FinanceOps --> ReconCmp
+    RiskAnalyst --> RiskCmp
 
+    UIBFF --> PayCmp
+    UIBFF --> WalletCmp
+    UIBFF --> RefundCmp
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    PayCmp --> RiskCmp
+    PayCmp --> RouteCmp
+    PayCmp --> OLTP
+    WalletCmp --> OLTP
+    RefundCmp --> OLTP
+    ReconCmp --> OLTP
+
+    PayCmp --> Bus
+    WalletCmp --> Bus
+    RefundCmp --> Bus
+    RouteCmp --> Cache
+    AuditCmp --> DWH
+```

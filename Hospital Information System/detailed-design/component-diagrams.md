@@ -1,25 +1,58 @@
 # Component Diagrams
 
-## Purpose
-Define the component diagrams artifacts for the **Hospital Information System** with implementation-ready detail.
+```mermaid
+flowchart LR
+    subgraph API[API Layer]
+      Gateway[Gateway/BFF]
+    end
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+    subgraph Clinical[Clinical Components]
+      Reg[Registration]
+      Sched[Scheduling]
+      EHR[Encounter/Clinical Notes]
+      Orders[Orders]
+      Meds[Medication Administration]
+      Admit[Admission/Bed Mgmt]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Revenue[Revenue Cycle Components]
+      Charge[Charge Capture]
+      Coding[Coding]
+      Claims[Claims]
+      Payments[Payments/Denials]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Platform[Platform Components]
+      Auth[AuthZ]
+      Audit[Audit]
+      Notify[Notifications]
+      Int[Integration Adapter]
+    end
 
+    subgraph Data[Data]
+      DB[(PostgreSQL)]
+      Bus[(Event Bus)]
+      Cache[(Redis)]
+    end
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    Gateway --> Reg --> DB
+    Gateway --> Sched --> DB
+    Gateway --> EHR --> DB
+    Gateway --> Orders --> DB
+    Gateway --> Meds --> DB
+    Gateway --> Admit --> DB
+
+    EHR --> Charge --> Coding --> Claims --> Payments
+    Claims --> Int
+
+    Reg --> Bus
+    Sched --> Bus
+    EHR --> Bus
+    Claims --> Bus
+
+    Gateway --> Auth
+    EHR --> Audit
+    Claims --> Audit
+    Bus --> Notify
+    Auth --> Cache
+```

@@ -1,16 +1,18 @@
-# C4 Context and Container Diagrams
+# C4 Diagrams
 
-## Context Level
-Shows the platform between client channels and enterprise integrations
-(identity, payments, ERP, notifications, analytics).
+## Context
+```mermaid
+flowchart LR
+  Users --> RLMP
+  RLMP --> Cloud
+  RLMP --> CMDB
+```
 
-## Container Level
-- API Gateway
-- Reservation Container
-- Fulfillment Container
-- Settlement Container
-- Incident/Governance Container
-- Eventing Container
-- Read Model Container
-
-Each container has explicit inbound/outbound contracts and ownership.
+## Containers
+```mermaid
+flowchart TB
+  Portal --> API
+  API --> Core
+  Core --> Workflow
+  Core --> DB
+```

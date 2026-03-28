@@ -1,25 +1,31 @@
 # Data Flow Diagrams
 
-## Purpose
-Define the data flow diagrams artifacts for the **Customer Relationship Management Platform** with implementation-ready detail.
+## Lead and Opportunity Data Flow
+```mermaid
+flowchart LR
+    Source[Web Form / Import / API] --> Ingest[Lead Ingestion API]
+    Ingest --> Validate[Validation + Normalization]
+    Validate --> Dedupe[Deduplication Engine]
+    Dedupe -->|clean| LeadStore[(Lead Tables)]
+    Dedupe -->|suspect duplicate| MergeQueue[(Merge Review Queue)]
 
-## Domain Context
-- Domain: CRM
-- Core entities: Lead, Contact, Account, Opportunity, Activity, Forecast Snapshot, Territory
-- Primary workflows: lead capture and qualification, deduplication and merge review, opportunity stage progression, territory assignment and reassignment, forecast rollup and approval
+    LeadStore --> Convert[Qualification + Conversion]
+    Convert --> AccountStore[(Account/Contact Tables)]
+    Convert --> OppStore[(Opportunity Tables)]
+    OppStore --> Forecast[Forecast Aggregator]
+    Forecast --> Snapshot[(Forecast Snapshot Tables)]
+```
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Operational and Analytics Data Flow
+```mermaid
+flowchart LR
+    OLTP[(CRM OLTP)] --> CDC[CDC / Event Publisher]
+    CDC --> Bus[(Event Bus)]
+    Bus --> SearchProj[Search Projection]
+    Bus --> Notify[Notification Processor]
+    Bus --> ETL[Warehouse ETL]
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    SearchProj --> Search[(Search Index)]
+    ETL --> WH[(Analytics Warehouse)]
+    Notify --> Channels[Email / Slack / In-App]
+```

@@ -1,25 +1,57 @@
 # Component Diagrams
 
-## Purpose
-Define the component diagrams artifacts for the **Warehouse Management System** with implementation-ready detail.
+```mermaid
+flowchart LR
+    subgraph API
+      Gateway
+      ReceivingAPI
+      FulfillmentAPI
+      InventoryAPI
+    end
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+    subgraph Core
+      ReceivingSvc
+      PutawaySvc
+      InventorySvc
+      AllocationSvc
+      WaveSvc
+      TaskSvc
+      ShippingSvc
+      ReturnsSvc
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Integrations
+      OMSAdapter
+      ERPAdapter
+      CarrierAdapter
+      ScannerAdapter
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph Data
+      DB[(PostgreSQL)]
+      MQ[(Event Bus)]
+      Cache[(Redis)]
+    end
 
+    Gateway --> ReceivingAPI --> ReceivingSvc
+    Gateway --> FulfillmentAPI --> AllocationSvc
+    Gateway --> InventoryAPI --> InventorySvc
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    ReceivingSvc --> PutawaySvc
+    AllocationSvc --> WaveSvc --> TaskSvc
+    TaskSvc --> ShippingSvc
+
+    ReceivingSvc --> DB
+    InventorySvc --> DB
+    AllocationSvc --> DB
+    TaskSvc --> DB
+    ShippingSvc --> DB
+
+    AllocationSvc --> OMSAdapter
+    ReceivingSvc --> ERPAdapter
+    ShippingSvc --> CarrierAdapter
+    TaskSvc --> ScannerAdapter
+
+    Core --> MQ
+    Core --> Cache
+```

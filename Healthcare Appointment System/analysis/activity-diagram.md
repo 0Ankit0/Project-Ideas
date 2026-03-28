@@ -1,17 +1,11 @@
 # Activity Diagram
 
-## Objective
-
-This document captures activity diagram guidance for the **Healthcare Appointment System**.
-
-## Scope
-
-- System: Healthcare Appointment System
-- Goal: Digital-first appointment scheduling, provider management, payments, and reminders for healthcare organizations.
-- Primary actors: Patients, Providers, Clinic Admin, Support Staff
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+flowchart TD
+  A[Patient requests slot] --> B[Check provider availability]
+  B --> C{Slot available?}
+  C -- No --> D[Offer alternatives]
+  C -- Yes --> E[Reserve slot]
+  D --> E
+  E --> F[Send confirmation/reminder]
+```

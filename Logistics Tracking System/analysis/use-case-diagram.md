@@ -1,17 +1,10 @@
 # Use Case Diagram
 
-## Objective
-
-This document captures use case diagram guidance for the **Logistics Tracking System**.
-
-## Scope
-
-- System: Logistics Tracking System
-- Goal: End-to-end shipment lifecycle tracking across hubs, fleets, drivers, and customer notifications.
-- Primary actors: Shippers, Customers, Dispatchers, Operations Admin
-
-## Implementation Notes
-
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+```mermaid
+flowchart LR
+  Dispatcher --> U1((Plan Shipment))
+  Driver --> U2((Update Delivery Status))
+  Customer --> U3((Track Shipment))
+  Dispatcher --> U4((Re-route Shipment))
+  Dispatcher --> U5((Handle Exception))
+```

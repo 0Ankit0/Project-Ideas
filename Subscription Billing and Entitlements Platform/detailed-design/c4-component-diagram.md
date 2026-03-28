@@ -1,25 +1,54 @@
 # C4 Component Diagram
 
-## Purpose
-Define the c4 component diagram artifacts for the **Subscription Billing and Entitlements Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    subgraph Users
+      Customer
+      SupportAgent
+      FinanceOps
+      BillingAdmin
+    end
 
-## Domain Context
-- Domain: Subscription Billing
-- Core entities: Plan, Subscription, Invoice, Usage Record, Entitlement, Credit Note, Dunning Case
-- Primary workflows: subscription creation and renewal, usage ingestion and rating, invoice generation and collection, dunning retry orchestration, entitlement grant and revoke
+    subgraph SBEP[Subscription Billing App Container]
+      UIBFF[Portal + BFF]
+      PlanCmp[Plan Catalog Component]
+      SubCmp[Subscription Component]
+      InvoiceCmp[Invoice Component]
+      PaymentCmp[Payment Component]
+      EntCmp[Entitlement Component]
+      DunningCmp[Dunning Component]
+      AuditCmp[Audit Component]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Infra
+      OLTP[(Billing DB)]
+      Bus[(Event Bus)]
+      Cache[(Redis)]
+      Warehouse[(Finance Warehouse)]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Customer --> UIBFF
+    SupportAgent --> UIBFF
+    FinanceOps --> UIBFF
+    BillingAdmin --> UIBFF
 
+    UIBFF --> PlanCmp
+    UIBFF --> SubCmp
+    UIBFF --> InvoiceCmp
+    UIBFF --> PaymentCmp
+    UIBFF --> EntCmp
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    PlanCmp --> OLTP
+    SubCmp --> OLTP
+    InvoiceCmp --> OLTP
+    PaymentCmp --> OLTP
+    EntCmp --> OLTP
+    DunningCmp --> OLTP
+
+    SubCmp --> Bus
+    InvoiceCmp --> Bus
+    PaymentCmp --> Bus
+    DunningCmp --> Bus
+    PaymentCmp --> Cache
+    AuditCmp --> Warehouse
+```

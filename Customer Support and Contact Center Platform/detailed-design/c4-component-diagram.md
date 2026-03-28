@@ -1,25 +1,51 @@
 # C4 Component Diagram
 
-## Purpose
-Define the c4 component diagram artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    subgraph Users
+      Customer
+      Agent
+      Supervisor
+      QAAnalyst
+    end
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
+    subgraph ContactCenter[Contact Center App Container]
+      UIBFF[Agent Console + BFF]
+      TicketCmp[Ticket Management]
+      RoutingCmp[Routing & Skills]
+      SessionCmp[Voice/Chat Session]
+      SlaCmp[SLA Monitoring]
+      EscCmp[Escalation Management]
+      QACmp[Quality Evaluation]
+      KBCmp[Knowledge Base Integration]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    subgraph Infra
+      OLTP[(Support DB)]
+      Bus[(Event Bus)]
+      Cache[(Routing Cache)]
+      Search[(Search)]
+    end
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    Customer --> SessionCmp
+    Agent --> UIBFF
+    Supervisor --> UIBFF
+    QAAnalyst --> QACmp
 
+    UIBFF --> TicketCmp
+    UIBFF --> SessionCmp
+    UIBFF --> EscCmp
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+    TicketCmp --> RoutingCmp
+    TicketCmp --> SlaCmp
+    TicketCmp --> OLTP
+    SessionCmp --> OLTP
+    SlaCmp --> OLTP
+    EscCmp --> OLTP
+
+    TicketCmp --> Bus
+    SessionCmp --> Bus
+    SlaCmp --> Bus
+    Bus --> Search
+    RoutingCmp --> Cache
+```

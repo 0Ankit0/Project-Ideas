@@ -1,25 +1,47 @@
 # Architecture Diagram
 
-## Purpose
-Define the architecture diagram artifacts for the **Customer Support and Contact Center Platform** with implementation-ready detail.
+```mermaid
+flowchart TB
+    Channels[Voice, Chat, Email, Portal] --> Edge[API Gateway / Channel Ingress]
 
-## Domain Context
-- Domain: Support Center
-- Core entities: Conversation, Ticket, Queue, SLA Policy, Agent Skill, Bot Session, Escalation
-- Primary workflows: intake across channels, skill-based routing and assignment, SLA monitoring and escalation, bot-to-human transfer, QA and workforce planning
+    subgraph Services[Support Domain Services]
+      Ticket[Ticket Management]
+      Routing[Routing/Skills]
+      Session[Conversation Session]
+      SLA[SLA Monitor]
+      Escalation[Escalation]
+      QA[Quality & Coaching]
+      Knowledge[Knowledge Integration]
+    end
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+    Edge --> Ticket
+    Edge --> Session
+    Ticket --> Routing
+    Ticket --> SLA
+    Ticket --> Escalation
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+    subgraph CrossCutting[Cross-Cutting]
+      Auth[AuthZ]
+      Audit[Audit]
+      Notify[Notifications]
+      Jobs[Async Workers]
+    end
 
+    Edge --> Auth
+    Ticket --> Audit
+    Session --> Audit
+    SLA --> Jobs
 
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+    subgraph DataInfra[Data/Infra]
+      DB[(PostgreSQL)]
+      Bus[(Event Bus)]
+      Search[(Search)]
+      BI[(Analytics Warehouse)]
+    end
+
+    Services --> DB
+    Services --> Bus
+    Bus --> Search
+    Bus --> BI
+    Jobs --> Notify
+```
