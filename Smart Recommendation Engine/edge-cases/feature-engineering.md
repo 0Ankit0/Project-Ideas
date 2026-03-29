@@ -20,3 +20,13 @@
 * **Solution**:
     * **Capping**: Limit top-k categories and bucket others.
     * **Hashing**: Use feature hashing for long-tail values.
+
+## Implementation Mitigation Blueprint
+### Detection Signals
+- Define concrete metrics/log signatures for feature engineering failures, with alert thresholds and pager routes.
+
+### Automated Mitigations
+- Feature flags, circuit breakers, and policy filters should mitigate user impact before manual intervention.
+
+### Verification
+- Add chaos/simulation tests reproducing top failure patterns and confirm fallback quality remains within baseline thresholds.

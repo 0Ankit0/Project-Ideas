@@ -163,3 +163,26 @@ flowchart TD
     Continue --> Monitor
     SwitchML --> End([Personalized Recommendations])
 ```
+
+## Implementation Notes
+- **Primary decision this diagram enables**: align product, data, and platform teams on boundary conditions before coding.
+- **Source-of-truth inputs**: PRD, event contracts, SLO targets, and security classification matrix.
+- **Validation cadence**: review on every major feature epic and before production release trains.
+
+## Mermaid Drill-Down: Activity Diagram Review Workflow
+```mermaid
+flowchart LR
+    A[Draft activity-diagram] --> B[Architecture review]
+    B --> C[Data contract review]
+    C --> D[SRE reliability review]
+    D --> E{Approved?}
+    E -- No --> F[Revise assumptions]
+    F --> A
+    E -- Yes --> G[Implementation tickets created]
+```
+
+## Implementation Checklist
+- [ ] Actors and system boundaries map to real owning teams.
+- [ ] Diagram paths include fallback behavior and failure branches.
+- [ ] Every external dependency has an SLO and timeout policy attached.
+- [ ] Observability events tied to each critical transition are defined.

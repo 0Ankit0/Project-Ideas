@@ -194,3 +194,13 @@ Smart Recommendation Engine/
 4. Train baseline models
 5. Deploy API
 6. Monitor & iterate
+
+## How to Use This Documentation (Implementation Path)
+1. Start with `requirements/` for acceptance criteria and measurable constraints.
+2. Use `analysis/` artifacts to validate actors, events, and business rules.
+3. Implement from `high-level-design/` and `detailed-design/` with contract tests.
+4. Execute rollout from `implementation/` and verify runtime posture in `infrastructure/`.
+5. Harden reliability with `edge-cases/` runbooks and continuous quality/fairness audits.
+
+## Required Release Artifacts
+- Data contract diff, model card, offline/online evaluation report, rollout plan, rollback evidence, and fairness assessment.

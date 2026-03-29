@@ -83,3 +83,17 @@ sequenceDiagram
 - Version recommendation payloads to avoid client breakage when features evolve.
 - Track `model version`, `feature snapshot`, and `experiment variant` per response.
 - Separate online ranking latency budget from offline training pipelines.
+
+## Code Realization Guidance
+- Ensure package boundaries mirror architectural boundaries and avoid cyclic dependencies.
+- Capture module-level observability conventions (structured logging, tracing spans, metric naming).
+
+## Mermaid CI Flow
+```mermaid
+flowchart LR
+    A[PR opened] --> B[Unit + contract tests]
+    B --> C[Static analysis]
+    C --> D[Build artifact + SBOM]
+    D --> E[Staging deploy]
+    E --> F[Canary rollout]
+```

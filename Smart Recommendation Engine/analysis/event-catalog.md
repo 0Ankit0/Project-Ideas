@@ -40,3 +40,15 @@ sequenceDiagram
 - P95 commit-to-publish latency below 5 seconds for tier-1 events.
 - DLQ triage acknowledgement within 15 minutes for production incidents.
 - Schema changes remain backward compatible within the same major version.
+
+## Implementation Eventing Guidance
+### Delivery Guarantees
+- Interaction and feedback events: at-least-once with idempotency keys.
+- Compliance and deletion events: exactly-once semantics where supported, otherwise compensating transaction log.
+
+### Producer/Consumer Contract
+- Producers must include schema version and event-time; consumers must reject unknown major versions.
+- Dead-letter queues require ownership and replay SOP with bounded recovery windows.
+
+### Observability
+- Track publish lag, consumer lag, invalid event ratio, and replay success rate per topic.

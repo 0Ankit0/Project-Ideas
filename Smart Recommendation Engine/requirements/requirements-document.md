@@ -294,3 +294,16 @@ An AI-powered recommendation engine that learns from user behavior and configura
 | **Cold Start** | Recommendation challenge for new users/items |
 | **Embedding** | Dense vector representation of users/items |
 | **Feature Store** | Centralized repository for ML features |
+
+## Implementation Acceptance Expansion
+### Feature Pipeline Requirements
+- Every feature must have owner, lineage, SLA, and deprecation policy prior to release approval.
+- Data-quality failures must automatically block model retraining and online publish.
+
+### Model and Evaluation Requirements
+- Model promotion requires offline lift + online guardrail compliance + fairness scorecard sign-off.
+- Experimentation framework must support canary, A/B, and automatic rollback hooks.
+
+### Serving and Fallback Requirements
+- Recommendation API must operate with deterministic degraded mode when dependencies fail.
+- Fallback outputs must still respect policy, safety, and legal exposure constraints.

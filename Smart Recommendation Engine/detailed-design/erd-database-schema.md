@@ -136,3 +136,24 @@ CREATE TABLE predictions (
 | action_type | view, click, purchase, like, save, share |
 | model_status | training, registered, staging, production, deprecated |
 | experiment_status | draft, running, analyzing, concluded |
+
+## Detailed Implementation Constraints
+- Translate each component/class/state transition into code-level interfaces with explicit pre/post-conditions.
+- Every persistence change must include migration strategy, rollback script, and backfill impact analysis.
+
+## Mermaid Verification Loop: Erd Database Schema
+```mermaid
+flowchart TD
+    A[Design artifact updated] --> B[Contract tests added]
+    B --> C[Static analysis + lint]
+    C --> D[Integration tests]
+    D --> E{Pass?}
+    E -- No --> F[Fix implementation/design mismatch]
+    F --> B
+    E -- Yes --> G[Promote to staging]
+```
+
+## Required Engineering Evidence
+- API/interface compatibility report
+- Query/index performance benchmarks
+- State transition and error-path tests
