@@ -52,3 +52,31 @@
 * **Solution**:
     * **Isolation**: Route to a dead-letter queue with reason and payload.
     * **Recovery**: Provide replay tooling after schema or code fixes.
+
+## Purpose and Scope
+Handles ingestion edge conditions: malformed payloads, replay, ordering, and duplicate suppression.
+
+## Assumptions and Constraints
+- Ingestion supports both streaming and bulk backfill paths.
+- Idempotency key strategy is consistent across producers.
+- Malformed data is quarantined, never silently dropped.
+
+### End-to-End Example with Realistic Data
+Nightly `batch_2026_02_14` (2M rows): 0.7% malformed rows sent to quarantine with row-level reason; valid rows publish with idempotency keys; replay cursor supports deterministic reprocessing after fix.
+
+## Decision Rationale and Alternatives Considered
+- Adopted quarantine-first pattern to preserve raw evidence.
+- Rejected “best effort parse” that can corrupt feature distributions.
+- Added replay controls keyed by producer and time window.
+
+## Failure Modes and Recovery Behaviors
+- Clock skew causes ordering anomalies -> event-time watermarking with late-arrival policy.
+- Backfill saturates stream cluster -> separate backfill lane with throttle limits.
+
+## Security and Compliance Implications
+- Inbound PII validation and tokenization checks run before persistence.
+- Quarantine store access is tightly restricted and audited.
+
+## Operational Runbooks and Observability Notes
+- Ingestion lag, quarantine rate, and replay throughput are key signals.
+- Runbook covers replay dry-run, cutover, and reconciliation checks.

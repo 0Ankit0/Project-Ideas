@@ -41,3 +41,31 @@
 * **Solution**:
 	* **Validation**: Clamp inputs and validate ranges.
 	* **Fallback**: Reject malformed events with error telemetry.
+
+## Purpose and Scope
+Covers runtime scoring anomalies, model divergence, calibration issues, and safe fallback behavior.
+
+## Assumptions and Constraints
+- Primary and shadow model outputs are continuously compared.
+- Decision thresholds are policy-managed and versioned.
+- Scoring service must return explainability metadata for high-risk decisions.
+
+### End-to-End Example with Realistic Data
+Primary `xgb_2026_03` returns 0.83 while shadow `lstm_2026_03` returns 0.62 on same event; divergence over threshold opens governance ticket and increases manual-review sampling for affected cohort.
+
+## Decision Rationale and Alternatives Considered
+- Kept shadow scoring in production to detect silent quality regressions.
+- Rejected automatic threshold retuning without governance approval.
+- Used calibrated probabilities over raw margins for operational stability.
+
+## Failure Modes and Recovery Behaviors
+- Model endpoint latency spikes -> fallback model or rules-only path with degraded flag.
+- Calibration drift detected -> freeze promotions and trigger retraining workflow.
+
+## Security and Compliance Implications
+- Model artifacts are signed and referenced by immutable digest.
+- Scoring logs avoid storing raw sensitive inputs; only necessary derived context retained.
+
+## Operational Runbooks and Observability Notes
+- Monitor precision/recall proxies, drift, calibration error, and latency.
+- Runbook details model rollback, threshold freeze, and communication plan.

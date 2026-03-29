@@ -105,3 +105,31 @@ System is considered implementation-ready and production-capable when:
 3. Deployment and rollback are fully automated and repeatable.
 4. Security, reliability, and operational controls are verified in staging.
 5. Stakeholders sign off on KPI and acceptance criteria.
+
+## Purpose and Scope
+Operationalizes rollout strategy, canary checks, rollback criteria, and post-release validation.
+
+## Assumptions and Constraints
+- Canary traffic can be isolated by tenant and risk level.
+- Rollout metrics are available in near real-time.
+- Rollback command path is pre-tested before release day.
+
+### End-to-End Example with Realistic Data
+Release `2026.03.2`: 5% canary for 30 minutes; gates: latency p95 <=250 ms, precision drop <1.5%, PSI<0.2. If gate fails, auto-rollback and open incident with diff summary.
+
+## Decision Rationale and Alternatives Considered
+- Adopted progressive rollout to reduce blast radius.
+- Rejected big-bang deploy due historical incident rate.
+- Integrated quality + reliability gates for balanced promotion decisions.
+
+## Failure Modes and Recovery Behaviors
+- Canary good but full rollout degrades -> staged promotion pauses and scales by cohort.
+- Rollback fails partially -> execute switchback playbook and freeze deploy pipeline.
+
+## Security and Compliance Implications
+- Playbook requires key/secret rotation checks before promotion.
+- Release evidence package retained for compliance with model version hashes.
+
+## Operational Runbooks and Observability Notes
+- Post-release watch window and ownership roster are mandatory.
+- Runbook includes emergency disable switches for high-risk policies.

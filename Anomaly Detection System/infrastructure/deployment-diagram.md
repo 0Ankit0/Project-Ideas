@@ -102,3 +102,31 @@ spec:
 | InfluxDB | 4 vCPU | 16GB | - | 3 (cluster) |
 | PostgreSQL | 4 vCPU | 16GB | - | 2 (primary+replica) |
 | Kafka Broker | 4 vCPU | 8GB | - | 3 |
+
+## Purpose and Scope
+Shows deployment units, environments, promotion gates, and rollback topology.
+
+## Assumptions and Constraints
+- Deployment artifacts are immutable and signed.
+- Blue/green and canary paths are both supported where needed.
+- Environment parity is maintained for critical dependencies.
+
+### End-to-End Example with Realistic Data
+`v2026.03.2` deployed to green stack, cache warmed, health checks pass for 30 minutes under mirrored load; traffic switch then proceeds gradually with switchback trigger at 0.5% error rate.
+
+## Decision Rationale and Alternatives Considered
+- Blue/green chosen for low-downtime and quick rollback.
+- Rejected manual host-by-host deploy due inconsistency and recovery time.
+- Added pre-switch synthetic checks to catch hidden dependency failures.
+
+## Failure Modes and Recovery Behaviors
+- New stack healthy but downstream incompatibility discovered -> instant switchback and compatibility patch rollout.
+- Partial deployment drift across AZs -> orchestrator halts promotion and reconciles versions.
+
+## Security and Compliance Implications
+- Artifact signing and provenance verification required before deployment.
+- Secrets are injected at runtime from managed vault, never baked into images.
+
+## Operational Runbooks and Observability Notes
+- Deployment dashboard tracks per-stage success and rollback latency.
+- Runbook includes abort criteria and communications template for stakeholders.

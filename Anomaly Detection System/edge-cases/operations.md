@@ -34,3 +34,31 @@
 * **Solution**:
 	* **Preparedness**: Pre-warmed nodes and immutable images.
 	* **Automation**: IaC templates and fast bootstrap scripts.
+
+## Purpose and Scope
+Defines operational incident management for platform reliability and anomaly-quality degradation.
+
+## Assumptions and Constraints
+- On-call rotations and escalation policies are documented and staffed.
+- Incident severities are tied to business impact and SLA breach risk.
+- Postmortems are mandatory for Sev1/Sev2 events.
+
+### End-to-End Example with Realistic Data
+`INC-314`: feature store saturation raises p95 latency to 420 ms. Mitigation: enable cached fallback, scale read replicas, verify recovery to 210 ms, then close with RCA actions.
+
+## Decision Rationale and Alternatives Considered
+- Adopted symptom-based triage first, then subsystem diagnosis.
+- Rejected ad-hoc incident handling due inconsistent outcomes.
+- Integrated quality and reliability signals in a single war-room view.
+
+## Failure Modes and Recovery Behaviors
+- Paging storm from correlated failures -> incident commander enables suppression policy and consolidates channels.
+- Runbook mismatch with reality -> incident notes feed immediate playbook patch task.
+
+## Security and Compliance Implications
+- Incident artifacts include access logs and privileged-action reports.
+- Operational tooling access follows least privilege with break-glass workflow.
+
+## Operational Runbooks and Observability Notes
+- MTTR, MTTD, and repeated-incident rate are tracked per subsystem.
+- Runbook contains communication templates for internal and external stakeholders.

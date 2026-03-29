@@ -247,3 +247,31 @@ mlflow>=2.2.0
 slack-sdk>=3.20.0
 sendgrid>=6.9.0
 ```
+
+## Purpose and Scope
+Defines coding conventions, quality gates, test standards, and review expectations for this system.
+
+## Assumptions and Constraints
+- All changes include tests proportional to risk.
+- Public interfaces require docs and compatibility notes.
+- Static analysis and lint checks are mandatory in CI.
+
+### End-to-End Example with Realistic Data
+PR adding `device_entropy_score` must include unit tests, contract test updates, migration script if schema changes, and rollout note documenting feature-flag behavior.
+
+## Decision Rationale and Alternatives Considered
+- Prioritized readability and deterministic behavior over micro-optimizations.
+- Rejected bypassing review checklists for “small” changes due repeated regressions.
+- Mandated traceable changelog entries for operationally significant changes.
+
+## Failure Modes and Recovery Behaviors
+- Missing tests in risk-sensitive module -> merge blocked.
+- Undocumented behavior change -> release note check fails CI.
+
+## Security and Compliance Implications
+- Guidelines require avoiding sensitive data in logs and test fixtures.
+- Security-sensitive modules require additional reviewer from security guild.
+
+## Operational Runbooks and Observability Notes
+- Guidelines reference production-readiness checklist before enablement.
+- Runbook indicates how to hotfix safely while preserving audit evidence.

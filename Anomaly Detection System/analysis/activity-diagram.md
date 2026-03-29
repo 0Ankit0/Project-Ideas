@@ -94,3 +94,31 @@ flowchart TD
     Suppress --> End
     NoAlert --> End
 ```
+
+## Purpose and Scope
+Explains process-level control flow from ingestion through triage, including decision branches and retries.
+
+## Assumptions and Constraints
+- Diagram nodes correspond to executable pipeline stages with ownership labels.
+- Retry/timeout branches are represented explicitly, not implied.
+- Async enrichment is separated from blocking score path.
+
+### End-to-End Example with Realistic Data
+For `sensor TX-44`, activity flow is: ingest -> normalize -> dedupe -> feature lookup -> score -> policy gate -> alert. Cache miss branch retries once (75 ms budget); second miss uses baseline features with `degraded_mode=true`.
+
+## Decision Rationale and Alternatives Considered
+- Modeled both happy and degraded paths to match incident reality.
+- Rejected single-line flow because it hid backpressure behavior.
+- Added branch timing budgets to guide implementation limits.
+
+## Failure Modes and Recovery Behaviors
+- Queue backlog at normalize step -> throttle low-priority tenants and preserve critical lane.
+- Feature step timeout -> branch to fallback and flag case for manual sampling.
+
+## Security and Compliance Implications
+- Cross-activity data handoffs specify tokenized identifier use only.
+- Manual steps require authenticated actor identity propagation.
+
+## Operational Runbooks and Observability Notes
+- Per-node latency histograms and transition counts feed SRE dashboards.
+- Runbook includes branch-specific mitigation by node name.

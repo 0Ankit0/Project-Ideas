@@ -164,3 +164,31 @@
 - Alert closed with resolution metadata
 
 **Success Criteria**: Resolution is visible in audit trail
+
+## Purpose and Scope
+Provides fully dressed textual flows, preconditions, postconditions, and alternatives for each use case.
+
+## Assumptions and Constraints
+- Descriptions are authoritative for QA scenario generation.
+- Alternative flows include auth expiry, dependency timeout, and duplicate-event handling.
+- Postconditions include both business state and audit state.
+
+### End-to-End Example with Realistic Data
+`UC-05 Investigate Alert`: precondition analyst has `risk_analyst` role. Main flow loads evidence pack and suggested actions. Alternate flow A handles IdP timeout; alternate flow B handles missing enrichment by switching to manual evidence path.
+
+## Decision Rationale and Alternatives Considered
+- Expanded alternate flows to reduce production surprises.
+- Rejected prose-only style; structured sections to match test automation needs.
+- Added explicit exception ownership at each alternate path.
+
+## Failure Modes and Recovery Behaviors
+- Precondition ambiguity leads inconsistent analyst behavior -> enforce checklist in UI and docs.
+- Postcondition not met (audit missing) -> case cannot be closed.
+
+## Security and Compliance Implications
+- Preconditions encode RBAC requirements; postconditions enforce audit completeness.
+- Sensitive attachments are redacted by default in description examples.
+
+## Operational Runbooks and Observability Notes
+- QA and SRE share canonical scenario IDs from this document.
+- Runbook links incident symptoms to failed use-case step numbers.

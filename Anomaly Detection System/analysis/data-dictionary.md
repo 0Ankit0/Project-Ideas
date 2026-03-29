@@ -39,3 +39,31 @@ erDiagram
 - Operational records remain online for active workflow windows and support forensic queries.
 - Historical records move to archive tiers by policy without breaking traceability.
 - Audit events are immutable and linked through correlation ids for incident analysis.
+
+## Purpose and Scope
+Defines field semantics, type constraints, ranges, units, and lineage for operational and model data.
+
+## Assumptions and Constraints
+- All producers use schema registry with compatibility checks.
+- Dictionary entries include owner, source-of-truth, and PII tag.
+- Feature columns have freshness and nullability guarantees.
+
+### End-to-End Example with Realistic Data
+`event_id` (string, immutable), `feature_velocity_5m` (int, 0-500), `anomaly_score` (float, 0-1), `model_version` (string, semantic + hash), `disposition` (enum pending/true_positive/false_positive/benign).
+
+## Decision Rationale and Alternatives Considered
+- Added units/range columns to prevent silent interpretation errors.
+- Rejected “free text definition only” format due insufficient data contract rigor.
+- Linked dictionary to event catalog for lineage traceability.
+
+## Failure Modes and Recovery Behaviors
+- Producer sends out-of-range value -> schema validator rejects and records violation metric.
+- Undocumented column appears -> ingestion blocks until dictionary updated.
+
+## Security and Compliance Implications
+- PII-tagged fields require encryption and restricted access annotations.
+- Dictionary includes retention/deletion policy by field class.
+
+## Operational Runbooks and Observability Notes
+- Data quality dashboard reads dictionary constraints as runtime checks.
+- Runbook explains schema rollback and replay when violations spike.

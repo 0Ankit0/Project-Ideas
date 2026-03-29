@@ -276,3 +276,31 @@
 ```
 
 Additional epics cover observability, compliance, data management, and model operations.
+
+## Purpose and Scope
+Captures role-specific workflows (analyst, incident commander, data scientist, compliance reviewer) with concrete acceptance criteria.
+
+## Assumptions and Constraints
+- Personas are based on actual on-call and investigation teams, not hypothetical roles.
+- Story acceptance includes UI/API behavior plus downstream model-feedback behavior.
+- Every story has at least one unhappy path for timeouts, duplicate alerts, or missing context.
+
+### End-to-End Example with Realistic Data
+Story: “As Risk Analyst Priya, I can triage critical alerts in <10 minutes.” For `case CASE-99231`, Priya opens timeline, validates device mismatch, applies playbook `ACCOUNT_TAKEOVER_V2`, and records disposition `true_positive` which is published to feedback queue.
+
+## Decision Rationale and Alternatives Considered
+- Structured stories by investigation lifecycle to align with SOC shifts and handoffs.
+- Rejected UI-only stories because they ignored API and queue side effects.
+- Used Given/When/Then acceptance for deterministic QA automation.
+
+## Failure Modes and Recovery Behaviors
+- Ambiguous persona ownership -> story rejected in backlog grooming until owning team is named.
+- Story passes UI checks but fails feedback publication -> story remains incomplete.
+
+## Security and Compliance Implications
+- Stories requiring sensitive evidence access include step-up auth and full audit trail assertions.
+- Analyst actions are non-repudiable: story acceptance requires actor identity in audit log.
+
+## Operational Runbooks and Observability Notes
+- Each critical story includes “operational verification” steps for canary releases.
+- Story dashboards track cycle time, SLA misses, and false-positive handling load.

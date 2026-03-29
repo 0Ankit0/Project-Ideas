@@ -41,3 +41,31 @@
 * **Solution**:
 	* **Idempotency**: Use message fingerprinting and idempotent webhooks.
 	* **Tracking**: Store per-channel delivery keys.
+
+## Purpose and Scope
+Covers noisy-alert suppression, deduplication, correlation, and escalation policy details.
+
+## Assumptions and Constraints
+- Alert channels support idempotent incident creation.
+- Severity mapping is policy-driven and versioned.
+- Critical alerts must reach human responder within SLA.
+
+### End-to-End Example with Realistic Data
+Merchant `M-778` emits 25 critical anomalies in 10 minutes; system creates one parent incident plus child tasks, suppresses duplicates, and pages primary then secondary if unacked after 5 minutes.
+
+## Decision Rationale and Alternatives Considered
+- Chose correlation windows to reduce page fatigue without hiding incidents.
+- Rejected simple count-based paging lacking entity-aware grouping.
+- Added escalation tiers tied to business impact.
+
+## Failure Modes and Recovery Behaviors
+- Dedup key bug merges unrelated incidents -> fallback to strict mode and incident review.
+- Pager provider outage -> failover to secondary channel with SMS/voice escalation.
+
+## Security and Compliance Implications
+- Alert payloads strip direct PII while retaining investigation pointers.
+- Escalation actions are fully auditable for post-incident review.
+
+## Operational Runbooks and Observability Notes
+- Alert quality metrics include precision of pages and ack latency.
+- Runbook includes temporary suppression policy with expiry guardrail.

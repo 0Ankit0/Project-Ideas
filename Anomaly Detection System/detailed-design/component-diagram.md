@@ -89,3 +89,31 @@ graph TB
 | PostgreSQL | Database | Store metadata, config |
 | Redis | Cache | Cache features, recent data |
 | Audit Logs | Database | Compliance event records |
+
+## Purpose and Scope
+Defines internal components and interactions within detection service boundary.
+
+## Assumptions and Constraints
+- Components communicate through clear interfaces and avoid shared mutable state.
+- Resilience patterns (retry/circuit breaker) are owned at boundary components.
+- Component ownership maps to team ownership.
+
+### End-to-End Example with Realistic Data
+`SchemaValidator` -> `EnrichmentAdapter` -> `ScoringAdapter` -> `DecisionPublisher`; malformed event `evt_bad_01` is diverted to DLQ with producer tag and validation code.
+
+## Decision Rationale and Alternatives Considered
+- Placed validation at ingress to fail fast and protect downstream capacity.
+- Rejected central mega-component to preserve testability and fault isolation.
+- Added audit writer as dedicated component to keep evidence immutable.
+
+## Failure Modes and Recovery Behaviors
+- Enrichment adapter timeout -> component returns partial profile + risk flag.
+- Decision publisher failure -> local outbox persists event for retry.
+
+## Security and Compliance Implications
+- Component interfaces define allowed data classes and redaction obligations.
+- Secrets access is isolated to specific adapters only.
+
+## Operational Runbooks and Observability Notes
+- Component dependency graph is used for blast-radius during incidents.
+- Runbook maps alerts directly to component owner and mitigation steps.
