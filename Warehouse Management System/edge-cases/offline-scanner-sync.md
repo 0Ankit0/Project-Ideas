@@ -1,23 +1,25 @@
 # Offline Scanner Sync
 
 ## Scenario
-Offline device recovery and conflict resolution.
+Scanner reconnects and uploads buffered events that may conflict with current state.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## Replay Rules
+- Events must be ordered by device sequence number.
+- Each event uses deterministic idempotency key (`device_id + sequence_no`).
+- Version conflicts generate review tasks, never silent overwrite.
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+## Conflict Resolution Flow
+```mermaid
+flowchart TD
+    A[Device reconnects] --> B[Upload buffered events]
+    B --> C[Validate sequence + signature]
+    C --> D{State version matches?}
+    D -- Yes --> E[Apply event]
+    D -- No --> F[Create replay conflict case]
+    F --> G[Supervisor resolve merge/compensate]
+    G --> H[Apply approved action]
+```
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
-
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+## Verification
+- Post-sync invariant check: no negative ATP, no duplicate ledger rows.
+- Device receives reconciliation summary for operator confirmation.

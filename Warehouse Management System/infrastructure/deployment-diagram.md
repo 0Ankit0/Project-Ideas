@@ -6,35 +6,39 @@ flowchart TB
     Edge[(Corporate Network / Internet)] --> WAF[WAF]
     WAF --> LB[Load Balancer]
 
-    subgraph VPC[Warehouse Cloud VPC]
-      subgraph App[Private App Subnets]
-        API[WMS API Pods]
-        Worker[Wave/Replenishment Workers]
+    subgraph RegionA[Region A]
+      subgraph AppA[Private App Subnets]
+        APIA[API Pods]
+        WRKA[Worker Pods]
       end
-
-      subgraph Data[Private Data Subnets]
-        DB[(PostgreSQL HA)]
-        MQ[(Managed MQ)]
-        Redis[(Redis)]
+      subgraph DataA[Data Subnets]
+        DBA[(Primary PostgreSQL)]
+        MQA[(Managed MQ)]
+        RCA[(Redis)]
       end
     end
 
-    LB --> API
-    API --> DB
-    API --> MQ
-    API --> Redis
-    Worker --> DB
-    Worker --> MQ
+    subgraph RegionB[DR Region]
+      DBB[(Standby PostgreSQL)]
+      MQB[(Standby MQ)]
+    end
 
-    API --> Obs[Logs/Tracing]
-    Worker --> Obs
-    DB --> Backup[Encrypted Backups]
+    LB --> APIA
+    APIA --> DBA
+    APIA --> MQA
+    APIA --> RCA
+    WRKA --> DBA
+    WRKA --> MQA
+
+    DBA --> DBB
+    MQA --> MQB
+
+    APIA --> Obs[Central Observability]
+    WRKA --> Obs
+    DBA --> Backup[Encrypted Backups]
 ```
 
-## Environment Promotion
-```mermaid
-flowchart LR
-    Dev --> Stage --> Prod
-    Stage --> Gate[Operational Readiness Gate]
-    Gate --> Prod
-```
+## Deployment Controls
+- Blue/green deploy for API tier.
+- Canary worker rollout for allocation/shipping queues.
+- Automated rollback when SLO burn exceeds threshold.

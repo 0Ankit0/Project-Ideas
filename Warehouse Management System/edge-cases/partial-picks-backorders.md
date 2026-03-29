@@ -1,23 +1,26 @@
-# Partial Picks Backorders
+# Partial Picks and Backorders
 
 ## Scenario
-Insufficient stock and partial fulfillment strategy.
+Picker cannot fulfill full reserved quantity due to shortage or damage.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## Policy
+- Prefer alternate-bin reallocation before creating backorder.
+- Preserve already-picked quantity and split remaining line.
+- Customer promise date recalculated based on replenishment ETA.
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+## Handling Flow
+```mermaid
+flowchart TD
+    A[Short pick reported] --> B[Check alternate bin]
+    B --> C{Stock found?}
+    C -- Yes --> D[Create follow-up pick task]
+    C -- No --> E[Split line + backorder remainder]
+    D --> F[Update order allocation]
+    E --> F
+    F --> G[Emit customer impact event]
+```
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
-
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+## Required Outputs
+- Updated reservation records.
+- Backorder reason code and expected recovery date.
+- SLA impact metric increment.

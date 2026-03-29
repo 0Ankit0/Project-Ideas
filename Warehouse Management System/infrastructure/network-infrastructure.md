@@ -1,25 +1,29 @@
 # Network Infrastructure
 
-## Purpose
-Define the network infrastructure artifacts for the **Warehouse Management System** with implementation-ready detail.
+## Network Segmentation Model
+```mermaid
+flowchart LR
+    Internet --> WAF
+    WAF --> PublicSubnet[Public Subnet: LB/API Gateway]
+    PublicSubnet --> AppSubnet[Private App Subnets]
+    AppSubnet --> DataSubnet[Private Data Subnets]
+    AppSubnet --> IntegrationSubnet[Private Integration Subnet]
+    DataSubnet --> KMS[Key Management Service]
+    IntegrationSubnet --> CarrierVPN[Carrier/Partner VPN]
+```
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+## Security Controls
+- Ingress restricted to WAF/API gateway; no direct DB exposure.
+- East-west traffic via mTLS + service identities.
+- Egress allow-list for OMS/ERP/carrier endpoints.
+- Network policies isolate high-risk worker pools.
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Reliability Controls
+- Multi-AZ subnets for API and data nodes.
+- Dedicated queue-processing subnets to avoid API starvation.
+- QoS/traffic shaping for scanner bursts during shift changes.
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Infrastructure Emphasis
-- Multi-environment topology (dev/stage/prod) with promotion gates.
-- Network segmentation, private service communication, and WAF boundaries.
-- Backup, disaster recovery, and key rotation procedures.
+## Operational Guidance
+- Flow logs retained for incident forensics.
+- Synthetic probes validate partner connectivity every 60s.
+- Security group changes require change-ticket and approval evidence.

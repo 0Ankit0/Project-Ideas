@@ -1,25 +1,28 @@
 # Domain Model
 
-## Purpose
-Define the domain model artifacts for the **Warehouse Management System** with implementation-ready detail.
+## Bounded Contexts
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+| Context | Responsibilities | Aggregates |
+|---|---|---|
+| Receiving | Validate inbound, create receipts, initiate putaway | `Receipt`, `PutawayBatch` |
+| Inventory | Maintain balances/ledger, reservation views | `InventoryBalance`, `InventoryLedger` |
+| Allocation | Reserve stock, build waves, reprioritize work | `Reservation`, `Wave` |
+| Fulfillment | Execute pick/pack tasks, enforce reconciliation | `PickTask`, `PackSession` |
+| Shipping | Confirm handoff, track carrier state | `Shipment` |
+| Operations | Manage exceptions/overrides | `ExceptionCase`, `OverrideApproval` |
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Core Domain Relationships
+```mermaid
+erDiagram
+    RECEIPT ||--o{ INVENTORY_LEDGER : creates
+    INVENTORY_BALANCE ||--o{ RESERVATION : supports
+    WAVE ||--o{ PICK_TASK : dispatches
+    PICK_TASK ||--|| PACK_SESSION : reconciles_into
+    PACK_SESSION ||--|| SHIPMENT : closes
+    EXCEPTION_CASE }o--o{ PICK_TASK : references
+```
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Architecture Emphasis
-- Bounded contexts with explicit API and event contracts.
-- Read/write model separation where throughput and consistency needs diverge.
-- Cross-cutting layers for authn/authz, observability, and policy enforcement.
+## Aggregate Rules
+- `InventoryBalance` enforces `on_hand >= reserved >= 0`.
+- `PickTask` transitions governed by state guards only.
+- `Shipment` confirmation is terminal except through returns workflow.

@@ -6,46 +6,49 @@ flowchart TB
       Picker
       Supervisor
       Planner
-      CarrierUser
+      Coordinator
     end
 
-    subgraph WMS[WMS App Container]
-      UIBFF[Warehouse UI + BFF]
-      ReceivingCmp[Receiving Component]
-      InventoryCmp[Inventory Component]
-      AllocationCmp[Allocation/Wave Component]
-      TaskCmp[Task Execution Component]
-      ShippingCmp[Shipping Component]
-      ExceptionCmp[Exception Management]
+    subgraph WMS[WMS Container]
+      BFF[UI BFF]
+      Receiving[Receiving Component]
+      Allocation[Allocation Component]
+      Fulfillment[Fulfillment Component]
+      Shipping[Shipping Component]
+      Operations[Exception Component]
+      Rules[Policy + Rule Engine]
     end
 
     subgraph Infra
-      OLTP[(WMS DB)]
+      DB[(PostgreSQL)]
       Bus[(Event Bus)]
       Cache[(Redis)]
-      Search[(Search)]
+      Search[(Operational Search)]
     end
 
-    Picker --> UIBFF
-    Supervisor --> UIBFF
-    Planner --> UIBFF
-    CarrierUser --> ShippingCmp
+    Picker --> BFF
+    Supervisor --> BFF
+    Planner --> BFF
+    Coordinator --> BFF
 
-    UIBFF --> ReceivingCmp
-    UIBFF --> InventoryCmp
-    UIBFF --> AllocationCmp
-    UIBFF --> TaskCmp
-    UIBFF --> ExceptionCmp
+    BFF --> Receiving
+    BFF --> Allocation
+    BFF --> Fulfillment
+    BFF --> Shipping
+    BFF --> Operations
 
-    ReceivingCmp --> OLTP
-    InventoryCmp --> OLTP
-    AllocationCmp --> OLTP
-    TaskCmp --> OLTP
-    ShippingCmp --> OLTP
+    Allocation --> Rules
+    Operations --> Rules
 
-    ReceivingCmp --> Bus
-    AllocationCmp --> Bus
-    ShippingCmp --> Bus
+    WMS --> DB
+    WMS --> Bus
+    WMS --> Cache
     Bus --> Search
-    AllocationCmp --> Cache
 ```
+
+## Component Responsibilities
+- Receiving: inbound validation + putaway creation.
+- Allocation: reservations + wave planning.
+- Fulfillment: pick/pack operations.
+- Shipping: carrier handoff and tracking confirmation.
+- Operations: exception lifecycle and approvals.

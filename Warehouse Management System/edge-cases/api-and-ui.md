@@ -1,15 +1,24 @@
-# API And Ui
+# API and UI Edge Cases
 
-## API Reliability Risks
-- Duplicate client retries without stable idempotency keys.
-- Pagination drift during concurrent writes.
-- Partial-success composite operations lacking clear error contracts.
+## API Failure Modes
 
-## UI/UX Risks
-- Stale optimistic views conflicting with authoritative backend state.
-- Ambiguous validation and remediation guidance for operators.
+| Case | Trigger | API Behavior | UI Behavior |
+|---|---|---|---|
+| Duplicate submit | Scanner retries after timeout | Return prior response by idempotency key | Show "already processed" with original timestamp |
+| Version conflict | Stale task version | `409` with latest version metadata | Prompt user to refresh task and retry |
+| Partial composite failure | Pack close succeeds, label fails | `202` with `PackingBlocked` status | Route operator to remediation queue |
 
-## Guardrails
-- Standardized error taxonomy and retryability hints.
-- ETag/version preconditions for concurrent edits.
-- Correlated request IDs visible in UI and support tooling.
+## UI Consistency Rules
+- UI must display backend authoritative state and last sync timestamp.
+- Optimistic updates require rollback UI path when server rejects transition.
+- Error toast includes `correlation_id` for support handoff.
+
+## Contract Example
+```json
+{
+  "code": "RESERVATION_MISMATCH",
+  "retryable": false,
+  "rule_id": "BR-7",
+  "correlation_id": "c-123"
+}
+```

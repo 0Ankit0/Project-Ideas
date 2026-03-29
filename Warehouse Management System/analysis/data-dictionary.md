@@ -1,41 +1,50 @@
 # Data Dictionary
 
-This data dictionary is the canonical reference for **Warehouse Management System**. It defines shared terminology, entity semantics, and governance controls required to keep warehouse management workflows consistent across teams and services.
+This document defines implementation-ready data semantics for WMS write paths, read models, and analytics pipelines.
 
-## Scope and Goals
-- Establish a stable vocabulary for architecture, API, analytics, and operations teams.
-- Define minimum required fields for core entities and expected relationship boundaries.
-- Document data quality and retention controls needed for production readiness.
+## Canonical Entities
 
-## Core Entities
-| Entity | Description | Required Attributes |
-|---|---|---|
-| TenantOrOrganization | Top-level ownership boundary for data segregation | `org_id, name, status, region, created_at` |
-| UserOrActor | Human/system principal that performs actions | `actor_id, org_id, role, status, last_active_at` |
-| PrimaryRecord | Main lifecycle object handled by the platform | `record_id, org_id, state, owner_id, created_at, updated_at` |
-| ChildTransaction | Operational transaction or sub-step linked to primary record | `txn_id, record_id, txn_type, amount_or_value, occurred_at` |
-| PolicyOrRule | Versioned policy configuration that influences decisions | `policy_id, scope, version, effective_from, effective_to` |
-| AuditEvent | Append-only evidence for state changes and controls | `audit_id, record_id, actor_id, action, reason_code, occurred_at` |
+| Entity | Purpose | Required Attributes | Business Constraints |
+|---|---|---|---|
+| `warehouse` | Physical operating boundary | `warehouse_id`, `code`, `timezone`, `region` | Unique `code` per region |
+| `sku` | Product identity and handling metadata | `sku_id`, `uom`, `lot_controlled`, `serial_controlled` | Lot/serial flags immutable after activation |
+| `inventory_balance` | Current stock snapshot by bin | `warehouse_id`, `sku_id`, `bin_id`, `on_hand`, `reserved` | `on_hand >= reserved >= 0` |
+| `inventory_ledger` | Immutable movement history | `ledger_id`, `mutation_type`, `qty_delta`, `correlation_id`, `actor_id` | Append-only; no hard updates |
+| `reservation` | Allocation commitment for order line | `reservation_id`, `order_line_id`, `sku_id`, `qty`, `state` | One active reservation per order-line split |
+| `pick_task` | Executable work unit | `task_id`, `wave_id`, `reservation_id`, `state`, `zone` | State transitions must follow guard graph |
+| `pack_session` | Carton reconciliation context | `pack_session_id`, `shipment_id`, `state`, `line_totals` | Cannot close if unreconciled deltas exist |
+| `shipment` | Outbound execution + carrier linkage | `shipment_id`, `status`, `carrier`, `tracking_no` | Confirm-once semantic |
+| `exception_case` | Operational issue and remediation | `case_id`, `type`, `state`, `owner_id`, `severity` | Closed cases immutable except comment append |
+| `audit_event` | Compliance trail | `audit_id`, `entity_type`, `entity_id`, `action`, `reason_code`, `occurred_at` | Immutable retention policy |
 
-## Canonical Relationship Diagram
+## Relationship Diagram
 ```mermaid
 erDiagram
-    TENANTORORGANIZATION ||--o{ USERORACTOR : owns
-    TENANTORORGANIZATION ||--o{ PRIMARYRECORD : contains
-    PRIMARYRECORD ||--o{ CHILDTRANSACTION : has
-    POLICYORRULE ||--o{ PRIMARYRECORD : governs
-    PRIMARYRECORD ||--o{ AUDITEVENT : audited_by
-    USERORACTOR ||--o{ AUDITEVENT : performs
+    WAREHOUSE ||--o{ INVENTORY_BALANCE : stores
+    SKU ||--o{ INVENTORY_BALANCE : represented_in
+    INVENTORY_BALANCE ||--o{ INVENTORY_LEDGER : explained_by
+    RESERVATION }o--|| INVENTORY_BALANCE : consumes
+    WAVE ||--o{ PICK_TASK : creates
+    PICK_TASK }o--|| RESERVATION : fulfills
+    PACK_SESSION }o--|| PICK_TASK : reconciles
+    SHIPMENT ||--|| PACK_SESSION : closes
+    EXCEPTION_CASE }o--o{ PICK_TASK : references
+    AUDIT_EVENT }o--|| EXCEPTION_CASE : records
 ```
 
-## Data Quality Controls
-1. All write paths enforce required-field validation and referential integrity for mandatory foreign keys.
-2. External imports must include provenance metadata (`source_system`, `source_ref`, `ingested_at`).
-3. Status/state fields use controlled vocabularies and reject unknown values.
-4. Duplicate detection runs on natural keys where business identity collisions are likely.
-5. Sensitive fields carry classification tags to drive masking, encryption, and export behavior.
+## Data Quality and Validation Rules
+- Required field validation must run before authorization side effects.
+- Natural-key duplicate detection required for scanner-originated transactions.
+- `reason_code` mandatory for all manual or exception-driven updates.
+- `correlation_id` required on all mutating command payloads.
 
-## Retention and Audit
-- Operational records remain online for active workflow windows and support forensic queries.
-- Historical records move to archive tiers by policy without breaking traceability.
-- Audit events are immutable and linked through correlation ids for incident analysis.
+## Retention and Access Patterns
+- Hot OLTP: balances, reservations, open tasks/cases.
+- Warm analytic store: inventory ledger, shipment history, performance KPIs.
+- Audit retention: immutable archive with legal-hold support.
+
+## Indexing Guidance
+- `inventory_balance(warehouse_id, sku_id, bin_id)`
+- `reservation(order_line_id, state)`
+- `pick_task(wave_id, state, zone)`
+- `exception_case(state, severity, owner_id)`

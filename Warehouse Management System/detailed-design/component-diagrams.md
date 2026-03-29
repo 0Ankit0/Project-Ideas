@@ -2,56 +2,55 @@
 
 ```mermaid
 flowchart LR
-    subgraph API
+    subgraph API[API Layer]
       Gateway
       ReceivingAPI
+      AllocationAPI
       FulfillmentAPI
-      InventoryAPI
+      ShippingAPI
+      ExceptionAPI
     end
 
-    subgraph Core
-      ReceivingSvc
-      PutawaySvc
-      InventorySvc
-      AllocationSvc
-      WaveSvc
-      TaskSvc
-      ShippingSvc
-      ReturnsSvc
+    subgraph Domain[Domain Components]
+      ReceivingCmp
+      PutawayCmp
+      ReservationCmp
+      WaveCmp
+      PickCmp
+      PackCmp
+      ShipmentCmp
+      ExceptionCmp
+      GuardLib[State Guard Library]
     end
 
-    subgraph Integrations
-      OMSAdapter
-      ERPAdapter
+    subgraph Infra[Infrastructure Components]
+      TxManager[Transaction Manager]
+      OutboxWriter
+      EventRelay
+      Repo[Repositories]
       CarrierAdapter
       ScannerAdapter
     end
 
-    subgraph Data
-      DB[(PostgreSQL)]
-      MQ[(Event Bus)]
-      Cache[(Redis)]
-    end
+    Gateway --> ReceivingAPI --> ReceivingCmp
+    Gateway --> AllocationAPI --> ReservationCmp
+    Gateway --> FulfillmentAPI --> PickCmp
+    Gateway --> ShippingAPI --> ShipmentCmp
+    Gateway --> ExceptionAPI --> ExceptionCmp
 
-    Gateway --> ReceivingAPI --> ReceivingSvc
-    Gateway --> FulfillmentAPI --> AllocationSvc
-    Gateway --> InventoryAPI --> InventorySvc
+    ReceivingCmp --> PutawayCmp
+    ReservationCmp --> WaveCmp
+    PickCmp --> PackCmp --> ShipmentCmp
 
-    ReceivingSvc --> PutawaySvc
-    AllocationSvc --> WaveSvc --> TaskSvc
-    TaskSvc --> ShippingSvc
-
-    ReceivingSvc --> DB
-    InventorySvc --> DB
-    AllocationSvc --> DB
-    TaskSvc --> DB
-    ShippingSvc --> DB
-
-    AllocationSvc --> OMSAdapter
-    ReceivingSvc --> ERPAdapter
-    ShippingSvc --> CarrierAdapter
-    TaskSvc --> ScannerAdapter
-
-    Core --> MQ
-    Core --> Cache
+    Domain --> GuardLib
+    Domain --> TxManager
+    Domain --> OutboxWriter
+    OutboxWriter --> EventRelay
+    Domain --> Repo
+    ShipmentCmp --> CarrierAdapter
+    PickCmp --> ScannerAdapter
 ```
+
+## Implementation Mapping
+- Each component corresponds to a deployable module/package.
+- GuardLib is shared to keep transition logic centralized and testable.

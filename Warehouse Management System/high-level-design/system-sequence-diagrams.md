@@ -1,33 +1,49 @@
 # System Sequence Diagrams
 
-## System Sequence: Receive Pallet
+## Sequence: Receive Pallet with Validation
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Picker
+    actor Receiver
     participant Scanner
     participant API as Receiving API
+    participant REC as Receiving Service
     participant INV as Inventory Service
+    participant EX as Exception Service
 
-    Picker->>Scanner: scan pallet + qty
-    Scanner->>API: POST /v1/receipts
-    API->>INV: post receipt
-    INV-->>API: stock updated
-    API-->>Scanner: receipt accepted
+    Receiver->>Scanner: scan ASN + pallet
+    Scanner->>API: POST /receipts
+    API->>REC: validate payload + authz
+    REC->>INV: validate ASN line/lot/qty
+    alt mismatch
+      INV-->>REC: validation failed
+      REC->>EX: create discrepancy case
+      REC-->>API: 422 + case id
+    else valid
+      INV-->>REC: validation passed
+      REC->>INV: commit receipt + ledger + outbox
+      REC-->>API: 201 receipt accepted
+    end
 ```
 
-## System Sequence: Complete Pick Task
+## Sequence: Confirm Shipment
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Picker
-    participant Scanner
-    participant API as Task API
-    participant Task as Task Service
+    actor Coordinator
+    participant API as Shipping API
+    participant SH as Shipping Service
+    participant Carrier
+    participant Outbox
 
-    Picker->>Scanner: confirm picked qty
-    Scanner->>API: POST /v1/tasks/{id}/complete
-    API->>Task: validate + complete task
-    Task-->>API: next task suggestion
-    API-->>Scanner: success
+    Coordinator->>API: POST /shipments/{id}/confirm
+    API->>SH: validate state + package reconciliation
+    SH->>Carrier: create manifest and label
+    alt timeout
+      SH-->>API: 503 retryable
+    else success
+      Carrier-->>SH: tracking + label
+      SH->>Outbox: write shipment-confirmed event
+      SH-->>API: 200 confirmed
+    end
 ```

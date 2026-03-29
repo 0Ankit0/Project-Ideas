@@ -1,25 +1,48 @@
-# Api Design
+# API Design
 
 ## Purpose
-Define the api design artifacts for the **Warehouse Management System** with implementation-ready detail.
+Define concrete API contracts for receiving, allocation, picking, packing, shipping, and exception handling.
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+## API Standards
+- REST JSON with versioned paths (`/api/v1/...`).
+- Mutating endpoints require `Idempotency-Key` and `X-Correlation-Id`.
+- Errors include `code`, `message`, `retryable`, `rule_id`.
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Core Command Endpoints
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+| Endpoint | Purpose | Success | Common Failure |
+|---|---|---|---|
+| `POST /api/v1/receipts` | Record received quantity by ASN line | `201` with `receipt_id` | `422 RECEIPT_TOLERANCE_BREACH` |
+| `POST /api/v1/putaway/tasks/generate` | Create putaway work from receipt | `202` with task batch id | `409 DUPLICATE_GENERATION` |
+| `POST /api/v1/waves` | Build wave from eligible orders | `202` with `wave_id` | `409 INSUFFICIENT_ALLOCATABLE_STOCK` |
+| `POST /api/v1/picks/{taskId}/confirm` | Confirm pick execution | `200` | `409 RESERVATION_MISMATCH` |
+| `POST /api/v1/packs/{shipmentId}/close` | Reconcile and close package | `200` | `422 PACK_RECONCILIATION_FAILED` |
+| `POST /api/v1/shipments/{shipmentId}/confirm` | Finalize shipping handoff | `200` | `503 CARRIER_CONFIRMATION_UNAVAILABLE` |
+| `POST /api/v1/exceptions/{caseId}/resolve` | Resolve exception with action | `200` | `409 EXCEPTION_STATE_CONFLICT` |
 
+## Example: Pick Confirmation Request
+```json
+{
+  "taskId": "PT-100045",
+  "reservationId": "RSV-9922",
+  "sku": "SKU-1234",
+  "pickedQty": 4,
+  "bin": "A-03-07",
+  "deviceTimestamp": "2026-03-28T10:10:33Z"
+}
+```
 
-## Detailed Design Emphasis
-- Table/entity constraints and invariants are explicit.
-- Failure semantics for retries/timeouts are defined per integration.
-- Versioning strategy documented for APIs, events, and data migrations.
+### Validation and Rule Mapping
+1. Verify task is `Assigned|InProgress` (BR-2).
+2. Verify reservation linkage and non-negative ATP post-mutation (BR-7).
+3. Persist mutation + audit + outbox in one transaction (BR-5).
+
+## Exception API Behavior
+- Exception resolution actions allowed: `RETRY`, `REALLOCATE`, `HOLD`, `BACKORDER`, `MANUAL_OVERRIDE`.
+- `MANUAL_OVERRIDE` requires `approverId`, `reasonCode`, `expiresAt` (BR-4).
+- Retry actions must preserve original `Idempotency-Key` lineage.
+
+## Observability Requirements
+- Emit RED metrics per endpoint and warehouse partition.
+- Audit log every state-changing call with outcome and violated rule ids.
+- Record p95/p99 latency and retry counts for carrier/OMS integrations.

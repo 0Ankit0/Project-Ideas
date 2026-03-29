@@ -1,42 +1,55 @@
 # Event Catalog
 
-This catalog defines stable event contracts for **Warehouse Management System** to support event-driven integrations, auditability, and analytics across warehouse management workflows.
+This catalog defines production event contracts for the **Warehouse Management System**. It is implementation-oriented and intended for service developers, integration teams, and analytics consumers.
 
 ## Contract Conventions
-- Event naming: `<domain>.<aggregate>.<action>.v1`.
-- Required metadata: `event_id`, `occurred_at`, `correlation_id`, `producer`, `schema_version`, `tenant_context`.
-- Delivery mode: at-least-once with mandatory consumer idempotency.
-- Ordering guarantee: per aggregate key; no global ordering assumption.
+- Event name format: `<domain>.<aggregate>.<action>.v1`.
+- Mandatory headers: `event_id`, `event_time`, `correlation_id`, `causation_id`, `tenant_id`, `schema_version`.
+- Delivery semantics: at-least-once; consumers must implement idempotency.
+- Ordering guarantee: ordered per partition key (`warehouse_id + aggregate_id`).
+- Breaking change policy: major version bump; old topic maintained during migration window.
 
-## Domain Events
-| Event Name | Payload Highlights | Typical Consumers |
-|---|---|---|
-| `domain.record.created.v1` | record_id, actor_id, initial_state, occurred_at | orchestration, analytics |
-| `domain.record.state_changed.v1` | record_id, old_state, new_state, reason_code | notifications, reporting |
-| `domain.record.validation_failed.v1` | record_id, violated_rules, correlation_id | operations, quality dashboards |
-| `domain.record.override_applied.v1` | record_id, override_type, approver_id, expires_at | compliance, audit |
-| `domain.record.closed.v1` | record_id, terminal_state, closed_at | billing/settlement, archives |
+## Core Operational Events
 
-## Publish and Consumption Sequence
+| Event | Producer | Partition Key | Key Fields | Triggers | Rule IDs |
+|---|---|---|---|---|---|
+| `receiving.receipt.confirmed.v1` | receiving-service | `warehouse_id+receipt_id` | `receipt_id`, `asn_line_id`, `lot`, `qty` | Valid receipt committed | BR-6 |
+| `receiving.discrepancy.created.v1` | receiving-service | `warehouse_id+case_id` | `case_id`, `reason_code`, `expected_qty`, `actual_qty` | ASN/qty mismatch | BR-10 |
+| `allocation.reservation.created.v1` | allocation-service | `warehouse_id+reservation_id` | `reservation_id`, `order_line_id`, `sku`, `reserved_qty` | Reservation commit | BR-7 |
+| `allocation.reservation.conflict.v1` | allocation-service | `warehouse_id+sku` | `sku`, `conflict_count`, `attempt_no` | OCC conflict | BR-5, BR-7 |
+| `fulfillment.pick.confirmed.v1` | fulfillment-service | `warehouse_id+task_id` | `task_id`, `reservation_id`, `picked_qty` | Pick confirm success | BR-7 |
+| `fulfillment.short_pick.reported.v1` | fulfillment-service | `warehouse_id+task_id` | `task_id`, `missing_qty`, `resolution_path` | Short pick detected | BR-10 |
+| `packing.reconciliation.failed.v1` | fulfillment-service | `warehouse_id+pack_session_id` | `pack_session_id`, `reason_code`, `line_deltas` | Pack close blocked | BR-8, BR-10 |
+| `shipping.confirmed.v1` | shipping-service | `warehouse_id+shipment_id` | `shipment_id`, `carrier`, `tracking_no`, `handoff_time` | Carrier handoff success | BR-9 |
+| `exception.case.resolved.v1` | operations-service | `warehouse_id+case_id` | `case_id`, `action`, `resolved_by`, `evidence_ref` | Case resolved | BR-3, BR-4, BR-10 |
+
+## Publish and Consumption Pattern
 ```mermaid
 sequenceDiagram
-    participant API as Command Service
-    participant DB as Transaction Store
-    participant Outbox as Outbox Relay
+    participant CommandSvc
+    participant DB as OLTP + Outbox
+    participant Relay as Outbox Relay
     participant Bus as Event Bus
-    participant Consumer as Downstream Consumer
-    API->>DB: Persist state change + outbox row
-    Outbox->>DB: Poll committed rows
-    Outbox->>Bus: Publish event
-    Bus-->>Consumer: Deliver event
-    Consumer->>Consumer: Idempotency check + process
-    alt Consumer failure
-        Consumer->>Bus: NACK
-        Bus-->>Consumer: Retry then DLQ
+    participant Consumer
+
+    CommandSvc->>DB: commit business change + outbox row
+    Relay->>DB: poll committed outbox records
+    Relay->>Bus: publish event with headers
+    Bus-->>Consumer: deliver message
+    Consumer->>Consumer: idempotency check + apply
+    alt processing failure
+      Consumer->>Bus: nack/retry
+      Bus-->>Consumer: redelivery or DLQ
     end
 ```
 
-## Operational SLOs
-- P95 commit-to-publish latency below 5 seconds for tier-1 events.
-- DLQ triage acknowledgement within 15 minutes for production incidents.
-- Schema changes remain backward compatible within the same major version.
+## Consumer Implementation Checklist
+1. Persist processed `event_id` for dedupe.
+2. Reject unknown mandatory fields and alert schema owner.
+3. Handle out-of-order events by aggregate version checks.
+4. Emit consumer lag and processing-failure metrics.
+
+## SLOs and Governance
+- P95 commit-to-publish latency <= 5 seconds.
+- DLQ acknowledgement <= 15 minutes for tier-1 domains.
+- Monthly schema compatibility review with integration teams.

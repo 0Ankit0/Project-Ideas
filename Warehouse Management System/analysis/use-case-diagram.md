@@ -2,27 +2,43 @@
 
 ```mermaid
 flowchart LR
-    Picker
-    Supervisor
-    Planner
-    Carrier
+    subgraph Actors
+      RA[Receiving Associate]
+      IP[Inventory Planner]
+      PK[Picker]
+      PO[Pack Operator]
+      TC[Transport Coordinator]
+      SV[Supervisor]
+    end
 
-    UC1((Receive Inbound ASN))
-    UC2((Putaway Inventory))
-    UC3((Allocate and Wave Orders))
-    UC4((Pick/Pack/Ship))
-    UC5((Cycle Count))
-    UC6((Replenish Pick Faces))
-    UC7((Handle Returns))
-    UC8((Manage Slotting Rules))
+    subgraph WMS[Warehouse Management System]
+      UC1((Receive & Validate Inbound))
+      UC2((Generate Putaway Tasks))
+      UC3((Allocate Orders))
+      UC4((Create/Release Waves))
+      UC5((Confirm Pick Tasks))
+      UC6((Reconcile Packing))
+      UC7((Confirm Shipment Handoff))
+      UC8((Resolve Exceptions))
+      UC9((Approve Override))
+    end
 
-    Supervisor --> UC1
-    Picker --> UC2
-    Planner --> UC3
-    Picker --> UC4
-    Planner --> UC5
-    Picker --> UC6
-    Supervisor --> UC7
-    Planner --> UC8
-    Carrier --> UC4
+    RA --> UC1 --> UC2
+    IP --> UC3 --> UC4
+    PK --> UC5
+    PO --> UC6
+    TC --> UC7
+    SV --> UC8
+    SV --> UC9
+
+    UC1 -. creates .-> UC8
+    UC5 -. short pick .-> UC8
+    UC6 -. mismatch .-> UC8
+    UC7 -. carrier outage .-> UC8
+    UC8 -. may require .-> UC9
 ```
+
+## Coverage Notes
+- UC1/UC2 enforce receiving validation and idempotent putaway generation.
+- UC5/UC6/UC7 define the controlled pick-pack-ship progression.
+- UC8/UC9 ensure exception and override controls are explicit.

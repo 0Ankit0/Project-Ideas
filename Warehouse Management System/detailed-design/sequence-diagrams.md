@@ -18,6 +18,10 @@ sequenceDiagram
     API-->>OMS: wave accepted
 ```
 
+**Critical Guarantees**
+- Allocation reservation and wave creation are linked by correlation id.
+- Duplicate OMS release message must return same `wave_id` (idempotent).
+
 ## Goods Receipt with Discrepancy
 ```mermaid
 sequenceDiagram
@@ -37,3 +41,33 @@ sequenceDiagram
     INV-->>API: updated stock
     API-->>Scanner: receipt confirmation
 ```
+
+## Pick -> Pack -> Ship with Carrier Failure Path
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Picker
+    participant PickAPI
+    participant PackAPI
+    participant ShipAPI
+    participant Carrier
+    participant EXQ as Exception Queue
+
+    Picker->>PickAPI: confirm pick
+    PickAPI->>PackAPI: mark line pick-complete
+    PackAPI->>PackAPI: reconcile carton
+    PackAPI->>ShipAPI: request shipment confirmation
+    ShipAPI->>Carrier: create manifest + label
+    alt carrier timeout
+      ShipAPI->>EXQ: enqueue shipping exception
+      ShipAPI-->>PackAPI: shipment pending
+    else success
+      Carrier-->>ShipAPI: tracking + label
+      ShipAPI-->>PackAPI: shipment confirmed
+    end
+```
+
+## Implementation Guidance
+- Use outbox relay between command DB and event bus.
+- Ensure retries are safe via business idempotency, not transport dedupe alone.
+- Persist external request/response hash for carrier disputes.

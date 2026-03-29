@@ -1,25 +1,34 @@
 # Implementation Guidelines
 
-## Purpose
-Define the implementation guidelines artifacts for the **Warehouse Management System** with implementation-ready detail.
+## Service Ownership Model
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+| Domain Capability | Primary Service | Supporting Components |
+|---|---|---|
+| Receiving & Putaway | `receiving-service` | scanner gateway, discrepancy handler |
+| Allocation & Waves | `allocation-service` | wave planner worker, reservation engine |
+| Picking & Packing | `fulfillment-service` | task dispatcher, pack reconciler |
+| Shipping | `shipping-service` | carrier adapter, manifest retry worker |
+| Exceptions & Overrides | `operations-service` | case workflow, approval policy engine |
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Coding and Data Guidelines
+- All mutating handlers must implement idempotency middleware.
+- Command handlers must emit structured audit events on success and rule violation.
+- Domain events are published only from committed outbox records.
+- State transitions must use centralized guard library (shared rule engine).
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+## Delivery Plan (Implementation Ready)
+1. **Phase 1:** Receiving + putaway + discrepancy cases.
+2. **Phase 2:** Allocation + wave planning + reservation protections.
+3. **Phase 3:** Pick/pack reconciliation and short-pick handling.
+4. **Phase 4:** Shipping confirmation, carrier resilience, and observability hardening.
 
+## Required Automated Tests
+- Unit tests for rule guards (BR-1..BR-10 coverage).
+- Integration tests for transactional boundaries (`reserve_inventory`, `confirm_pick`, `confirm_shipment`).
+- Contract tests for OMS/carrier integrations.
+- Chaos tests for worker crash and replay scenarios.
 
-## Delivery Emphasis
-- Milestones mapped to slices that are testable end-to-end.
-- CI quality gates include lint, unit/integration tests, and contract checks.
-- Backend status matrix tracks readiness by capability and release wave.
+## Observability and Operations
+- Dashboards: receiving mismatch rate, reservation conflicts, pack blocks, shipment retries.
+- Alerts: DLQ depth, event lag, ATP negative-attempt guard triggers.
+- Runbooks: replay, backfill, carrier outage failover, scanner offline recovery.

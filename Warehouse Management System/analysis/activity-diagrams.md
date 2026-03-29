@@ -15,7 +15,12 @@ flowchart TD
     I --> J[Confirm bin location]
 ```
 
-## Order Fulfillment
+**Implementation Notes**
+- `Create discrepancy case` writes a case row and emits `receiving.discrepancy.created.v1`.
+- `Receive inventory` and outbox insert must be a single transaction.
+- `Generate putaway tasks` uses idempotency key `receipt_id + line_id`.
+
+## Order Fulfillment (Allocation -> Pick -> Pack -> Ship)
 ```mermaid
 flowchart TD
     A[Orders imported from OMS] --> B[Run allocation rules]
@@ -26,6 +31,11 @@ flowchart TD
     F --> G[Ship manifest to carrier]
     G --> H[Post shipment confirmation]
 ```
+
+**Implementation Notes**
+- Allocation step must lock candidate stock by partition key (`warehouse_id + sku`).
+- Pack step is a reconciliation gate; shipment cannot proceed if mismatch exists.
+- Shipment confirmation is terminal decrement finalization event.
 
 ## Cycle Count Adjustment
 ```mermaid
@@ -39,3 +49,8 @@ flowchart TD
     G -- No --> E
     G -- Yes --> H[Adjust inventory + audit]
 ```
+
+## Exception Branch Contract
+- Every `No/Fail` branch must produce reason code + actor attribution.
+- Branch outcomes are limited to: **retry**, **reallocate**, **hold**, **manual-review**.
+- Escalation events feed operations SLA dashboard.

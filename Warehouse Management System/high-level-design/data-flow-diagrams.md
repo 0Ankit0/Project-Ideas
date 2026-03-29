@@ -1,22 +1,31 @@
 # Data Flow Diagrams
 
-## Inbound and Inventory Data Flow
+## DFD Level 0 - Fulfillment Data Flow
 ```mermaid
 flowchart LR
-    ASN[Inbound ASN] --> Receive[Receiving Service]
-    Receive --> QC[Quality Check]
-    QC --> Putaway[Putaway Service]
-    Putaway --> Stock[(Stock Balances)]
-    Stock --> Replenish[Replenishment Engine]
+    OMS[OMS Orders] --> P1[Allocate + Wave]
+    P1 --> D1[(Reservations)]
+    P1 --> P2[Pick Execution]
+    P2 --> D2[(Pick Confirmations)]
+    P2 --> P3[Pack Reconciliation]
+    P3 --> D3[(Pack Sessions)]
+    P3 --> P4[Ship Confirmation]
+    P4 --> D4[(Shipments)]
+    P4 --> OMS
 ```
 
-## Order Fulfillment Data Flow
+## DFD Level 1 - Receiving Flow
 ```mermaid
 flowchart LR
-    Orders[Released Orders] --> Allocate[Allocation Engine]
-    Allocate --> Wave[Wave Planner]
-    Wave --> Tasks[Pick Tasks]
-    Tasks --> Pack[Pack/Label]
-    Pack --> Ship[Carrier Manifest]
-    Ship --> Confirm[Shipment Confirmation]
+    ERP[ASN/PO] --> R1[Receive Validation]
+    Scanner[RF Scan] --> R1
+    R1 --> D5[(Receipt Ledger)]
+    R1 --> R2[Putaway Planner]
+    R2 --> D6[(Putaway Tasks)]
+    R1 --> EX[Exception Case Manager]
 ```
+
+## Data Controls
+- All writes carry `correlation_id`, `actor_id`, and reason metadata.
+- Outbox ensures event publication after commit only.
+- Reconciliation jobs compare ledger totals with balances.

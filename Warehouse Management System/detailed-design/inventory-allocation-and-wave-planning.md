@@ -1,25 +1,40 @@
 # Inventory Allocation and Wave Planning
 
 ## Problem Scope
-This document details architecture and operational controls for **inventory allocation and wave planning** in the **Warehouse Management System**.
+Define deterministic allocation and wave planning behavior under high throughput and partial-failure conditions.
+
+## Allocation Policy Model
+
+| Policy Dimension | Strategy | Default |
+|---|---|---|
+| Stock rotation | FIFO / FEFO | FEFO for lot-controlled SKUs |
+| Zone preference | Nearest pick zone first | Enabled |
+| Priority | SLA tier then order age | SLA tier > age |
+| Split policy | Minimize carton splits | Enabled with max-split threshold |
 
 ## Core Invariants
-- Critical mutations are idempotent and traceable through correlation IDs.
-- Reconciliation can recompute canonical state from immutable source events.
-- User-visible state transitions remain monotonic and auditable.
+1. Reservable ATP never negative after commit.
+2. Allocation writes and reservation events commit atomically.
+3. Wave generation is deterministic for same input snapshot and policy version.
 
-## Workflow Design
-1. Validate request shape, policy, and actor permissions.
-2. Execute transactional write(s) with optimistic concurrency protections.
-3. Emit durable events for downstream projections and side effects.
-4. Run compensating actions when asynchronous steps fail.
+## Execution Steps
+1. Build candidate stock set by `warehouse_id`, SKU, and eligibility filters.
+2. Score candidates using policy weights.
+3. Reserve stock with optimistic concurrency (`version` check).
+4. Generate pick tasks grouped by zone/path optimization.
+5. Emit allocation and wave events through outbox.
 
-## Data and API Considerations
-- Enumerate lifecycle statuses and forbidden transitions.
-- Define read model projections for dashboards and operations tooling.
-- Include API idempotency keys, pagination, filtering, and cursor semantics.
+## Failure and Compensation
+- Concurrency conflict -> retry with fresh snapshot and bounded attempts.
+- Mid-wave stock loss -> deallocate impacted lines and trigger replan.
+- Worker crash after DB commit -> outbox relay guarantees downstream event publication.
 
-## Failure Handling
-- Timeout handling with bounded retries and dead-letter workflows.
-- Human-in-the-loop escalation path for unrecoverable conflicts.
-- Post-incident replay/backfill procedure with verification checklist.
+## Operational Metrics
+- Reservation conflict rate by SKU and warehouse.
+- Wave plan build latency and task-count distribution.
+- Replan frequency due to short picks or damaged stock.
+
+## Rule and Artifact Mapping
+- BR-7: reservation + ATP protection.
+- BR-5: idempotent retries and compensation safety.
+- BR-10: deterministic recovery for short picks/replans.

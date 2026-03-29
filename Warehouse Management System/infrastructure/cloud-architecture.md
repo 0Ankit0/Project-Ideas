@@ -1,25 +1,34 @@
 # Cloud Architecture
 
-## Purpose
-Define the cloud architecture artifacts for the **Warehouse Management System** with implementation-ready detail.
+## Runtime Topology
+- API tier (receiving/picking/packing/shipping command services).
+- Worker tier (allocation, wave planner, reconciliation, outbox relay).
+- Data tier (OLTP primary + read replicas + object archive).
+- Integration tier (carrier adapters, OMS connectors, notification services).
 
-## Domain Context
-- Domain: Warehouse
-- Core entities: SKU, Bin, Lot, Wave, Pick Task, Pack Station, Cycle Count
-- Primary workflows: inbound receiving and putaway, allocation and wave release, pick-pack-ship execution, cycle counting and adjustments, scanner synchronization
+## Availability and Scale Strategy
+- Multi-AZ deployment for API and database.
+- Autoscaling on queue depth, request rate, and p95 latency.
+- Horizontal partitioning by warehouse region to contain blast radius.
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Resilience Patterns
+- Outbox pattern for guaranteed event publication.
+- Circuit breakers and fallback routing for carrier APIs.
+- Dead-letter queues per integration with replay tooling.
+- Backpressure gate on wave release when downstream dependency health degrades.
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+## Security and Compliance
+- Private service networking; internet ingress only via WAF/API gateway.
+- mTLS service-to-service authentication.
+- KMS-managed encryption keys with periodic rotation.
+- Immutable audit logs exported to long-retention storage.
 
+## Disaster Recovery
+- Cross-region backup replication every 5 minutes.
+- Quarterly restore drills for inventory and shipment datasets.
+- Defined RPO/RTO targets: 5 min / 30 min.
 
-## Infrastructure Emphasis
-- Multi-environment topology (dev/stage/prod) with promotion gates.
-- Network segmentation, private service communication, and WAF boundaries.
-- Backup, disaster recovery, and key rotation procedures.
+## Capacity Planning Inputs
+- Peak orders/hour, scans/minute, waves/hour by warehouse.
+- Average and p99 event payload size.
+- Carrier API throughput limits and timeout profile.
