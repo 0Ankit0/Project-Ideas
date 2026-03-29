@@ -180,3 +180,13 @@ feast>=0.25.0
 # Data Processing
 pyarrow>=10.0.0
 ```
+
+## Implementation Standards (Enforced)
+- Minimum test coverage gates per package and mandatory contract tests for service boundaries.
+- Model-serving code must separate business policy filters from model scoring logic.
+- Feature extraction code must be deterministic and replayable from event snapshots.
+
+## Pull Request Checklist
+- [ ] Includes migration notes if schema or feature definitions changed.
+- [ ] Adds/updates dashboards and alerts for new runtime paths.
+- [ ] Documents rollback and operational playbook updates.

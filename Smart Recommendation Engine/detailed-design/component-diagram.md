@@ -78,3 +78,24 @@ graph TB
 | Policy Engine | Python | Apply business rules/diversity |
 | Event Processor | Kafka Consumer | Process user action events |
 | Feature Engineer | PySpark | Compute features from raw data |
+
+## Detailed Implementation Constraints
+- Translate each component/class/state transition into code-level interfaces with explicit pre/post-conditions.
+- Every persistence change must include migration strategy, rollback script, and backfill impact analysis.
+
+## Mermaid Verification Loop: Component Diagram
+```mermaid
+flowchart TD
+    A[Design artifact updated] --> B[Contract tests added]
+    B --> C[Static analysis + lint]
+    C --> D[Integration tests]
+    D --> E{Pass?}
+    E -- No --> F[Fix implementation/design mismatch]
+    F --> B
+    E -- Yes --> G[Promote to staging]
+```
+
+## Required Engineering Evidence
+- API/interface compatibility report
+- Query/index performance benchmarks
+- State transition and error-path tests

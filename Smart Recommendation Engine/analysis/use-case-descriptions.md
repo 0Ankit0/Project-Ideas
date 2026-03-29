@@ -29,3 +29,12 @@
 7. System saves model to registry
 
 **Success**: Model trained and registered with performance metrics
+
+## Implementation Traceability Matrix
+- Map each use case to APIs, feature groups, model artifacts, and dashboards.
+- Define explicit non-functional acceptance criteria (latency, availability, fairness, and privacy controls) per use case.
+- Include rollout dependencies and rollback path for every user-visible behavior.
+
+## UAT Readiness
+- Build scenario packs for cold-start users, sparse-history users, and policy-restricted items.
+- Require sign-off from PM, QA, ML lead, and SRE before release candidate approval.

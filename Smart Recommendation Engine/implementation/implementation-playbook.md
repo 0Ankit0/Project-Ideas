@@ -105,3 +105,13 @@ System is considered implementation-ready and production-capable when:
 3. Deployment and rollback are fully automated and repeatable.
 4. Security, reliability, and operational controls are verified in staging.
 5. Stakeholders sign off on KPI and acceptance criteria.
+
+## Rollout Playbook Expansion
+### Phase Gates
+1. **Pre-prod**: replay training data, run load tests, complete fairness scorecard.
+2. **Canary**: 1-5% traffic, abort on latency/error/fairness guardrails.
+3. **Ramp**: 25% -> 50% -> 100% only with signed checkpoint reviews.
+
+### On-call Runbook
+- Define first 30-minute triage actions, rollback triggers, and stakeholder escalation paths.
+- Maintain one-click model rollback and feature-flag fallback controls.

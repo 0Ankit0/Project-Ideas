@@ -39,3 +39,15 @@ erDiagram
 - Operational records remain online for active workflow windows and support forensic queries.
 - Historical records move to archive tiers by policy without breaking traceability.
 - Audit events are immutable and linked through correlation ids for incident analysis.
+
+## Implementation Data Contract Addendum
+### Mandatory Field Metadata
+For each field define: semantic type, nullability, retention class, PII category, freshness expectation, and owning team.
+
+### Compatibility Rules
+- Additive changes are backward-compatible only when defaults are documented.
+- Semantic changes require a version bump and dual-read migration period.
+
+### Quality Gates
+- CI checks type drift, cardinality explosions, and enum expansion impacts.
+- Failing checks block feature-store publication and model training triggers.

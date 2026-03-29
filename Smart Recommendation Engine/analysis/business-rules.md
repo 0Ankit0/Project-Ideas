@@ -33,3 +33,16 @@ flowchart TD
 - Overrides are restricted to approved exception classes and require dual logging (business + security audit).
 - Override windows automatically expire and trigger follow-up verification tasks.
 - Repeated override patterns are reviewed for policy redesign and automation improvements.
+
+## Implementation-Ready Rulebook
+### Rule Authoring Standard
+- Express each rule with: `rule_id`, trigger event, preconditions, deterministic action, audit fields, and override policy.
+- Tag rules as `safety`, `ranking`, `compliance`, or `experiment` to control approval path.
+
+### Runtime Enforcement
+- Rule engine executes in this order: **hard safety filters -> legal/compliance constraints -> business objectives -> experimentation overlays**.
+- Any rule failure must emit structured audit logs with decision trace IDs.
+
+### Governance
+- Weekly stale-rule review with product + ML + compliance stakeholders.
+- Sunset criteria: zero hits for 30 days and no dependency references.

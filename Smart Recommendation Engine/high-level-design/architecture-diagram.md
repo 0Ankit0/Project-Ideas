@@ -90,3 +90,31 @@ graph TB
 - **Training Service**: Train and evaluate models
 - **Inference Service**: Generate predictions
 - **Recommendation API**: Public-facing endpoints
+
+## Design Realization Guidance
+- Use this artifact to define deployment units, API ownership boundaries, and cross-service contracts.
+- Bind each edge in the diagram to a concrete protocol (`HTTP/gRPC/Kafka`), timeout, retry, and auth mode.
+
+## Mermaid Scenario: Failure-Aware Architecture Diagram
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant FeatureStore
+    participant Ranker
+    Client->>API: Recommendation request
+    API->>FeatureStore: Read features (timeout budget)
+    alt feature store healthy
+        FeatureStore-->>API: Feature vector
+        API->>Ranker: Score candidates
+        Ranker-->>API: Ranked list
+    else feature store degraded
+        API->>API: activate fallback policy
+    end
+    API-->>Client: Response + trace id
+```
+
+## Release Gate
+- [ ] Capacity model updated for projected QPS and catalog growth.
+- [ ] Threat model and data classification map reviewed.
+- [ ] Rollback topology validated in staging.

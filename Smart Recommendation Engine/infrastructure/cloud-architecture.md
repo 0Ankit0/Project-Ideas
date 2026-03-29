@@ -94,3 +94,24 @@ graph TB
 | **Starter** | ~$500 | 2 API instances, t3.medium, basic ML |
 | **Growth** | ~$2000 | Auto-scaling, r5.large, GPU training |
 | **Enterprise** | ~$8000+ | Multi-region, dedicated GPU, HA |
+
+## Infrastructure Deployment Notes
+- Bind each infrastructure component to IaC modules, environment promotion strategy, and blast-radius boundaries.
+- Document subnet, IAM, secret rotation, and data encryption controls directly in deployment checklists.
+
+## Mermaid Operations Path: Cloud Architecture
+```mermaid
+flowchart TB
+    A[Commit IaC change] --> B[Plan + policy checks]
+    B --> C[Security review]
+    C --> D[Apply to staging]
+    D --> E[Resilience tests]
+    E --> F{Healthy?}
+    F -- No --> G[Rollback and incident ticket]
+    F -- Yes --> H[Promote to production]
+```
+
+## Capacity & Reliability Requirements
+- Forecast capacity for peak events and retraining windows.
+- Validate AZ/zone failure behavior and recovery-time objective (RTO).
+- Ensure observability endpoints and synthetic probes are deployed with the stack.

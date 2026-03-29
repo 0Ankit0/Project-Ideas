@@ -319,3 +319,8 @@
 ### Content Platform
 - US-2.1: "As a reader, I want to discover articles I'll enjoy"
 - US-2.3: "As a viewer, I want to rate video recommendations"
+
+## Story Elaboration for Build Teams
+- Each story must include implementation notes: required events, features, APIs, dashboards, and on-call alerts.
+- Add explicit acceptance criteria for latency, recommendation quality, and fairness outcomes by persona.
+- Define negative-path stories (timeouts, stale features, no-history users) with expected fallback behavior.

@@ -113,3 +113,15 @@
   "metrics": ["ctr", "conversion_rate"]
 }
 ```
+
+## API Production Readiness Addendum
+### Request/Response Contract Requirements
+- Define idempotency behavior for POST endpoints and deterministic pagination for list endpoints.
+- Include explicit error model (`code`, `message`, `retryable`, `trace_id`) across all responses.
+
+### SLA and Guardrails
+- p95 latency targets by endpoint, request size limits, and per-tenant rate limits are mandatory.
+- Backward compatibility policy: no breaking response-field changes without version bump.
+
+### Security Controls
+- Require auth scopes per endpoint, payload validation, and abuse throttling policies.
