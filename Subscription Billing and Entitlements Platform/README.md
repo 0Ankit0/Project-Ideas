@@ -29,6 +29,16 @@
 - Dunning retry orchestration with auditability and operational controls
 - Entitlement grant and revoke with auditability and operational controls
 
+
+## Cross-Cutting Deep-Dive Additions
+
+- [Requirements: Plan/versioning + lifecycle controls](./requirements/plan-versioning-and-lifecycle-requirements.md)
+- [Analysis: Entitlement and reconciliation flows](./analysis/reconciliation-and-entitlement-flows.md)
+- [HLD: Billing lifecycle and commercial versioning](./high-level-design/billing-lifecycle-and-versioning.md)
+- [Detailed design: Versioning, invoice/proration, entitlements, recovery](./detailed-design/plan-versioning-invoice-proration-entitlements.md)
+- [Infrastructure: Reconciliation and recovery architecture](./infrastructure/reconciliation-and-recovery-architecture.md)
+- [Implementation: Reconciliation and recovery playbook](./implementation/reconciliation-and-recovery-playbook.md)
+
 ## Diagram Generation
 
 Diagrams are authored in Mermaid where applicable; export via VS Code Mermaid preview, mermaid.live, or Mermaid CLI.
@@ -45,3 +55,19 @@ Diagrams are authored in Mermaid where applicable; export via VS Code Mermaid pr
 - ✅ Full Wave 1 documentation scaffold is present for this project.
 - ✅ Includes domain deep-dive (`detailed-design/usage-metering-and-entitlements.md`) and operational edge-case pack.
 - ⏳ Keep diagrams and status matrix synchronized with implementation changes.
+
+## Beginner Reading Guide
+If you are new to subscription systems, use this order:
+1. **Start with requirements** to learn what the business needs and why controls exist.
+2. **Read analysis** to see business flow and ownership (finance, billing, support).
+3. **Read high-level design** to understand how services collaborate.
+4. **Read detailed design** for schemas, APIs, and algorithms.
+5. **Read infrastructure and implementation** to understand operations, alerts, and rollout.
+
+### Core Terms (Quick Glossary)
+- **Plan**: a product package sold to a customer (e.g., Pro).
+- **Plan Version**: a frozen snapshot of plan rules/prices used for audit-safe history.
+- **Proration**: partial-cycle credit/debit when a customer changes plan mid-cycle.
+- **Entitlement**: what the customer is allowed to access right now.
+- **Reconciliation**: process that verifies billing, payments, ledger, and entitlements agree.
+
