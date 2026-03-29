@@ -40,3 +40,25 @@ sequenceDiagram
 - P95 commit-to-publish latency below 5 seconds for tier-1 events.
 - DLQ triage acknowledgement within 15 minutes for production incidents.
 - Schema changes remain backward compatible within the same major version.
+
+## Implementation Details: Event Reliability Contract
+
+### Producer requirements
+- Events must include `event_id`, `schema_version`, `tenant_id`, `correlation_id`, `causation_id`.
+- Producers must publish from outbox to avoid dual-write inconsistency.
+
+### Consumer requirements
+- Idempotent handlers keyed by domain identity + version.
+- Poison handling via DLQ with replay commands and audit trail.
+
+```mermaid
+sequenceDiagram
+    participant S as Service
+    participant O as Outbox
+    participant B as Bus
+    participant C as Consumer
+    S->>O: commit state + event
+    O->>B: publish
+    B->>C: deliver (at least once)
+    C->>C: dedup + apply
+```

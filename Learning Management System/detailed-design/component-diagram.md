@@ -28,3 +28,9 @@ flowchart LR
 | Grading and Feedback | Rubrics, reviewer workflows, overrides |
 | Certification | Completion evaluation and credential issuance |
 | Reporting | Dashboards, exports, engagement summaries |
+
+## Implementation Details: Component Interaction Rules
+
+- Commands and queries remain separated to simplify replay and projection rebuild.
+- Cross-component calls must use versioned contracts and fallback behavior.
+- Side-effecting components must emit audit and metric events.

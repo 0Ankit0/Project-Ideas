@@ -44,3 +44,9 @@ flowchart TB
     gradingQueue --> grading
     certificatesJobs --> certificates
 ```
+
+## Implementation Details: Code-Level Module Rules
+
+- Keep command handlers free of read-model dependencies.
+- Keep projectors side-effect free except projection writes.
+- Cross-module calls go through explicit interfaces, not direct persistence access.

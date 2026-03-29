@@ -34,3 +34,13 @@ sequenceDiagram
     Grade->>Progress: recalculate course progress
     Progress-->>Learner: updated status available
 ```
+
+## Implementation Details: Failure Paths in Sequences
+
+Include explicit alternative paths for:
+- duplicate submission requests,
+- stale etag conflicts,
+- downstream integration timeout,
+- delayed manual review queue.
+
+Each path must map to deterministic user-facing status.

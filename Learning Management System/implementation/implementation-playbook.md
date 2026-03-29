@@ -33,3 +33,10 @@ Build a production-ready, multi-tenant LMS that supports course authoring, learn
 - [ ] Certificate issuance and verification flow validated
 - [ ] Notification templates, alerts, and runbooks enabled
 - [ ] Reporting freshness and recovery procedures rehearsed
+
+## Implementation Details: Release Gate Checklist
+
+1. Synthetic end-to-end enroll->submit->grade->certificate checks passing.
+2. Migration and replay drills executed for current release artifacts.
+3. On-call handoff includes dashboards, alerts, and rollback commands.
+4. Tenant communication plan prepared for policy or grade-impacting changes.

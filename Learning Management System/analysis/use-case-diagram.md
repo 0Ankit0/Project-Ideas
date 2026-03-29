@@ -37,3 +37,21 @@ flowchart LR
     uc4 --> uc5
     uc5 --> uc8
 ```
+
+## Implementation Details: Use-Case Realization
+
+### Actor-to-service responsibility mapping
+- **Learner** operations map to enrollment, lesson player, assessment, and progress endpoints with tenant guard checks.
+- **Instructor/Reviewer** operations map to review queues, rubric workflows, moderation overrides, and feedback publication.
+- **Tenant admin** operations map to policy configuration, cohort management, and reporting exports.
+
+```mermaid
+flowchart TD
+    U[Use case invoked] --> A{Authorization valid?}
+    A -- no --> X[Reject + audit]
+    A -- yes --> P[Policy evaluation]
+    P --> C{Constraint satisfied?}
+    C -- no --> D[Return actionable denial reason]
+    C -- yes --> W[Write domain state + emit event]
+    W --> R[Project read models]
+```

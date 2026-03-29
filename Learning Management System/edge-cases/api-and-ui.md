@@ -7,3 +7,10 @@
 | Large cohort dashboard becomes slow | Staff lose operational visibility | Use projection-based summaries and paginated drill-downs |
 | Staff workspace leaks learner data across tenants | Severe isolation breach | Enforce tenant scoping before query and render on every route |
 | Lesson player fails to render embedded content | Progress flow breaks | Provide graceful fallback with retry and support messaging |
+
+
+## Implementation Details: API/UI Contract Alignment
+
+- Each API error code maps to deterministic UI copy and retry guidance.
+- UI should not assume completion/grade finalization until evaluator confirmation event.
+- Long-running operations expose polling status and correlation reference.

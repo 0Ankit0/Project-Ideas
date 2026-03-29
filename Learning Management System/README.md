@@ -89,3 +89,19 @@ Learning Management System/
 - ✅ Infrastructure complete
 - ✅ Edge cases complete
 - ✅ Implementation complete
+
+## Delivery Blueprint
+
+### Lifecycle handoff checkpoints
+1. **Authoring done**: course version has objectives, rubric mapping, accessibility checks, and prerequisite graph validation.
+2. **Review done**: pedagogical, compliance, and assessment quality reviews approved with explicit decision notes.
+3. **Publish done**: release policy defines target cohorts, start/end windows, rollback trigger, and communication plan.
+4. **Runtime done**: monitoring and runbooks active for enrollment, progress, grading, and certificate workflows.
+
+### Cross-team implementation responsibilities
+| Area | Primary | Outputs required before coding |
+|---|---|---|
+| Course lifecycle | Content platform | state transitions, migration policy, rollback strategy |
+| Grading/progress | Assessment platform | deterministic formulas, edge-case policies, reconciliation plan |
+| Operations | SRE | SLOs, alert thresholds, incident runbooks |
+| Compliance | Security/compliance | audit retention, override controls, evidence export process |

@@ -26,3 +26,9 @@ stateDiagram-v2
     reactivated --> active
     completed --> certified
 ```
+
+## Implementation Details: State Transition Rules
+
+- Every transition defines guard condition, side effects, and emitted events.
+- Illegal transitions are rejected with auditable reason codes.
+- Terminal states (`archived`, `revoked`) must block further write transitions.

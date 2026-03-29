@@ -81,3 +81,9 @@ classDiagram
     User "1" --> "many" ProgressRecord
     User "1" --> "many" Certificate
 ```
+
+## Implementation Details: Domain Object Constraints
+
+- Value objects: `Score`, `Progress`, `TimeWindow`, `PolicyOutcome`.
+- Entities enforce invariants at construction (no invalid empty tenant scope, no negative max points).
+- Domain services perform policy evaluation without side effects.

@@ -33,3 +33,16 @@ erDiagram
     USER ||--o{ PROGRESS_RECORD : generates
     USER ||--o{ CERTIFICATE : earns
 ```
+
+## Implementation Details: Aggregate Consistency Rules
+
+- `Enrollment` and `Attempt` aggregates must not be updated from projection services.
+- `GradeRecord` is append-only by revision; overrides create new revision entries.
+- `CertificateRecord` transitions require completed + integrity-cleared invariant checks.
+
+```mermaid
+flowchart LR
+    Attempt --> GradeRecord
+    GradeRecord --> CompletionDecision
+    CompletionDecision --> CertificateRecord
+```
