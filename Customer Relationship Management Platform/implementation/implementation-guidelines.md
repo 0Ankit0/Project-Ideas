@@ -23,3 +23,37 @@ Define the implementation guidelines artifacts for the **Customer Relationship M
 - Milestones mapped to slices that are testable end-to-end.
 - CI quality gates include lint, unit/integration tests, and contract checks.
 - Backend status matrix tracks readiness by capability and release wave.
+
+## Domain Glossary
+- **Implementation Rule**: File-specific term used to anchor decisions in **Implementation Guidelines**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Draft Standard -> Team Review -> Adopt -> Enforce -> Audit`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Draft Standard] --> B[Team Review]
+    B[Team Review] --> C[Adopt]
+    C[Adopt] --> D[Enforce]
+    D[Enforce] --> E[Audit]
+    E[Audit]
+```
+
+## Integration Boundaries
+- Guidelines integrate CI linting, security scanning, and release governance.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- Pipeline transient failures auto-retry; policy violations fail fast.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- Guidelines include measurable thresholds for coverage, lint, and vuln severity.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.

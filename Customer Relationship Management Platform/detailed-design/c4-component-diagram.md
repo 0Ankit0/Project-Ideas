@@ -72,3 +72,36 @@ flowchart TB
 - **AuthZ + Policy**: central authorization checks and policy decisioning.
 - **Audit & Compliance**: immutable event journaling for sensitive actions.
 - **Integration Orchestrator**: async sync/replay between CRM and external systems.
+
+## Domain Glossary
+- **Component Interface**: File-specific term used to anchor decisions in **C4 Component Diagram**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Define Component -> Wire Dependencies -> Validate Contract -> Deploy`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Define Component] --> B[Wire Dependencies]
+    B[Wire Dependencies] --> C[Validate Contract]
+    C[Validate Contract] --> D[Deploy]
+    D[Deploy]
+```
+
+## Integration Boundaries
+- Shows component ports for command handling, queries, and event publication.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- If dependency unavailable, component enters degraded mode and emits health event.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- Each component declares owner, SLA tier, and dependency criticality.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.

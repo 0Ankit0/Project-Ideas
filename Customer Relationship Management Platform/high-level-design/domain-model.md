@@ -23,3 +23,36 @@ Define the domain model artifacts for the **Customer Relationship Management Pla
 - Bounded contexts with explicit API and event contracts.
 - Read/write model separation where throughput and consistency needs diverge.
 - Cross-cutting layers for authn/authz, observability, and policy enforcement.
+
+## Domain Glossary
+- **Aggregate Invariant**: File-specific term used to anchor decisions in **Domain Model**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Create Aggregate -> Mutate via Commands -> Emit Events -> Archive`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Create Aggregate] --> B[Mutate via Commands]
+    B[Mutate via Commands] --> C[Emit Events]
+    C[Emit Events] --> D[Archive]
+    D[Archive]
+```
+
+## Integration Boundaries
+- Model boundaries align with lead, account, opportunity, and forecast contexts.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- Invariant violations return conflict errors; no partial aggregate writes.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- Each aggregate defines invariants and concurrency strategy.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.

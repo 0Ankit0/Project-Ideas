@@ -64,3 +64,37 @@ flowchart TB
     LeadApp --> Authz
     OppApp --> Authz
 ```
+
+## Domain Glossary
+- **Code Module Boundary**: File-specific term used to anchor decisions in **C4 Code Diagram**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Module Planned -> Implemented -> Reviewed -> Tagged -> Released`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Module Planned] --> B[Implemented]
+    B[Implemented] --> C[Reviewed]
+    C[Reviewed] --> D[Tagged]
+    D[Tagged] --> E[Released]
+    E[Released]
+```
+
+## Integration Boundaries
+- Maps code packages to runtime containers and ownership teams.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- Build retries transient dependency fetch failures; test failures are non-retryable.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- Each module has dependency direction and public API surface documented.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.

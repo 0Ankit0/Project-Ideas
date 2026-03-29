@@ -58,3 +58,36 @@ flowchart TB
     Bus --> WH
     Auth --> Cache
 ```
+
+## Domain Glossary
+- **Architecture View**: File-specific term used to anchor decisions in **Architecture Diagram**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Current State -> Target State -> Migration Stage -> Steady State`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Current State] --> B[Target State]
+    B[Target State] --> C[Migration Stage]
+    C[Migration Stage] --> D[Steady State]
+    D[Steady State]
+```
+
+## Integration Boundaries
+- Boundaries separate ingress, domain microservices, event fabric, and data planes.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- Inter-service calls retry with circuit breakers; cross-domain writes use saga compensation.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- Diagram identifies all tier-1 components with HA strategy and owner.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.
