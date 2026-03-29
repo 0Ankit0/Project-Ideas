@@ -34,3 +34,32 @@
 ## Application End User
 
 - **US-END-001**: As an application end user, I want authentication, file access, and realtime features to work consistently even if the app's backend provider changes underneath.
+
+## API/Isolation Acceptance Addendum
+
+### Story-level API contract acceptance
+- **As a tenant admin**, I can call `POST /api/v1/control/projects/{projectId}/bindings` with an idempotency key and receive either one created binding or the same replayed response.
+- **As an app developer**, I receive a stable error envelope from auth, data, storage, functions, and realtime APIs regardless of provider.
+- **As an operator**, I can query operation lifecycle via `GET /api/v1/control/operations/{id}` for every async provisioning or migration step.
+
+### Story-level tenancy/isolation acceptance
+- Tenant A cannot query or mutate Tenant B resources even with guessed IDs.
+- Environment secrets are readable only by workloads in the same environment.
+- Realtime channels require project+environment scoped claims.
+
+### Story-level lifecycle and migration acceptance
+```mermaid
+flowchart LR
+A[Draft config] --> B[Validated]
+B --> C[Applied to staging]
+C --> D[Canary prod]
+D --> E[Full rollout]
+D --> F[Rollback]
+```
+
+### Story-level error/SLO acceptance
+| Scenario | Expected error taxonomy | SLO impact rule |
+|---|---|---|
+| Invalid schema deploy | `VAL_SCHEMA_INVALID` | No error-budget burn (client fix needed) |
+| Provider timeout | `DEP_PROVIDER_TIMEOUT` | Counts toward dependency availability budget |
+| Unauthorized token | `AUTHN_TOKEN_EXPIRED` | Excluded if token older than max refresh window |

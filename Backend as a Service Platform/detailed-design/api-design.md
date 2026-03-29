@@ -59,3 +59,38 @@
 - Project owners and operators can create or change bindings subject to role policy.
 - App-facing auth, data, storage, function, and event APIs are always resolved through environment-scoped facade contracts.
 - Secret creation, provider switchover, and cross-environment operations require elevated permissions and audit logging.
+
+## Detailed Contracts (Expanded)
+
+### Canonical headers
+| Header | Required | Description |
+|---|---|---|
+| `Authorization` | yes | Bearer token containing tenant/project/env claims |
+| `Idempotency-Key` | mutations | Prevent duplicate side effects |
+| `X-Correlation-Id` | recommended | End-to-end tracing and incident correlation |
+| `If-Match` | stateful updates | optimistic concurrency guard |
+
+### Operation status contract
+```json
+{
+  "operationId": "op_8f3",
+  "type": "binding.switchover",
+  "state": "verifying",
+  "startedAt": "2026-03-29T10:23:00Z",
+  "lastError": null,
+  "progress": {"currentStep": "parity-check", "percent": 78}
+}
+```
+
+### Error contract examples
+```json
+{
+  "error": {
+    "code": "DEP_PROVIDER_TIMEOUT",
+    "category": "dependency",
+    "message": "storage adapter timed out",
+    "retryable": true,
+    "correlationId": "corr_123"
+  }
+}
+```

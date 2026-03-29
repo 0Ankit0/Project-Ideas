@@ -29,3 +29,11 @@
 - Integration tests for project provisioning, binding activation, and provider switchover.
 - Load tests for data API, event fanout, and worker orchestration.
 - Recovery tests for queue replay, Postgres failover, and secret rotation.
+
+## Implementation Rules for Contracts and Errors
+
+1. Keep request/response DTOs versioned by API namespace package/module.
+2. Implement a shared error-mapping library; adapter code must not leak raw provider errors.
+3. Enforce scope checks in middleware before handler execution.
+4. Emit structured logs with `correlationId`, `tenantId`, `projectId`, `envId`, `operationId`.
+5. Add contract tests for every public endpoint and each adapter conformance profile.

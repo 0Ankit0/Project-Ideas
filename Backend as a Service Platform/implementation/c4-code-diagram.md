@@ -30,3 +30,16 @@ flowchart TB
     providers --> capabilities
     providers --> platform
 ```
+
+## Code-Level Addendum
+
+```mermaid
+graph TD
+    Router[API Router] --> Middleware[Scope + Idempotency Middleware]
+    Middleware --> Handlers[Control/Runtime Handlers]
+    Handlers --> Orchestrator[Lifecycle Orchestrator]
+    Orchestrator --> Adapters[Provider Adapter Interfaces]
+    Handlers --> Errors[Error Taxonomy Mapper]
+    Handlers --> Metrics[SLI Instrumentation]
+    Orchestrator --> Repo[(State + Version Repositories)]
+```

@@ -33,3 +33,31 @@ flowchart TD
 - Overrides are restricted to approved exception classes and require dual logging (business + security audit).
 - Override windows automatically expire and trigger follow-up verification tasks.
 - Repeated override patterns are reviewed for policy redesign and automation improvements.
+
+## Deep-Dive: Rules for Contracts, Isolation, and Operations
+
+### Contract rules
+1. Every façade operation maps to a canonical command contract before adapter execution.
+2. Adapter-specific optional fields are allowed only under `extensions.<providerKey>` namespacing.
+3. Breaking changes in request/response shape are prohibited in minor versions.
+
+### Isolation rules
+1. All rule evaluations include tenant, project, and environment context.
+2. Cross-environment reads require explicit promotion workflows; direct reads are denied.
+3. Secrets cannot be copied across tenants; only re-created via rotation workflows.
+
+### Lifecycle rules
+| Domain object | Allowed transitions |
+|---|---|
+| Capability binding | `draft -> validating -> active -> switching -> active/failed` |
+| Migration | `planned -> dry-run -> applying -> verified -> completed/rolled-back` |
+| Function release | `uploaded -> scanned -> deployed -> active -> deprecated` |
+
+### Error/SLO rules
+- `STATE_CONFLICT` must include current version and expected version.
+- `DEP_RATE_LIMITED` must include retry-after metadata.
+- SLOs are measured per capability and per environment tier (dev/stage/prod).
+
+### Versioning rules
+- API contract versions are semver-tagged; adapters declare minimum compatible contract version.
+- Migration plans must record forward and backward compatibility assumptions.

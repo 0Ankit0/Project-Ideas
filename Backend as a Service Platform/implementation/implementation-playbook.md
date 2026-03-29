@@ -38,3 +38,17 @@ Build a production-ready, Postgres-centered BaaS platform that exposes stable au
 - [ ] Provider switchover runbooks tested in staging
 - [ ] Secrets rotation, audit export, and health dashboards enabled
 - [ ] Incident, rollback, and support runbooks rehearsed
+
+## Delivery Playbook: Safe Evolution
+
+### Rollout path
+1. Update API contract spec and regenerate SDK artifacts.
+2. Deploy behind feature flag for internal tenants.
+3. Run conformance + migration dry-run tests in staging.
+4. Canary 5% prod environments.
+5. Promote to full rollout when SLO burn-rate remains below threshold.
+
+### Incident and rollback checklist
+- If `DEP_*` or `INT_*` error rate > 1% for 10 min, freeze rollout.
+- Roll back to previous adapter/API version if parity checks fail.
+- Record post-incident corrective action in migration runbook.

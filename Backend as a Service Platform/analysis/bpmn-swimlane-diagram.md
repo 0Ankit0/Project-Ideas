@@ -39,3 +39,30 @@ flowchart LR
 - The control plane owns validation, metadata, policy, and migration orchestration.
 - Capability adapters perform provider-specific activation and runtime work while staying behind unified contracts.
 - Platform operations remain involved whenever migration, health degradation, or rollback decisions are needed.
+
+## BPMN Extension: Migration Governance Swimlane
+
+```mermaid
+flowchart LR
+    subgraph Admin
+      A1[Submit migration plan]
+      A2[Approve cutover]
+    end
+    subgraph ControlPlane
+      B1[Validate contract/version]
+      B2[Start operation]
+      B3[Track lifecycle state]
+    end
+    subgraph Adapter
+      C1[Run dry-run]
+      C2[Apply migration]
+      C3[Return verification]
+    end
+    subgraph Observability
+      D1[Compute SLI/SLO impact]
+      D2[Trigger alert if burn high]
+    end
+    A1 --> B1 --> C1 --> B2 --> C2 --> C3 --> B3 --> D1
+    D1 --> D2
+    B3 --> A2
+```

@@ -79,3 +79,31 @@ flowchart TB
 | Realtime and Events Facade | Channels, subscriptions, event fanout, webhook semantics |
 | Migration and Switchover Orchestrator | Provider change plans, cutover, rollback, and auditability |
 | Adapter Registry | Adapter catalog, certification state, compatibility profiles |
+
+## Architecture Addendum: Isolation and Contract Layers
+
+```mermaid
+graph TB
+    API[Versioned API Gateway]
+    CP[Control Plane Services]
+    RP[Runtime Plane Services]
+    OP[Operations + SLO Engine]
+    AD[Adapter Mesh]
+    PG[(PostgreSQL + RLS)]
+    SEC[Secret Manager]
+
+    API --> CP
+    API --> RP
+    CP --> AD
+    RP --> AD
+    CP --> PG
+    RP --> PG
+    CP --> SEC
+    RP --> SEC
+    CP --> OP
+    RP --> OP
+```
+
+- API gateway enforces contract version and idempotency middleware.
+- Control/runtime planes are isolated but share policy-backed PostgreSQL core.
+- Operations plane owns SLI computation, error budget policies, and migration gates.

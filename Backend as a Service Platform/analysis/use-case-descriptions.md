@@ -98,3 +98,22 @@
 **Exceptions**:
 - E1: Migration validation fails -> switchover is blocked before activation.
 - E2: Provider health degrades during cutover -> rollback or pause state is entered.
+
+## Extended Use Cases: Contracted Operations
+
+### UC-09 Provider Switchover with Compatibility Guard
+- **Primary actor:** Tenant Admin
+- **Preconditions:** target adapter certified and compatibility matrix green.
+- **Main flow:** submit switchover request -> dry-run parity checks -> canary traffic split -> full cutover.
+- **Postconditions:** binding version increments; old binding retained for rollback window.
+- **Error taxonomy examples:** `DEP_MIGRATION_TIMEOUT`, `STATE_CUTOVER_BLOCKED`.
+
+### UC-10 Versioned API Upgrade
+- **Primary actor:** Platform Operator
+- **Main flow:** publish API minor -> regenerate SDKs -> run contract tests -> enable for selected tenants.
+- **State transitions:** `proposed -> validated -> released -> deprecated`.
+
+### UC-11 SLO Burn Response
+- **Primary actor:** On-call Operator
+- **Main flow:** alert fired -> classify by SLI -> mitigation action -> incident review.
+- **Outputs:** incident timeline, corrective action, migration guard updates.

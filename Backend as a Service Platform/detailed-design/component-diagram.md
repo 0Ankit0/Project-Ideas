@@ -35,3 +35,13 @@ flowchart LR
 | Secrets and Config | Secret references, provider config, rotations |
 | Switchover | Migration plans, cutover, rollback |
 | Usage and Audit | Metering, operational visibility, immutable history |
+
+## Component Flow Enhancements
+
+| Component | Input contract | Output contract |
+|---|---|---|
+| Contract Gateway | HTTP + headers | Canonical command object |
+| Policy Engine | command + claims | allow/deny with reason code |
+| Adapter Driver | command + binding config | provider response/error |
+| State Store | operation updates | lifecycle snapshots |
+| Telemetry Sink | result metadata | SLI datapoints + alerts |
