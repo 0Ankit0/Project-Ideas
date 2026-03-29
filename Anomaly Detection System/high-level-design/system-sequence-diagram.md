@@ -78,3 +78,31 @@ sequenceDiagram
     API-->>-UI: 200 OK
     UI-->>-Operator: Alert Acknowledged
 ```
+
+## Purpose and Scope
+Shows cross-system request ordering, timing, and async callbacks for the core detection journey.
+
+## Assumptions and Constraints
+- Sequence timings are measured in production and reviewed quarterly.
+- Fallback paths are first-class participants in the sequence.
+- Correlation IDs are propagated across every hop.
+
+### End-to-End Example with Realistic Data
+`evt_20391`: client->ingress->feature->model->policy->case->notify. Model timeout at 120 ms triggers fallback scorer and marks response as degraded before notifying analyst queue.
+
+## Decision Rationale and Alternatives Considered
+- Modeled async post-processing separately to keep critical path clear.
+- Rejected hidden retries; all retries are explicit in the sequence.
+- Attached timeout budgets directly to arrows for implementability.
+
+## Failure Modes and Recovery Behaviors
+- Callback lost after case creation -> reconciliation worker closes gap using trace_id.
+- Notification fanout partial failure -> successful channels acked, failed channels retried idempotently.
+
+## Security and Compliance Implications
+- Sequence marks auth context propagation and token refresh boundaries.
+- Sensitive payload suppression shown on notification edges.
+
+## Operational Runbooks and Observability Notes
+- Trace waterfall view mirrors this sequence for incident triage.
+- Runbook contains per-hop dependency tests to isolate latency regressions.

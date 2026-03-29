@@ -60,3 +60,31 @@ graph TB
 - **Stream**: Kafka + Flink
 - **Detection**: GPU nodes
 - **Data**: Databases, cache
+
+## Purpose and Scope
+Specifies VPC/VNet layout, routing, security groups, service mesh, and ingress/egress controls.
+
+## Assumptions and Constraints
+- Default-deny network posture is enforced.
+- Inter-service traffic uses mTLS identity, not IP allowlists alone.
+- Private connectivity is preferred over public internet paths.
+
+### End-to-End Example with Realistic Data
+Producer VPC `10.42.0.0/16` sends via PrivateLink to detection VPC `10.80.0.0/16`; only ports 443 and 9092 allowed between specific security groups.
+
+## Decision Rationale and Alternatives Considered
+- Chose segmented subnets by trust zone to reduce lateral movement risk.
+- Rejected flat network topology because blast radius was too large.
+- Introduced egress proxy for controlled external dependencies.
+
+## Failure Modes and Recovery Behaviors
+- Route table drift opens unintended path -> policy scanner blocks apply and alerts network team.
+- mTLS cert expiry -> automated rotation fallback and pre-expiry paging.
+
+## Security and Compliance Implications
+- Network docs include threat model assumptions and compensating controls.
+- Flow logs retained and queryable for incident forensics.
+
+## Operational Runbooks and Observability Notes
+- Synthetic network probes validate critical paths continuously.
+- Runbook includes step-by-step network isolation for active incident containment.

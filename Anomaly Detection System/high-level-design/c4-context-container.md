@@ -70,3 +70,31 @@ graph TB
 | InfluxDB | Time-Series DB | Store metrics and anomalies |
 | PostgreSQL | Database | Store metadata, config |
 | Redis | Cache | Feature caching |
+
+## Purpose and Scope
+Breaks context into deployable containers and interaction contracts.
+
+## Assumptions and Constraints
+- Each container has a single primary responsibility.
+- Container interactions are observable via distributed tracing.
+- State ownership is explicit to avoid split-brain writes.
+
+### End-to-End Example with Realistic Data
+`Real-time Scoring` container reads features from `Online Feature Store`, calls `Policy Engine`, emits decisions to `Case Orchestrator`; `Batch Trainer` consumes offline lake and never blocks online path.
+
+## Decision Rationale and Alternatives Considered
+- Container split mirrors team boundaries and scaling profiles.
+- Rejected monolith because update cadence differs by domain module.
+- Introduced adapter container for partner-specific protocol translation.
+
+## Failure Modes and Recovery Behaviors
+- Adapter container fails schema conversion -> message diverted to quarantine with partner-specific alert.
+- Policy engine spike -> queue backpressure and graceful degradation policy.
+
+## Security and Compliance Implications
+- Container diagram marks secrets boundary and key-management scope per container.
+- Inter-container auth method documented (service identity + mTLS).
+
+## Operational Runbooks and Observability Notes
+- Per-container RED metrics with ownership tags drive paging.
+- Runbook includes container-level restart/rollback blast-radius guidance.

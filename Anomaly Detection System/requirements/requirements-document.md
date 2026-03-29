@@ -273,3 +273,31 @@ An AI-powered anomaly detection system that monitors data streams in real-time, 
 | **Concept Drift** | Change in underlying data patterns over time |
 | **False Positive** | Normal data incorrectly flagged as anomaly |
 | **Anomaly Score** | Numeric measure of how anomalous (0-1) |
+
+## Purpose and Scope
+Defines measurable product requirements for anomaly detection capabilities, including functional, non-functional, audit, and model-governance expectations.
+
+## Assumptions and Constraints
+- Fraud, abuse, and operational-anomaly classes are versioned in a shared taxonomy owned by Risk Ops.
+- Requirements map 1:1 to acceptance tests and telemetry metrics before implementation starts.
+- Regulatory-impacting requirements include an explicit evidence artifact and retention period.
+
+### End-to-End Example with Realistic Data
+A requirement `REQ-RISK-014` states: “for card-not-present events over $5,000, decision response <= 250 ms p95 and explainability payload must include top 3 reasons.” For test event `txn_884190` (`amount=9875`, `ip_country=RO`, `billing_country=US`), system returns `score=0.97` and reason codes in SLA.
+
+## Decision Rationale and Alternatives Considered
+- Kept hard SLOs in requirements (not only ops docs) to prevent late-stage performance surprises.
+- Rejected vague “near real-time” wording because it cannot be tested or audited.
+- Chose requirement traceability matrix over free-form narrative to support regulator review.
+
+## Failure Modes and Recovery Behaviors
+- Conflicting KPI requests from Risk and Product -> escalation path via architecture review board with dated decision log.
+- Requirement without telemetry mapping -> marked non-implementable until metric contract exists.
+
+## Security and Compliance Implications
+- Requirement IDs include data-classification tags (PII, SPI, model-sensitive) so controls are inherited automatically.
+- Evidence retention and right-to-access obligations are attached to each requirement with compliance owner.
+
+## Operational Runbooks and Observability Notes
+- Runbook links each critical requirement to dashboards and alert thresholds.
+- Release gate blocks deployment if requirement-level canary checks fail.

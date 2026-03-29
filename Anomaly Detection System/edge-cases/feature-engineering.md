@@ -41,3 +41,31 @@
 * **Solution**:
 	* **Fallback**: Substitute default values and flag partial computation.
 	* **Alerting**: Notify on recurring missing dependency events.
+
+## Purpose and Scope
+Documents feature computation edge cases: sparsity, late data, skew, and fallback feature policies.
+
+## Assumptions and Constraints
+- Online and offline feature definitions are generated from one registry.
+- Missingness indicators are explicit features, not implicit null semantics.
+- Feature freshness windows are enforced in serving path.
+
+### End-to-End Example with Realistic Data
+For account `A-77`, compute `rolling_txn_count_5m=14`, `geo_entropy_24h=2.8`; if geolocation missing, use `UNK` bucket + `geo_missing=true` to preserve model behavior consistency.
+
+## Decision Rationale and Alternatives Considered
+- Kept feature parity contract between batch and real-time pipelines.
+- Rejected silent imputation because it obscures data quality issues.
+- Added drift-sensitive features only with guardrail monitoring.
+
+## Failure Modes and Recovery Behaviors
+- Feature registry mismatch online/offline -> block model promotion until parity restored.
+- Late data modifies aggregates unexpectedly -> watermark + correction event strategy.
+
+## Security and Compliance Implications
+- Features derived from sensitive attributes require policy review and documentation.
+- Feature tables carry lineage tags for explainability audits.
+
+## Operational Runbooks and Observability Notes
+- Monitor null-rate, freshness, and distribution drift per feature family.
+- Runbook includes emergency feature disable flags and fallback set activation.

@@ -97,3 +97,31 @@ graph TB
 - Kafka/MSK cluster size
 - Time-series data retention
 - Data transfer volume
+
+## Purpose and Scope
+Details cloud service choices, scaling behavior, managed service dependencies, and regional strategy.
+
+## Assumptions and Constraints
+- Compute and streaming services support autoscaling by queue lag and CPU.
+- Object storage lifecycle policies are enforced centrally.
+- Regional failover runbooks are tested, not theoretical.
+
+### End-to-End Example with Realistic Data
+During 5x event surge, scorer pods scale 20->140, stream partitions 48->120, and feature-store replicas double; anomaly delay stays <3s end-to-end.
+
+## Decision Rationale and Alternatives Considered
+- Used managed stream + autoscaling compute to reduce undifferentiated ops load.
+- Rejected single-region design due unacceptable resiliency risk.
+- Separated online/offline data stores by workload profile.
+
+## Failure Modes and Recovery Behaviors
+- Cloud API quota exhaustion -> pre-provisioned capacity + quota alarms.
+- Regional control-plane issue -> failover to warm standby region with read-only degrade option.
+
+## Security and Compliance Implications
+- KMS boundaries and key policies align with tenant/data classification.
+- Cross-region replication obeys residency and legal restrictions.
+
+## Operational Runbooks and Observability Notes
+- FinOps and SRE jointly monitor cost-per-million-events.
+- Runbook covers region evacuation and controlled return.

@@ -193,3 +193,31 @@ CREATE TABLE audit_logs (
 | alert_status | pending, sent, acknowledged, escalated, resolved |
 | model_status | training, evaluating, registered, production, deprecated |
 | channel_type | email, slack, pagerduty, webhook |
+
+## Purpose and Scope
+Defines physical schema, relationships, indexes, partitioning, and data-retention behaviors.
+
+## Assumptions and Constraints
+- Write-heavy event tables are time-partitioned.
+- Foreign keys enforce case-event-audit integrity.
+- Migrations are backward compatible and reversible.
+
+### End-to-End Example with Realistic Data
+`anomaly_event(evt_77123)` references `detection_case(CASE-99231)`; `case_audit` stores immutable action log with actor and timestamp. Partitions rotate daily with 400-day hot retention.
+
+## Decision Rationale and Alternatives Considered
+- Normalized core entities to guarantee referential integrity.
+- Rejected denormalized audit writes due forensic incompleteness risk.
+- Added selective indexes for analyst search patterns.
+
+## Failure Modes and Recovery Behaviors
+- Migration introduces lock contention -> use online migration plan and phased index build.
+- Partition prune failure -> emergency retention job and query guardrails.
+
+## Security and Compliance Implications
+- Column-level encryption for sensitive evidence fields.
+- DB roles separate read-only analytics from write-capable workflows.
+
+## Operational Runbooks and Observability Notes
+- DB dashboards track query latency, bloat, dead tuples, and replication lag.
+- Runbook defines point-in-time restore and data-consistency verification.

@@ -77,3 +77,31 @@ graph TB
 - **Rule Engine**: Evaluate alert conditions
 - **Deduplicator**: Prevent duplicate alerts
 - **Audit Logger**: Record alert actions for compliance
+
+## Purpose and Scope
+Shows component-level architecture within the container, including interfaces and responsibilities.
+
+## Assumptions and Constraints
+- Each component publishes health and dependency metrics.
+- Cross-component communication uses typed contracts.
+- Shared libraries are limited to cross-cutting concerns.
+
+### End-to-End Example with Realistic Data
+Inside Detection API container: `AuthFilter` validates token, `InputValidator` enforces schema, `ScoringAdapter` executes model call, `AuditLogger` persists signed decision context.
+
+## Decision Rationale and Alternatives Considered
+- Separated auth/validation/scoring/audit to isolate failure domains.
+- Rejected combined middleware stack that obscured accountability.
+- Introduced adapter boundaries to support model backend swaps.
+
+## Failure Modes and Recovery Behaviors
+- Auth provider latency spike -> short-lived token cache + circuit-breaker around introspection endpoint.
+- Audit sink backpressure -> durable local queue with flush worker.
+
+## Security and Compliance Implications
+- Component data contracts label sensitive fields and allowed consumers.
+- Audit component uses append-only storage with key rotation.
+
+## Operational Runbooks and Observability Notes
+- Component-level dashboards include saturation and error budget burn.
+- Runbook contains component restart order and safe-degradation matrix.

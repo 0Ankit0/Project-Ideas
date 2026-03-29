@@ -300,3 +300,31 @@
 - At-least-once delivery with exponential backoff.
 - Requests signed with `X-Signature` HMAC.
 - Dead-letter queue for failed deliveries.
+
+## Purpose and Scope
+Specifies API resources, payload schemas, error model, idempotency, and versioning for external/internal consumers.
+
+## Assumptions and Constraints
+- Clients require deterministic error handling and retriable semantics.
+- APIs are backward compatible within major version.
+- OpenAPI spec is generated from source and validated in CI.
+
+### End-to-End Example with Realistic Data
+`POST /v1/anomalies/score` with `{entity_id:"acct_221",amount:9875,country:"RO"}` returns `200` with score/severity/reasons; invalid payload returns `422` with field errors; dependency timeout returns `200 degraded_mode=true` + advisory.
+
+## Decision Rationale and Alternatives Considered
+- Kept degraded success response to avoid hard-failing critical workflows.
+- Rejected overloading 500 for all failures; used typed 4xx/5xx taxonomy.
+- Included idempotency header to handle producer retries safely.
+
+## Failure Modes and Recovery Behaviors
+- Schema mismatch -> 422 with stable machine-readable error code.
+- Idempotency key replay with divergent payload -> 409 conflict and audit event.
+
+## Security and Compliance Implications
+- Auth scopes differ for scoring, override, and evidence endpoints.
+- PII fields are redacted in logs by API middleware policy.
+
+## Operational Runbooks and Observability Notes
+- API error-rate by code and endpoint drives paging policy.
+- Runbook includes traffic shadowing and contract rollback steps.

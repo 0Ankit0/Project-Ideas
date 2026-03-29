@@ -40,3 +40,31 @@ sequenceDiagram
 - P95 commit-to-publish latency below 5 seconds for tier-1 events.
 - DLQ triage acknowledgement within 15 minutes for production incidents.
 - Schema changes remain backward compatible within the same major version.
+
+## Purpose and Scope
+Catalogs domain events, versions, payload contracts, producers, consumers, and lifecycle policies.
+
+## Assumptions and Constraints
+- Event names are stable and semantically meaningful.
+- Versioning uses additive-first strategy with deprecation windows.
+- Each event lists idempotency and ordering expectations.
+
+### End-to-End Example with Realistic Data
+`anomaly.detected.v1` producer `scoring-service`, consumers `case-service`, `notification-service`; payload includes `score`, `severity`, `reason_codes`, `trace_id`; expected consumer ack p95 < 500 ms.
+
+## Decision Rationale and Alternatives Considered
+- Formalized producer/consumer ownership to reduce orphan topics.
+- Rejected silent payload changes; mandated schema evolution policy.
+- Included replay and backfill semantics per event type.
+
+## Failure Modes and Recovery Behaviors
+- Consumer lag exceeds threshold -> autoscale consumer group and optionally pause non-critical producers.
+- Unknown event version observed -> route to compatibility handler and alert integration owner.
+
+## Security and Compliance Implications
+- Catalog marks which events can contain regulated identifiers.
+- Cross-border event routing constraints documented per topic.
+
+## Operational Runbooks and Observability Notes
+- Kafka lag, retry, and DLQ metrics are grouped by event contract ID.
+- Runbook includes safe reprocessing steps by event type.

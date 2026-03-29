@@ -18,3 +18,31 @@ This folder captures cross-cutting edge cases across ingestion, modeling, alerti
 1. Review edge cases during design and implementation.
 2. Map each edge case to tests and runbooks.
 3. Update as new data sources, models, or alert channels are added.
+
+## Purpose and Scope
+Acts as navigation layer for all edge-case scenarios and how to use this folder during incidents and design reviews.
+
+## Assumptions and Constraints
+- Operators search by symptom first, then by subsystem.
+- Each linked file has owner and last-reviewed date.
+- README is kept short but directive.
+
+### End-to-End Example with Realistic Data
+Symptom “alert storm for one merchant” links to `alerting.md`; symptom “late nightly backfill” links to `data-ingestion.md`; symptom “model drift spike” links to `model-scoring.md`.
+
+## Decision Rationale and Alternatives Considered
+- Used symptom-first index because on-call users start from observed behavior.
+- Rejected taxonomy-only index that required pre-knowledge of subsystem names.
+- Added escalation map for after-hours routing.
+
+## Failure Modes and Recovery Behaviors
+- Broken link to playbook -> CI link-check fails and blocks merge.
+- Playbook stale ownership -> quarterly review job opens maintenance ticket.
+
+## Security and Compliance Implications
+- README highlights which playbooks involve regulated-data handling.
+- Sensitive-response procedures are linked from this index.
+
+## Operational Runbooks and Observability Notes
+- On-call checklist starts here for triage routing.
+- Runbook maturity tracker measures review freshness and drill completion.
