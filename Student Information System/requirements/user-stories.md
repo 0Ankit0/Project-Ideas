@@ -157,3 +157,27 @@
 | PAR-002 | As a parent, I want to view attendance records so that I know if my ward is attending classes | - Attendance % per course<br>- Absent sessions shown<br>- Alert notifications |
 | PAR-003 | As a parent, I want to view fee invoices and payment status so that I can ensure payments are made | - Invoice list visible<br>- Due amounts highlighted<br>- Payment history shown |
 | PAR-004 | As a parent, I want to receive alerts for low attendance and academic warnings so that I can intervene | - Email/SMS alert on threshold breach<br>- Summary of issue<br>- Contact advisor option |
+
+## Implementation-Ready Addendum for User Stories
+
+### Purpose in This Artifact
+Adds role-specific stories with testable acceptance criteria and policy references.
+
+### Scope Focus
+- Lifecycle and transcript story pack
+- Enrollment lifecycle enforcement relevant to this artifact
+- Grading/transcript consistency constraints relevant to this artifact
+- Role-based and integration concerns at this layer
+
+#### Implementation Rules
+- Enrollment lifecycle operations must emit auditable events with correlation IDs and actor scope.
+- Grade and transcript actions must preserve immutability through versioned records; no destructive updates.
+- RBAC must be combined with context constraints (term, department, assigned section, advisee).
+- External integrations must remain contract-first with explicit versioning and backward-compatibility strategy.
+
+#### Acceptance Criteria
+1. Business rules are testable and mapped to policy IDs in this artifact.
+2. Failure paths (authorization, policy window, downstream sync) are explicitly documented.
+3. Data ownership and source-of-truth boundaries are clearly identified.
+4. Diagram and narrative remain consistent for the scenarios covered in this file.
+
