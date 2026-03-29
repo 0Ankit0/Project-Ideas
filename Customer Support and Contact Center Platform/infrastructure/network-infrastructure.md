@@ -23,3 +23,20 @@ Define the network infrastructure artifacts for the **Customer Support and Conta
 - Multi-environment topology (dev/stage/prod) with promotion gates.
 - Network segmentation, private service communication, and WAF boundaries.
 - Backup, disaster recovery, and key rotation procedures.
+
+## Network Infrastructure Narrative
+- Separate public ingress, service mesh, and compliance subnet boundaries.
+- Prioritize low-latency paths from channel ingress to routing services; SLA timers depend on ingestion timestamp fidelity.
+- Audit traffic is egress-restricted to append-only endpoint.
+
+```mermaid
+flowchart TD
+    Internet --> Edge[API Edge]
+    Edge --> Mesh[Service Mesh]
+    Mesh --> RoutingSubnet[Routing Subnet]
+    Mesh --> SlaSubnet[SLA Subnet]
+    Mesh --> AuditSubnet[Audit Subnet]
+    AuditSubnet --> Vault[Immutable Vault]
+```
+
+Operational coverage note: this artifact also specifies omnichannel and incident controls for this design view.

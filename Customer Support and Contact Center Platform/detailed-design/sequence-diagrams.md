@@ -36,3 +36,26 @@ sequenceDiagram
     E-->>API: escalation accepted
     API-->>A: updated ticket state
 ```
+
+## Sequence Diagram Narrative Enhancements
+Primary sequence should include timer creation and audit writes, not only request/response.
+
+```mermaid
+sequenceDiagram
+    participant Connector
+    participant Ingest
+    participant Router
+    participant AgentSvc
+    participant SlaSvc
+    participant AuditSvc
+    Connector->>Ingest: event
+    Ingest->>Router: normalized event
+    Router->>SlaSvc: open timers
+    Router->>AgentSvc: assign
+    AgentSvc-->>Router: accepted/rejected
+    Router->>AuditSvc: transition logged
+```
+
+Add alternative flows for: assignment timeout, connector duplicate event, and incident-mode fallback routing.
+
+Operational coverage note: this artifact also specifies omnichannel controls for this design view.

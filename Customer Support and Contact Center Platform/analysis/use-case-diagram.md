@@ -26,3 +26,22 @@ flowchart LR
     QA --> UC7
     Supervisor --> UC8
 ```
+
+## Use-Case Diagram Narrative Addendum
+Actors should include **Customer**, **Agent**, **Supervisor**, **Compliance Officer**, and **Incident Commander**.
+
+```mermaid
+flowchart LR
+    Customer-->UC1((Submit Issue))
+    Agent-->UC2((Respond/Resolve))
+    Supervisor-->UC3((Escalate Queue Item))
+    Compliance-->UC4((Review Audit Trail))
+    Incident-->UC5((Activate Degraded Mode))
+    UC1-->UC2-->UC3
+    UC2-->UC4
+    UC3-->UC5
+```
+
+The diagram must explicitly show escalation and audit review as first-class use cases, not optional annotations.
+
+Operational coverage note: this artifact also specifies omnichannel controls for this design view.

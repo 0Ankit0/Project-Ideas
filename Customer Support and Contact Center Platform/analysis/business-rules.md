@@ -33,3 +33,22 @@ flowchart TD
 - Overrides are restricted to approved exception classes and require dual logging (business + security audit).
 - Override windows automatically expire and trigger follow-up verification tasks.
 - Repeated override patterns are reviewed for policy redesign and automation improvements.
+
+## Domain Rule Expansion for Contact Center Operations
+
+```mermaid
+flowchart LR
+    P[Policy Load] --> V[Validate Tenant + Channel]
+    V --> R[Resolve Rule Set]
+    R --> S{SLA Critical?}
+    S -- yes --> E[Escalation Policy Applied]
+    S -- no --> Q[Standard Queue Policy]
+    E --> A[Audit Append]
+    Q --> A
+```
+
+1. **Queue/workflow rules:** queue assignment requires matching language, skill, and compliance flags; fallback queues require supervisor approval token.
+2. **SLA/escalation rules:** P1 issues escalate at T-15m to incident commander; P2 at breach; P3 only after two missed response checkpoints.
+3. **Omnichannel rules:** duplicate inbound events are discarded using `(connector_id, external_message_id)` uniqueness contract.
+4. **Auditability rules:** policy overrides must include `override_reason`, `expiry_at`, and `approved_by`.
+5. **Incident rules:** during connector outage, rule engine disables nonessential automations and forces human review for unresolved high-priority cases.

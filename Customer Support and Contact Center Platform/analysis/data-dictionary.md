@@ -39,3 +39,21 @@ erDiagram
 - Operational records remain online for active workflow windows and support forensic queries.
 - Historical records move to archive tiers by policy without breaking traceability.
 - Audit events are immutable and linked through correlation ids for incident analysis.
+
+## Data Dictionary Narrative: SLA, Queue, and Incident Entities
+Key entities to keep this platform auditable and operable:
+- `queue_item`: `queue_id`, `priority_score`, `entered_at`, `assignment_deadline_at`, `workflow_state`.
+- `sla_clock`: `clock_type`, `started_at`, `paused_at`, `breach_at`, `policy_version`.
+- `omnichannel_event`: canonical envelope with `channel`, `source_event_id`, `causation_id`, `payload_hash`.
+- `audit_record`: immutable row with `actor`, `action`, `before_json`, `after_json`, `signature`.
+- `incident_annotation`: `incident_id`, `service_component`, `impact_segment`, `mitigation_step`.
+
+```mermaid
+erDiagram
+    QUEUE_ITEM ||--|| SLA_CLOCK : "tracked by"
+    QUEUE_ITEM ||--o{ OMNICHANNEL_EVENT : "originates from"
+    QUEUE_ITEM ||--o{ AUDIT_RECORD : "changes logged"
+    QUEUE_ITEM ||--o{ INCIDENT_ANNOTATION : "impacted by"
+```
+
+Operational requirement: dictionary fields used in routing/SLA decisions must be non-null and versioned to permit historical replay.

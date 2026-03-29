@@ -33,3 +33,24 @@ sequenceDiagram
     ESC-->>API: escalation opened
     API-->>UI: case id
 ```
+
+## System Sequence Narrative
+Top-level sequence should include control-loop interactions for SLA warnings and incident activation.
+
+```mermaid
+sequenceDiagram
+    participant Customer
+    participant Channel
+    participant Core
+    participant SLA
+    participant Supervisor
+    participant Incident
+    Customer->>Channel: send issue
+    Channel->>Core: normalized interaction
+    Core->>SLA: start clocks
+    SLA-->>Supervisor: warning/breach
+    Supervisor->>Core: escalate
+    Core->>Incident: trigger if systemic
+```
+
+Operational coverage note: this artifact also specifies queue, omnichannel and audit controls for this design view.
