@@ -35,3 +35,9 @@ erDiagram
 | progress_records | Lesson- or content-level completion data |
 | certificates | Completion credentials |
 | audit_logs | Immutable system and workflow history |
+
+## Implementation Details: Schema Safety Requirements
+
+- Add composite tenant-first indexes for high-volume read/write paths.
+- Store grade revisions and override reasons in append-only history tables.
+- Enforce uniqueness for idempotency tokens and certificate serial numbers.

@@ -33,3 +33,13 @@ flowchart TD
 - Overrides are restricted to approved exception classes and require dual logging (business + security audit).
 - Override windows automatically expire and trigger follow-up verification tasks.
 - Repeated override patterns are reviewed for policy redesign and automation improvements.
+
+## Implementation Details: Rule Lifecycle Governance
+
+### Rule change protocol
+- Draft -> simulation -> approval -> activation with effective date.
+- High-risk rules (grading/completion/certification) require rollback plan before activation.
+- Rule versions must be referenced in grade and completion decision records.
+
+### Minimum metadata per rule
+`owner`, `effective_from`, `effective_to`, `impacted_entities`, `test_fixture_set`, `rollback_strategy`.

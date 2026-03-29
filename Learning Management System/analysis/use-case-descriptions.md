@@ -108,3 +108,12 @@
 2. System validates conflicts and scope boundaries.
 3. Changes are versioned and applied according to effective dates.
 4. Audit logs capture actor, before/after state, and scope.
+
+## Implementation Details: Use-Case Contract Template
+
+For each use case include:
+1. Preconditions and authorization scope.
+2. Main path plus compensation path.
+3. Events emitted and idempotency behavior.
+4. Audit entries and data retention class.
+5. User-facing status for delayed/failed dependencies.

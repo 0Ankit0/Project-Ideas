@@ -7,3 +7,10 @@
 | Certificate verification endpoint leaks learner data | Privacy violation | Expose only minimal public verification metadata |
 | Downloadable course assets contain sensitive content | Unauthorized redistribution risk | Use signed URLs, scoped access, and watermarking where needed |
 | Export includes more learner data than allowed by policy | Compliance issue | Apply role-scoped export templates and approval flows |
+
+
+## Implementation Details: Compliance Execution
+
+- Privileged operations require role checks plus justification text.
+- Tamper-evident audit pipeline with retention lock for regulated windows.
+- Data export endpoints enforce scope filtering and signed export manifests.

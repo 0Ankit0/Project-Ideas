@@ -40,3 +40,13 @@ sequenceDiagram
         Grade->>Notify: Publish score and feedback
     end
 ```
+
+## Implementation Details: Sequence Nonfunctional Budgets
+
+| Interaction | Target latency | Timeout behavior |
+|---|---|---|
+| Enrollment create | < 500ms p95 | return policy/seat denial reason |
+| Submission ack | < 700ms p95 | accept + async grading queue |
+| Grade publish | < 60s p95 | pending state with ETA |
+
+Sequences must explicitly specify retry policy and idempotency expectations for each write.

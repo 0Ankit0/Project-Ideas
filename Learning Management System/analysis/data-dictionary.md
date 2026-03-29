@@ -39,3 +39,15 @@ erDiagram
 - Operational records remain online for active workflow windows and support forensic queries.
 - Historical records move to archive tiers by policy without breaking traceability.
 - Audit events are immutable and linked through correlation ids for incident analysis.
+
+## Implementation Details: Data Quality and Privacy Tags
+
+### Required metadata per entity field group
+- Mutability (`immutable`, `append-only`, `mutable-with-audit`).
+- Sensitivity (`public`, `internal`, `restricted`, `pii`).
+- Retention class and encryption requirement.
+- Source-of-truth service and replication targets.
+
+### Data validation gates
+- Reject writes with missing tenant scope.
+- Reject grade records without policy version reference.

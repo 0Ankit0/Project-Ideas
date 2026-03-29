@@ -11,3 +11,8 @@ This folder captures cross-cutting scenarios that can break content integrity, g
 - `api-and-ui.md`
 - `security-and-compliance.md`
 - `operations.md`
+
+
+## Implementation Details: Edge-Case Governance
+
+This folder is the source of truth for non-happy-path behavior. Any feature change that touches grading, completion, certificates, or tenant policy must update at least one edge-case document and add automated coverage.

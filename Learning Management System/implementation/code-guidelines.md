@@ -72,3 +72,9 @@ export interface RecordProgressEventCommand {
 - Integration tests for enrollment, lesson progression, assessment submission, grading, and certificate issuance.
 - API contract tests for learner-facing and staff-facing endpoints.
 - E2E tests for discover-to-enroll, learn-to-submit, grade-to-feedback, and complete-to-certificate flows.
+
+## Implementation Details: Engineering Quality Gates
+
+- Domain invariants belong in domain modules, not controllers.
+- All write handlers produce structured audit and tracing context.
+- Background jobs must be idempotent, resumable, and observable.

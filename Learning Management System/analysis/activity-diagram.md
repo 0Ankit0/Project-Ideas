@@ -22,3 +22,20 @@ flowchart TD
     passed -- Yes --> certify[Issue certificate and update dashboards]
     certify --> end([Learning record completed])
 ```
+
+## Implementation Details: Flow Guards and Retries
+
+### Decision-point implementation notes
+- `Eligible and seats available?` maps to a policy endpoint that returns machine-readable denial reasons.
+- `Completion criteria met?` must use the same evaluator for learner UI and certificate issuance.
+- Retry loops require attempt caps and cooldown configuration.
+
+```mermaid
+flowchart LR
+    E[Event received] --> O{Out-of-order?}
+    O -- yes --> Q[Queue for reorder/replay]
+    O -- no --> I[Apply invariant checks]
+    I --> S{State valid?}
+    S -- no --> F[Flag for remediation]
+    S -- yes --> P[Project progress]
+```

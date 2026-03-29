@@ -16,3 +16,21 @@
 - Staff and admin access should traverse explicit access controls and stronger session requirements.
 - Search and analytics outputs must not bypass application-level authorization for protected learner data.
 - Media delivery should be tokenized or scoped when content is not public.
+
+## Implementation Details: Network Control Plan
+
+### Traffic and policy controls
+- East-west traffic uses service identity and mTLS.
+- Egress policies are allow-list based for IdP, email, live session, and analytics providers.
+
+```mermaid
+flowchart TB
+    WAF --> API
+    API --> AppSubnet
+    AppSubnet --> DataSubnet
+    AppSubnet --> IntegrationEgress
+```
+
+### Verification checklist
+- No direct public access to data subnet resources.
+- Access logs retained with tenant and request correlation identifiers.

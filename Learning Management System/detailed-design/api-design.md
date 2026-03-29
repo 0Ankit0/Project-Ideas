@@ -51,3 +51,16 @@
 - Learners may access only their own enrollment, progress, assessments, and certificates.
 - Staff access is scoped by tenant and role to authoring, instruction, review, or administrative surfaces.
 - Grade overrides, certificate reissues, and tenant policy changes require elevated permissions and full audit logging.
+
+## Implementation Details: API Contract Hardening
+
+### Required HTTP semantics
+- `POST` writes must support idempotency keys.
+- `PATCH/PUT` on mutable resources must require `If-Match`/etag for optimistic concurrency.
+- Error responses must include stable error codes and remediation hints.
+
+### Endpoint completeness checklist
+1. AuthZ scope documented.
+2. Audit behavior documented.
+3. Event emission documented.
+4. Retry/dedup behavior documented.

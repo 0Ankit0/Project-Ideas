@@ -36,3 +36,14 @@
 
 - **US-PAD-001**: As a platform admin, I want to manage tenant lifecycles, integrations, and operational controls so the service stays reliable and compliant.
 - **US-PAD-002**: As a platform admin, I want complete audit logs and observability so incidents and compliance reviews are manageable.
+
+## Implementation Details: User Story Execution
+
+### Story slicing standard
+- Split each story into: API contract, policy/rule engine, projection/read model, and observability tasks.
+- Add one explicit “failure path” sub-story for retry, dedup, and partial outage behavior.
+
+### Definition of ready for sprint planning
+1. Story references the governing business rule.
+2. Event(s) emitted are named and include idempotency key strategy.
+3. UI behavior for pending/failed states is specified.

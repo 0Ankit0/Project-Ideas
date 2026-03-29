@@ -55,3 +55,13 @@ flowchart TB
     queue --> workers
     queue --> projector
 ```
+
+## Implementation Details: Container Readiness Checklist
+
+| Container | Critical metrics | Runbook required |
+|---|---|---|
+| API | p95 latency, auth failures, 5xx rate | incident triage + rollback |
+| Worker | queue lag, job retries, DLQ count | replay + dead-letter handling |
+| Projection/Search | freshness lag, index errors | rebuild and backfill |
+
+All containers must document owner, escalation rota, and deployment rollback plan.

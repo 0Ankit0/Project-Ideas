@@ -129,3 +129,17 @@ Build a production-ready learning management platform that supports course creat
 - 100% of grading overrides and certificate issuances are auditable.
 - Tenant admins can monitor enrollment, completion, and at-risk learners from one dashboard.
 - Course publication, enrollment, learning, assessment, and certification workflows remain traceable end to end.
+
+## Implementation Details: Requirements Baseline
+
+### Formal grading and completion rules
+- Grade release must be policy-driven (`immediate`, `delayed`, `after_all_reviewed`) and captured per cohort.
+- Completion must evaluate both percentage and mandatory gates (required assessment pass, attendance, integrity status).
+- Regrade campaigns must declare scope (`tenant`, `course_version`, `cohort`) and produce before/after diff reports.
+
+### Acceptance suite starter matrix
+| Requirement | Positive test | Negative test |
+|---|---|---|
+| Versioned content | learner stays pinned to enrolled version | incompatible migration attempt rejected |
+| Idempotent submissions | duplicate request returns same attempt | checksum mismatch surfaces conflict |
+| Auditability | override has actor/reason/timestamp | missing rationale blocks override |
