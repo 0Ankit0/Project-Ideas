@@ -41,3 +41,24 @@ sequenceDiagram
         Mig->>Meta: Roll back to prior active binding
     end
 ```
+
+## Extended Sequence: Contracted Mutation
+
+```mermaid
+sequenceDiagram
+participant C as Client
+participant G as API Gateway
+participant CP as Control Plane
+participant AD as Adapter
+participant OP as Operation Store
+participant SL as SLO Engine
+
+C->>G: POST /control/bindings (Idempotency-Key)
+G->>CP: validated command
+CP->>OP: create operation(requested)
+CP->>AD: execute binding
+AD-->>CP: success/failure
+CP->>OP: update operation(active|failed)
+CP->>SL: emit latency/success + error taxonomy
+CP-->>C: 202 + operationId / mapped error
+```

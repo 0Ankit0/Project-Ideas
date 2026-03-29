@@ -27,3 +27,18 @@ flowchart LR
 1. PostgreSQL stores platform metadata and powers the core data API.
 2. Provider-facing capability operations flow through internal facade services and adapters rather than direct client integration.
 3. Async tasks such as execution dispatch, event delivery, usage aggregation, and migration work are queue-backed.
+
+## Data Flow Expansion: Error + SLO + Migration Signals
+
+```mermaid
+flowchart LR
+    Req[Client Request] --> Val[Contract Validation]
+    Val --> AuthZ[Scope Authorization]
+    AuthZ --> Exec[Capability Execution]
+    Exec --> Resp[Response Envelope]
+    Exec --> Err[Error Mapper]
+    Exec --> SLI[SLI Collector]
+    SLI --> SLO[SLO Evaluator]
+    SLO --> Gate[Migration/rollout Gate]
+    Err --> Resp
+```

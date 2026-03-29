@@ -136,3 +136,57 @@ Build a production-ready backend-as-a-service platform that provides Appwrite/Su
 - 95% of app-developer workflows do not require provider-specific code changes after capability selection.
 - 100% of supported adapters pass contract conformance tests before activation.
 - Platform operators can identify adapter failures, migration state, and project capability health from one control plane.
+
+## 6. Contract and Isolation Requirements (Normative)
+
+### 6.1 Canonical API Contract
+| Contract ID | Requirement |
+|---|---|
+| API-CON-001 | All control-plane APIs SHALL be exposed under `/api/v1/control/*` and data-plane APIs under `/api/v1/runtime/*`. |
+| API-CON-002 | Mutations SHALL require `Idempotency-Key` and return identical response bodies for equivalent replays within 24 hours. |
+| API-CON-003 | Errors SHALL follow `{error:{code,category,message,retryable,correlationId,details}}`. |
+| API-CON-004 | Async operations SHALL return `202` + `operationId` and support `GET /api/v1/control/operations/{operationId}`. |
+
+### 6.2 Tenancy and Isolation Requirements
+| Model Area | MUST requirement |
+|---|---|
+| Identity boundary | Tenant, project, environment identifiers are mandatory on every mutable command. |
+| Data isolation | PostgreSQL row-level policies enforce `(tenant_id, project_id, env_id)` predicates for all runtime data tables. |
+| Compute isolation | Function workers execute with environment-scoped service accounts and secret scopes. |
+| Network isolation | Per-environment egress policy objects block cross-tenant private endpoint access. |
+
+### 6.3 Lifecycle States (Required)
+```mermaid
+stateDiagram-v2
+    [*] --> requested
+    requested --> provisioning
+    provisioning --> ready
+    ready --> degraded
+    degraded --> ready
+    ready --> maintenance
+    maintenance --> ready
+    maintenance --> retired
+    retired --> [*]
+```
+
+### 6.4 Error Taxonomy (Required)
+- `VAL_*` validation/schema violations (HTTP 400/422).
+- `AUTHN_*` authentication/session failures (HTTP 401).
+- `AUTHZ_*` authorization/policy failures (HTTP 403).
+- `STATE_*` invalid transitions or optimistic lock conflicts (HTTP 409).
+- `DEP_*` provider or network dependency failures (HTTP 502/503/504).
+- `INT_*` internal platform failures (HTTP 500).
+
+### 6.5 SLI/SLO Mapping
+| Journey | SLI | SLO |
+|---|---|---|
+| Provision environment | Success ratio of `POST /control/environments` | >= 99.9% monthly |
+| Facade CRUD request | p95 latency + non-2xx rate | p95 < 250 ms, errors < 0.5% |
+| Function invoke | Queue delay + completion ratio | p95 delay < 2s, completion >= 99.5% |
+| Realtime delivery | publish->deliver latency | p95 < 5s |
+
+### 6.6 Migration and Versioning Guidance
+1. Use expand/contract schema migrations with dual-write only during migration windows.
+2. Switchover providers per capability using ring rollout: dev -> staging -> prod-canary -> prod.
+3. Maintain compatibility matrix for SDK version to API major/minor support.
+4. Deprecations require published sunset date and one full minor cycle warning.

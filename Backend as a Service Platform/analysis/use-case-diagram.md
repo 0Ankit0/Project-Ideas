@@ -40,3 +40,20 @@ flowchart LR
     uc2 --> uc9
     uc10 --> uc2
 ```
+
+## Detailed Use-Case Expansion
+
+```mermaid
+graph LR
+    TA[Tenant Admin] --> UC1[Provision Environment]
+    TA --> UC2[Bind Capability Provider]
+    Dev[App Developer] --> UC3[Invoke Data/Auth/Storage APIs]
+    Op[Operator] --> UC4[Track SLO + Errors]
+    Op --> UC5[Run Versioned Migration]
+    UC2 --> UC5
+    UC3 --> UC4
+```
+
+- Provisioning and binding use explicit API contracts with idempotency and operation tracking.
+- Runtime use cases are isolation-aware through scoped tokens and project/environment claims.
+- Migration use cases are stateful and rollback-capable by design.

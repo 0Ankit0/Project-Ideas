@@ -58,3 +58,13 @@ flowchart TB
     queue --> workers
     queue --> projector
 ```
+
+## Container Responsibilities (Extended)
+
+| Container | Contract responsibility | Isolation responsibility | Lifecycle responsibility |
+|---|---|---|---|
+| API Gateway | version negotiation, error envelope | tenant claim validation | operation creation for async calls |
+| Control Plane | provisioning contracts | project/env scope enforcement | binding/migration state transitions |
+| Runtime Plane | data/auth/storage/functions API contract | per-request scope checks | runtime rollout and drain states |
+| Adapter Mesh | provider translation | scoped credentials only | switchover and rollback hooks |
+| SLO Engine | SLI ingestion API | tenant-aware metrics partitioning | burn-rate based lifecycle gates |

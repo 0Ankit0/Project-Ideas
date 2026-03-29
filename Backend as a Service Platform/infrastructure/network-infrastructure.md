@@ -15,3 +15,15 @@
 - Client traffic should never call provider APIs directly when facade semantics are required.
 - Secret-bearing traffic should be isolated to approved runtime components.
 - Switchover and migration workflows should be observable and interruptible without breaking control-plane safety.
+
+## Network Isolation and Failure Taxonomy
+
+- Separate network segments for control plane, runtime plane, and adapter egress.
+- Private link/VPC endpoints for provider integrations where supported.
+- Egress policies tied to environment identity to prevent cross-tenant data paths.
+
+| Failure class | Network signal | Error mapping |
+|---|---|---|
+| DNS/connectivity | timeout/refused | `DEP_NETWORK_UNAVAILABLE` |
+| TLS/auth upstream | handshake/401 | `DEP_UPSTREAM_AUTH` |
+| Rate limit | 429 | `DEP_RATE_LIMITED` |

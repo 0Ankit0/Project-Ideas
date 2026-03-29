@@ -44,3 +44,13 @@ erDiagram
 | subscriptions | Webhook, event, or channel subscribers |
 | usage_meters | Usage measurements by capability |
 | audit_logs | Immutable operational history |
+
+## ERD Additions for Versioning and SLO
+
+| Table | Purpose |
+|---|---|
+| `api_contract_release` | published API versions and deprecation metadata |
+| `operation_state_history` | fine-grained lifecycle transitions per operation |
+| `error_occurrence` | taxonomy-coded runtime and control-plane errors |
+| `sli_window_aggregate` | aggregated SLI metrics by window and scope |
+| `migration_checkpoint` | parity/verification checkpoints for cutovers |

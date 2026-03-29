@@ -36,3 +36,13 @@ erDiagram
     ENVIRONMENT ||--o{ FUNCTION_DEFINITION : runs
     ENVIRONMENT ||--o{ EVENT_CHANNEL : exposes
 ```
+
+## Domain Extensions for Lifecycle and Versioning
+
+| Aggregate | Key fields added |
+|---|---|
+| `ApiContract` | `major`, `minor`, `status`, `sunset_date` |
+| `CapabilityBinding` | `state`, `active_version`, `target_version`, `rollback_token` |
+| `MigrationRun` | `phase`, `dry_run_report`, `parity_score`, `rollback_ready` |
+| `SloPolicy` | `sli_key`, `objective`, `window`, `burn_threshold` |
+| `ErrorDefinition` | `code`, `category`, `retry_strategy` |

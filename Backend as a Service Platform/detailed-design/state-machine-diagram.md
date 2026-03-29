@@ -32,3 +32,22 @@ stateDiagram-v2
     retrying --> failed
     deployed --> archived
 ```
+
+## Additional State Machines
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> validating
+    validating --> active
+    active --> switching
+    switching --> verifying
+    verifying --> active
+    switching --> rollback
+    rollback --> active
+    switching --> failed
+    failed --> [*]
+```
+
+- Invalid transition attempts return `STATE_INVALID_TRANSITION`.
+- Transition guards include contract compatibility checks and SLO burn-rate gates.

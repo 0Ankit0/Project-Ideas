@@ -41,3 +41,23 @@ sequenceDiagram
         Mig->>Meta: Restore prior active binding
     end
 ```
+
+## Sequence Expansion: Provider Switchover
+
+```mermaid
+sequenceDiagram
+participant Admin
+participant API
+participant Orchestrator
+participant SourceAdapter
+participant TargetAdapter
+participant Metrics
+Admin->>API: POST switchover request
+API->>Orchestrator: create operation(switching)
+Orchestrator->>SourceAdapter: export/checkpoint
+Orchestrator->>TargetAdapter: import/validate
+TargetAdapter-->>Orchestrator: parity report
+Orchestrator->>Metrics: publish migration SLI
+Orchestrator-->>API: state=verified or failed
+API-->>Admin: operation status
+```

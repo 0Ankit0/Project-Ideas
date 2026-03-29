@@ -39,3 +39,30 @@ erDiagram
 - Operational records remain online for active workflow windows and support forensic queries.
 - Historical records move to archive tiers by policy without breaking traceability.
 - Audit events are immutable and linked through correlation ids for incident analysis.
+
+## Operational Metadata Extensions
+
+### API contract entities
+| Entity | Key fields |
+|---|---|
+| `api_contract_versions` | `contract_version`, `effective_from`, `breaking_change` |
+| `api_error_catalog` | `error_code`, `category`, `http_status`, `retryable` |
+| `operation_records` | `operation_id`, `operation_type`, `state`, `started_at`, `finished_at` |
+
+### Isolation entities
+| Entity | Key fields |
+|---|---|
+| `tenant_boundaries` | `tenant_id`, `region_policy`, `data_residency_class` |
+| `env_isolation_policies` | `env_id`, `egress_policy_id`, `secret_scope_id` |
+
+### Lifecycle entities
+| Entity | States encoded |
+|---|---|
+| `binding_lifecycle_events` | validating/active/switching/failed |
+| `migration_runs` | planned/dry_run/applying/verified/completed/rolled_back |
+
+### SLO + versioning entities
+| Entity | Purpose |
+|---|---|
+| `sli_measurements` | stores per-minute SLI datapoints for latency, success, queue delay |
+| `version_migration_matrix` | contract version vs adapter version compatibility |

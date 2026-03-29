@@ -88,3 +88,35 @@ classDiagram
     Environment "1" --> "many" EventChannel
     Environment "1" --> "many" UsageMeter
 ```
+
+## Class Model Extensions
+
+```mermaid
+classDiagram
+class ApiError {
+  +string code
+  +string category
+  +bool retryable
+  +string correlationId
+}
+class Operation {
+  +string id
+  +string type
+  +string state
+  +int progress
+}
+class CapabilityBinding {
+  +string bindingId
+  +string state
+  +string activeVersion
+  +string targetVersion
+}
+class SloObjective {
+  +string sliKey
+  +float target
+  +string window
+}
+Operation --> ApiError : lastError
+CapabilityBinding --> Operation : migratesBy
+SloObjective --> Operation : observes
+```

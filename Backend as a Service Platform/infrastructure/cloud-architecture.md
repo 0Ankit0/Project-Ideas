@@ -19,3 +19,15 @@
 - The control plane can run in one cloud while adapters target multiple supported providers.
 - Production environments should isolate secret domains, project metadata, and provider egress policies carefully.
 - Switchover workflows may require temporary dual-writes, copy jobs, or migration runners depending on capability type.
+
+## Cloud Controls for Isolation and SLO
+
+| Layer | Design choice |
+|---|---|
+| API ingress | regional gateways with WAF and per-tenant rate limits |
+| compute | dedicated worker pools per environment tier |
+| data | PostgreSQL with RLS and encrypted backups |
+| secrets | KMS-backed secret stores with scoped access policies |
+| observability | centralized metrics/traces/logs with tenant-aware labels |
+
+- Migration cutovers use traffic steering and health gates from observability signals.

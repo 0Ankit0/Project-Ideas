@@ -7,3 +7,11 @@
 | Multipart upload interrupted mid-transfer | Orphaned objects or incomplete metadata | Use resumable flow state and cleanup jobs |
 | File metadata written but provider object missing | Broken references | Reconcile object existence before committing active file state |
 | Storage provider migration for large buckets | Long migration windows | Support staged copy, dual-write, checksum verification, and delayed retirement |
+
+## Deep Edge Cases: Storage and File Providers
+
+- Object metadata incompatibility across providers is normalized through facade metadata schema.
+- Multipart upload commit race returns `STATE_UPLOAD_COMMIT_CONFLICT`.
+- Signed URL policy drift returns `AUTHZ_URL_SCOPE_INVALID`.
+
+Migration approach: dual-write metadata, background copy objects, parity sample, then cutover.

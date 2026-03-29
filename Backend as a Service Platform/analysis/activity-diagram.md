@@ -22,3 +22,19 @@ flowchart TD
     cutover -- Yes --> activate2[Activate new provider binding]
     activate2 --> monitor
 ```
+
+## Expanded Activity Flow (Provision + Bind + Verify)
+
+```mermaid
+flowchart TD
+    A[Receive request with tenant/project/env] --> B{Idempotency key exists?}
+    B -- yes --> C[Return previous result]
+    B -- no --> D[Validate contract schema]
+    D --> E[Authorize scoped actor]
+    E --> F[Create async operation]
+    F --> G[Adapter execution]
+    G --> H{Success?}
+    H -- yes --> I[Emit completion event + update SLI]
+    H -- no --> J[Map to error taxonomy + retry policy]
+    J --> K[Update operation state failed]
+```

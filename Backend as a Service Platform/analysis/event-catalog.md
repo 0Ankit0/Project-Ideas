@@ -40,3 +40,36 @@ sequenceDiagram
 - P95 commit-to-publish latency below 5 seconds for tier-1 events.
 - DLQ triage acknowledgement within 15 minutes for production incidents.
 - Schema changes remain backward compatible within the same major version.
+
+## Contracted Event Semantics
+
+### API contract events
+| Event | Payload contract |
+|---|---|
+| `control.operation.started` | `operationId`, `operationType`, `tenantId`, `envId`, `requestedBy` |
+| `control.operation.completed` | `operationId`, `state`, `durationMs`, `resultVersion` |
+| `runtime.error.raised` | `error.code`, `error.category`, `retryable`, `correlationId` |
+
+### Isolation events
+- `security.isolation.violation.detected` (contains actor scope + denied scope).
+- `security.secret.scope.denied` (environment mismatch metadata).
+
+### Lifecycle and migration events
+```mermaid
+sequenceDiagram
+participant CP as Control Plane
+participant OP as Operation Tracker
+participant AD as Adapter
+CP->>OP: operation.started
+CP->>AD: apply migration
+AD-->>OP: migration.state.changed
+AD-->>OP: migration.verified
+OP-->>CP: operation.completed
+```
+
+### SLO mapping events
+| Event | SLI contribution |
+|---|---|
+| `runtime.request.completed` | latency and success denominator/numerator |
+| `realtime.delivery.completed` | dispatch latency |
+| `functions.invoke.completed` | completion ratio + queue latency |
