@@ -200,3 +200,24 @@ sequenceDiagram
     Platform-->>Owner: 200 Cost logged
     Platform->>Platform: Unblock asset availability calendar
 ```
+## Implementation-Specific Addendum: System-level command choreography
+
+### Why this diagram matters
+Clarify orchestration vs choreography and timeout behavior per integration.
+
+### Mermaid implementation scenario
+```mermaid
+flowchart LR
+    A[SystemSequenceDiagStart] --> B[Validate booking window and policy version]
+    B --> C{Conflict or exception?}
+    C -- No --> D[Persist state transition + emit domain event]
+    C -- Yes --> E[Run compensating action and alternate allocation]
+    D --> F[Update pricing/deposit ledger projections]
+    E --> F
+    F --> G[Notify customer and operations channels]
+```
+
+### Required validation checklist
+- Confirm every branch in this diagram maps to an API response code and domain event.
+- Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
+- Ensure maintenance blocks and compliance checks can preempt transitions when required.

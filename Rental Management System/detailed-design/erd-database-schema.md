@@ -490,3 +490,24 @@ erDiagram
 | Assessments | Pre/post comparison done at application layer using two `condition_assessments` records per booking |
 | Notifications | Persisted in DB for WebSocket fanout and in-app notification inbox |
 | Audit logs | Immutable append-only log for all user actions on financial and agreement entities |
+## Implementation-Specific Addendum: Relational integrity and indexing
+
+### Why this diagram matters
+Specify FK strategy, unique constraints for availability, and audit-table partitioning.
+
+### Mermaid implementation scenario
+```mermaid
+flowchart LR
+    A[ErdDatabaseSchemaStart] --> B[Validate booking window and policy version]
+    B --> C{Conflict or exception?}
+    C -- No --> D[Persist state transition + emit domain event]
+    C -- Yes --> E[Run compensating action and alternate allocation]
+    D --> F[Update pricing/deposit ledger projections]
+    E --> F
+    F --> G[Notify customer and operations channels]
+```
+
+### Required validation checklist
+- Confirm every branch in this diagram maps to an API response code and domain event.
+- Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
+- Ensure maintenance blocks and compliance checks can preempt transitions when required.

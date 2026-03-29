@@ -1,4 +1,4 @@
-# Swimlane Diagrams
+# Swimlane Diagrams (BPMN)
 
 ## Overview
 BPMN-style swimlane diagrams illustrating cross-actor workflows in the rental management system, applicable to any asset type.
@@ -255,3 +255,24 @@ sequenceDiagram
         P->>P: Retry payout in next batch
     end
 ```
+## Implementation-Specific Addendum: Cross-actor handoff timing
+
+### Why this diagram matters
+Make customer, branch-ops, billing, and maintenance handoffs explicit with SLA windows.
+
+### Mermaid implementation scenario
+```mermaid
+flowchart LR
+    A[SwimlaneDiagramsStart] --> B[Validate booking window and policy version]
+    B --> C{Conflict or exception?}
+    C -- No --> D[Persist state transition + emit domain event]
+    C -- Yes --> E[Run compensating action and alternate allocation]
+    D --> F[Update pricing/deposit ledger projections]
+    E --> F
+    F --> G[Notify customer and operations channels]
+```
+
+### Required validation checklist
+- Confirm every branch in this diagram maps to an API response code and domain event.
+- Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
+- Ensure maintenance blocks and compliance checks can preempt transitions when required.

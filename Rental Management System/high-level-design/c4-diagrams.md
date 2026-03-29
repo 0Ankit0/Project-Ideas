@@ -175,3 +175,24 @@ graph TB
 | Primary Database | PostgreSQL | Source of truth for all rental entities; JSONB for flexible asset attributes |
 | Cache & Queue | Redis | JWT block list, availability locks, rate-limit counters, task queue |
 | Object Storage | AWS S3 / GCS | Asset photos, signed agreement PDFs, assessment reports, financial export files |
+## Implementation-Specific Addendum: C4 consistency
+
+### Why this diagram matters
+Align context/container/component boundaries with ownership and deployment topology.
+
+### Mermaid implementation scenario
+```mermaid
+flowchart LR
+    A[C4DiagramsStart] --> B[Validate booking window and policy version]
+    B --> C{Conflict or exception?}
+    C -- No --> D[Persist state transition + emit domain event]
+    C -- Yes --> E[Run compensating action and alternate allocation]
+    D --> F[Update pricing/deposit ledger projections]
+    E --> F
+    F --> G[Notify customer and operations channels]
+```
+
+### Required validation checklist
+- Confirm every branch in this diagram maps to an API response code and domain event.
+- Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
+- Ensure maintenance blocks and compliance checks can preempt transitions when required.

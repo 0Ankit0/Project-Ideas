@@ -528,3 +528,24 @@ classDiagram
 
     MaintenanceRequest "1" --> "0..1" MaintenanceCost
 ```
+## Implementation-Specific Addendum: Entity/value-object discipline
+
+### Why this diagram matters
+Distinguish mutable aggregates from immutable value objects and enforce invariants.
+
+### Mermaid implementation scenario
+```mermaid
+flowchart LR
+    A[ClassDiagramsStart] --> B[Validate booking window and policy version]
+    B --> C{Conflict or exception?}
+    C -- No --> D[Persist state transition + emit domain event]
+    C -- Yes --> E[Run compensating action and alternate allocation]
+    D --> F[Update pricing/deposit ledger projections]
+    E --> F
+    F --> G[Notify customer and operations channels]
+```
+
+### Required validation checklist
+- Confirm every branch in this diagram maps to an API response code and domain event.
+- Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
+- Ensure maintenance blocks and compliance checks can preempt transitions when required.
