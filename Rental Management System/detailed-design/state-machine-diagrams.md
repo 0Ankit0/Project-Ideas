@@ -176,3 +176,24 @@ stateDiagram-v2
     SENT --> WAIVED : Owner waives invoice (e.g., goodwill)
     WAIVED --> [*]
 ```
+## Implementation-Specific Addendum: Strict transition governance
+
+### Why this diagram matters
+Define allowed transitions, forbidden shortcuts, and operator override gates.
+
+### Mermaid implementation scenario
+```mermaid
+flowchart LR
+    A[StateMachineDiagraStart] --> B[Validate booking window and policy version]
+    B --> C{Conflict or exception?}
+    C -- No --> D[Persist state transition + emit domain event]
+    C -- Yes --> E[Run compensating action and alternate allocation]
+    D --> F[Update pricing/deposit ledger projections]
+    E --> F
+    F --> G[Notify customer and operations channels]
+```
+
+### Required validation checklist
+- Confirm every branch in this diagram maps to an API response code and domain event.
+- Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
+- Ensure maintenance blocks and compliance checks can preempt transitions when required.

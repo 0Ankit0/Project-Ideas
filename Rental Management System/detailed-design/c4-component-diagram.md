@@ -186,3 +186,24 @@ graph TB
 | Maintenance Service | Request lifecycle, staff assignment, cost tracking |
 | Notification Service | Event-driven notifications; WebSocket push; email/SMS dispatch |
 | Report Service | Revenue, utilisation, tax summary report generation and export |
+## Implementation-Specific Addendum: Internal component responsibilities
+
+### Why this diagram matters
+Map adapters, domain services, repositories, and policy evaluators to clear interfaces.
+
+### Mermaid implementation scenario
+```mermaid
+flowchart LR
+    A[C4ComponentDiagramStart] --> B[Validate booking window and policy version]
+    B --> C{Conflict or exception?}
+    C -- No --> D[Persist state transition + emit domain event]
+    C -- Yes --> E[Run compensating action and alternate allocation]
+    D --> F[Update pricing/deposit ledger projections]
+    E --> F
+    F --> G[Notify customer and operations channels]
+```
+
+### Required validation checklist
+- Confirm every branch in this diagram maps to an API response code and domain event.
+- Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
+- Ensure maintenance blocks and compliance checks can preempt transitions when required.

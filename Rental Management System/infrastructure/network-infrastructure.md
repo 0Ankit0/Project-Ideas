@@ -1,4 +1,4 @@
-# Network Infrastructure
+# Network / Infrastructure Diagram
 
 ## Overview
 Network topology and security architecture for the rental management system running on AWS.
@@ -170,3 +170,19 @@ graph TB
 | WebSocket | 3001 | TCP | ALB SG only |
 | PostgreSQL | 5432 | TCP | App SG, Worker SG only |
 | Redis | 6379 | TCP | App SG, Worker SG only |
+## Implementation-Specific Addendum: Network security segmentation
+
+### Domain-level decisions
+- Specify ingress/egress controls, private service paths, and audit logging points.
+- Capture booking lifecycle transition metadata (`actor`, `reason_code`, `request_id`, `policy_version`) for auditability.
+- Keep pricing and deposit calculations reproducible from immutable snapshots to support dispute handling.
+
+### Failure handling and recovery
+- Define explicit compensation steps for payment success + booking write failure, including replay and operator tooling.
+- Record availability conflict outcomes with deterministic winner selection and customer alternative suggestions.
+- For maintenance interruptions, document swap/refund decision matrix with SLA-based customer communications.
+
+### Implementation test vectors
+- Concurrency: 50+ parallel hold requests on same asset/time window with deterministic outcomes.
+- Financial: partial deposit capture + late fee + damage adjustment with tax correctness.
+- Operations: offline check-in/check-out replay with out-of-order events and final state convergence.

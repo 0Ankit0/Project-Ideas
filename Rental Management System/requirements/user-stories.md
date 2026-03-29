@@ -160,3 +160,19 @@
 | ADM-010 | As an admin, I want to configure platform commission rates so that owner payouts are correct | - Commission rate set (flat or percentage)<br>- Effective date configured<br>- Changes versioned |
 | ADM-011 | As an admin, I want to configure notification templates so that communications are consistent | - Template editor per event type<br>- Preview function<br>- Save and publish |
 | ADM-012 | As an admin, I want to manage admin roles and permissions so that access is controlled | - Role creation<br>- Permission matrix<br>- Assign to admin users |
+## Implementation-Specific Addendum: Story-level implementation depth
+
+### Domain-level decisions
+- For each story, define API contract impact, persistence impact, and operations impact.
+- Capture booking lifecycle transition metadata (`actor`, `reason_code`, `request_id`, `policy_version`) for auditability.
+- Keep pricing and deposit calculations reproducible from immutable snapshots to support dispute handling.
+
+### Failure handling and recovery
+- Define explicit compensation steps for payment success + booking write failure, including replay and operator tooling.
+- Record availability conflict outcomes with deterministic winner selection and customer alternative suggestions.
+- For maintenance interruptions, document swap/refund decision matrix with SLA-based customer communications.
+
+### Implementation test vectors
+- Concurrency: 50+ parallel hold requests on same asset/time window with deterministic outcomes.
+- Financial: partial deposit capture + late fee + damage adjustment with tax correctness.
+- Operations: offline check-in/check-out replay with out-of-order events and final state convergence.
