@@ -1,313 +1,108 @@
-# Requirements Document
-
-## 1. Introduction
-
-### 1.1 Purpose
-This document defines the functional and non-functional requirements for a content management system (CMS) similar to Blogger, with fully customizable layouts, widget-based page composition, multi-author publishing workflows, and extensible plugin architecture.
-
-### 1.2 Scope
-The system will support:
-- Widget-driven page layout customization (header, footer, sidebar, content areas)
-- Multi-author and multi-role publishing workflows
-- Full taxonomy management (categories, tags, custom taxonomies)
-- Rich media management (images, video embeds, documents)
-- Commenting, moderation, and subscription features
-- SEO tooling and feed generation
-- Analytics and reporting
-- Multi-site management
-
-### 1.3 Definitions
-
-| Term | Definition |
-|------|------------|
-| **Widget** | A self-contained, configurable UI component placed into a page layout zone (e.g., Recent Posts, Tag Cloud, Search Box) |
-| **Layout Zone** | A named region within a page template where widgets can be added, reordered, or removed |
-| **Post** | A time-stamped, author-attributed piece of published content (article/blog entry) |
-| **Page** | A static, non-dated content entity used for About, Contact, and custom landing pages |
-| **Taxonomy** | A classification system; built-in types are Category and Tag; custom taxonomies may be defined |
-| **Theme** | A collection of templates, stylesheets, and default widget configurations that define the visual appearance of the site |
-| **Plugin** | An optional extension that adds features without modifying core code |
-| **Revision** | A saved snapshot of a post or page captured on every edit |
-| **Slug** | A URL-friendly identifier derived from a post or page title |
-
----
-
-## 2. Functional Requirements
-
-### 2.1 User Management Module
-
-#### FR-UM-001: Reader Registration
-- System shall allow readers to register with email or social login (Google, GitHub)
-- System shall verify email via token-based link
-- Registered readers can comment and subscribe to feeds
-
-#### FR-UM-002: Author Registration & Onboarding
-- Admins shall invite authors by email
-- Authors complete profile setup (display name, bio, avatar)
-- System shall assign Author role upon invitation acceptance
-
-#### FR-UM-003: Role-Based Access Control
-- System shall support roles: Reader, Author, Editor, Administrator, Super Admin
-- Permissions shall be role-specific and non-overlapping except where explicitly inherited
-- Administrators shall manage role assignment per user per site
-
-#### FR-UM-004: Authentication
-- System shall implement JWT-based authentication with refresh tokens
-- System shall support OAuth2 social login (Google, GitHub)
-- System shall enforce configurable password strength policies
-- System shall support two-factor authentication (TOTP/email OTP) for staff accounts
-
----
-
-### 2.2 Content Authoring Module
-
-#### FR-CA-001: Post Creation
-- Authors shall create posts using a rich text editor (WYSIWYG) or Markdown editor
-- Authors shall save drafts with auto-save on configurable intervals
-- System shall store full revision history for every save
-
-#### FR-CA-002: Page Creation
-- Admins and Editors shall create static pages with custom slugs
-- Pages shall support the same rich editor as posts
-- Pages shall be individually toggleable in site navigation menus
-
-#### FR-CA-003: Media Management
-- Authors shall upload images, documents, and embed video URLs
-- System shall generate multiple image sizes (thumbnail, medium, large, original)
-- System shall allow bulk upload with progress indication
-- System shall provide a media library with search and filter
-
-#### FR-CA-004: Taxonomies
-- System shall provide built-in Category and Tag taxonomies
-- Authors shall assign one or more categories and tags to a post
-- Admins shall create, edit, and delete taxonomy terms
-- System shall support custom hierarchical taxonomies defined by admins
-
-#### FR-CA-005: Revision Management
-- System shall capture a revision snapshot on each save
-- Authors and Editors shall compare any two revisions (diff view)
-- Editors shall restore a previous revision as the current draft
-
----
-
-### 2.3 Publishing Workflow Module
-
-#### FR-PW-001: Draft Management
-- Authors shall save content as Draft at any time
-- Drafts shall be private to the author and Editors/Admins
-
-#### FR-PW-002: Submission for Review
-- Authors shall submit a draft for editorial review
-- System shall notify assigned Editors of pending submissions
-
-#### FR-PW-003: Editorial Review
-- Editors shall review submitted drafts and leave inline or general comments
-- Editors shall approve (publish) or reject (return to draft with feedback) submissions
-
-#### FR-PW-004: Scheduled Publishing
-- Editors and Admins shall schedule a post for future publication at a specific datetime
-- System shall automatically publish scheduled posts at the specified time
-
-#### FR-PW-005: Post Lifecycle
-- System shall support post states: Draft, Pending Review, Scheduled, Published, Archived, Trashed
-- Admins shall permanently delete trashed posts after configurable retention period
-
----
-
-### 2.4 Layout & Widget Management Module
-
-#### FR-LW-001: Theme Management
-- Admins shall install, activate, and deactivate themes
-- System shall provide a live preview of a theme before activation
-- Each theme shall define named layout zones (Header, Main, Sidebar, Footer, etc.)
-
-#### FR-LW-002: Widget Library
-- System shall provide built-in widgets: Recent Posts, Popular Posts, Tag Cloud, Category List, Search Box, RSS Feed, Author Bio, Social Links, Custom HTML, Image Banner, Newsletter Signup
-- Plugins may register additional widgets
-- Each widget shall expose a configuration form for its settings
-
-#### FR-LW-003: Widget Placement
-- Admins shall drag and drop widgets into any layout zone
-- Admins shall reorder widgets within a zone
-- Admins shall configure each placed widget instance independently
-- Changes shall be previewable before saving
-
-#### FR-LW-004: Per-Page Layout Overrides
-- Admins shall override the default layout for individual pages or posts
-- Post types shall have configurable default templates (full-width, with-sidebar, etc.)
-
-#### FR-LW-005: Navigation Menus
-- Admins shall create multiple named menus (Primary Nav, Footer Nav, etc.)
-- Menus shall include pages, posts, custom links, and taxonomy term links
-- Admins shall assign menus to navigation zones defined by the active theme
-
----
-
-### 2.5 Commenting Module
-
-#### FR-CM-001: Comment Submission
-- Registered readers and guests (with name/email) shall submit comments on published posts
-- System shall support threaded replies up to configurable depth
-
-#### FR-CM-002: Comment Moderation
-- System shall queue new comments for moderation if moderation is enabled
-- Editors and Admins shall approve, reject, or mark comments as spam
-- System shall integrate with spam-detection service (Akismet-style API)
-
-#### FR-CM-003: Comment Notifications
-- Post authors shall be notified of new comments on their posts
-- Commenters shall be notified of replies to their comments
-
----
-
-### 2.6 SEO & Feed Module
-
-#### FR-SF-001: SEO Meta Management
-- Authors and Editors shall set custom meta title, description, and OG image per post/page
-- System shall auto-generate meta tags from title and excerpt if not explicitly set
-- System shall generate a sitemap.xml updated on every publish/unpublish event
-
-#### FR-SF-002: RSS/Atom Feeds
-- System shall provide a global RSS/Atom feed for all published posts
-- System shall provide per-author, per-category, and per-tag feeds
-- Feeds shall include configurable full-content or excerpt mode
-
-#### FR-SF-003: Canonical URLs & Redirects
-- System shall enforce canonical URLs for all content
-- Admins shall create 301/302 redirect rules for changed slugs
-
----
-
-### 2.7 Subscription & Newsletter Module
-
-#### FR-SN-001: Email Subscription
-- Readers shall subscribe to site or per-author newsletters
-- System shall send new-post digest emails on configurable schedules (instant, daily, weekly)
-
-#### FR-SN-002: Subscription Management
-- Subscribers shall manage their preferences and unsubscribe via a one-click link
-- Admins shall view subscriber list and export to CSV
-
----
-
-### 2.8 Analytics Module
-
-#### FR-AN-001: Content Analytics
-- Admins and Authors shall view page views, unique visitors, and average time-on-page per post
-- System shall surface top-performing posts by views, comments, and shares
-
-#### FR-AN-002: Traffic Source Analytics
-- System shall record referrer, UTM parameters, and device type per visit
-- Admins shall view traffic source breakdown (organic, direct, social, referral)
-
-#### FR-AN-003: Author Performance
-- Admins shall view per-author publish frequency, total views, and comment engagement
-
----
-
-### 2.9 Plugin & Extension Module
-
-#### FR-PE-001: Plugin Installation
-- Admins shall install plugins from a marketplace or by uploading a package
-- System shall validate plugin compatibility before activation
-
-#### FR-PE-002: Plugin Lifecycle
-- Admins shall activate, deactivate, update, and uninstall plugins
-- Plugins shall register hooks for content rendering, widget types, admin menu items, and API endpoints
-
----
-
-### 2.10 Multi-Site Module
-
-#### FR-MS-001: Site Management
-- Super Admins shall create and configure multiple sites within a single installation
-- Each site shall have independent themes, plugins, users, and content
-
-#### FR-MS-002: Cross-Site Administration
-- Super Admins shall view aggregate analytics and manage users across all sites
-- Super Admins shall push theme or plugin updates across all sites simultaneously
-
----
-
-### 2.11 Notification Module
-
-#### FR-NM-001: Email Notifications
-- System shall send transactional emails: new comment, comment reply, submission review, publish confirmation, scheduled publish reminder
-- System shall use configurable email templates
-
-#### FR-NM-002: In-App Notifications
-- System shall deliver in-app bell notifications for editorial events
-- Notifications shall be dismissible and linkable to the relevant content
-
----
-
-## 3. Non-Functional Requirements
-
-### 3.1 Performance
-
-| Requirement | Target |
-|-------------|--------|
-| Page load time (frontend) | < 1.5 seconds (TTI) |
-| API response time | < 200 ms (p95) |
-| Search results | < 400 ms |
-| Media upload throughput | 50 MB/s minimum |
-| Concurrent readers | 50,000+ |
-
-### 3.2 Scalability
-- Horizontal scaling of application servers
-- Database read replicas for public-facing read operations
-- CDN for media assets and rendered static pages
-- Auto-scaling based on traffic spikes
-
-### 3.3 Availability
-- 99.9% uptime SLA
-- Zero-downtime deployments with rolling updates
-- Graceful degradation if analytics or comment services are unavailable
-
-### 3.4 Security
-- HTTPS/TLS 1.3 for all communications
-- CSRF protection on all state-mutating endpoints
-- XSS sanitization of all user-generated rich text content
-- Rate limiting on comment submission and login endpoints
-- Role-based permission enforcement at the API layer
-- Regular dependency audits
-
-### 3.5 Reliability
-- Automated database backups (hourly incremental, daily full)
-- Point-in-time recovery with 30-day retention
-- Content revision history retained indefinitely
-- Circuit breaker patterns for external integrations (spam filter, email provider)
-
-### 3.6 Maintainability
-- Modular architecture separating CMS core from plugins
-- Comprehensive structured logging
-- Distributed tracing for request pipelines
-- Health check and readiness probe endpoints
-- Feature flags for gradual rollouts of new editor features
-
-### 3.7 Usability
-- Mobile-responsive admin interface
-- WCAG 2.1 AA accessibility compliance
-- Keyboard-navigable widget drag-and-drop editor
-- Auto-save with conflict detection for concurrent edits
-- Multi-language admin interface (i18n)
-
----
-
-## 4. System Constraints
-
-### 4.1 Technical Constraints
-- Cloud-native deployment (AWS/GCP/Azure)
-- Container-based deployment (Docker/Kubernetes)
-- Event-driven architecture for async operations (publish events, emails, analytics ingestion)
-- API-first design (REST with optional GraphQL read layer)
-
-### 4.2 Business Constraints
-- Multi-tenancy support for SaaS hosting model
-- White-label capability for enterprise customers
-- Import from existing Blogger, WordPress, or Medium exports (WXR/JSON)
-
-### 4.3 Regulatory Constraints
-- GDPR compliance: right to erasure of reader data and comments
-- Cookie consent banner integration
-- Data residency options (EU, US, APAC)
+# Requirements
+
+## Scope
+Baseline functional and non-functional requirements with direct traceability to design artifacts.
+
+## Functional Requirements
+### Content Lifecycle
+- **FR-CNT-001** Draft authoring with autosave, version history, and conflict detection.
+- **FR-CNT-002** Editorial review queue with delegation, comments, and SLA timers.
+- **FR-CNT-003** Multi-channel publishing (`web`, `rss`, `amp`) with publish preview.
+- **FR-CNT-004** Controlled rollback to prior revision with cache/feed repair.
+
+### Platform and Operations
+- **FR-OPS-001** Multi-tenant isolation for data, cache keys, and search indexes.
+- **FR-OPS-002** Zero-downtime migrations for schema and API version rollouts.
+- **FR-OPS-003** Auditability for privileged actions and compliance evidence export.
+
+## Non-Functional Requirements (Target Levels)
+| Area | Requirement |
+|---|---|
+| Availability | CMS authoring APIs 99.95%; publishing worker 99.99% |
+| Performance | p95 command latency < 350 ms; p99 read latency < 500 ms |
+| Scalability | Sustain 10k publish actions/hour with no manual intervention |
+| Security | OIDC + MFA for staff roles; field-level encryption for sensitive attributes |
+| Resilience | RPO 5 min; RTO 30 min for authoring plane |
+
+## Requirement-to-Implementation Traceability
+| Requirement | Use Case | API | Diagram | Edge Case |
+|---|---|---|---|---|
+| FR-CNT-001 | [UC-01](../analysis/use-case-descriptions.md#uc-01-create-and-save-draft) | [POST /v1/content](../detailed-design/api-design.md#content-api) | [Create Draft Sequence](../detailed-design/sequence-diagrams.md#create-draft-sequence) | [Ingestion/Versioning](../edge-cases/content-ingestion-and-versioning.md) |
+| FR-CNT-002 | [UC-04](../analysis/use-case-descriptions.md#uc-04-review-approve-or-request-changes) | [POST /v1/workflow/tasks/{id}/decision](../detailed-design/api-design.md#workflow-api) | [Review System Sequence](../high-level-design/system-sequence-diagrams.md#review-and-publish-system-sequence) | [Workflow/Approvals](../edge-cases/workflow-and-approvals.md) |
+| FR-CNT-004 | [UC-06](../analysis/use-case-descriptions.md#uc-06-schedule-publish-and-rollback) | [POST /v1/publications/{id}/rollback](../detailed-design/api-design.md#publishing-api) | [Rollback Sequence](../detailed-design/sequence-diagrams.md#rollback-sequence) | [Publishing/Rollbacks](../edge-cases/publishing-and-rollbacks.md) |
+
+
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
+
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
+
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
+
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
+```
+
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
+```
+
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
+
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

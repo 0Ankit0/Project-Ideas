@@ -1,305 +1,106 @@
 # Class Diagrams
 
-## Overview
-Class diagrams model the detailed internal structure of the CMS domain objects, their attributes, methods, and relationships.
+## Scope
+Object model and collaboration patterns inside content and workflow modules.
 
----
-
-## Content Domain Classes
-
+## Mermaid Diagram
 ```mermaid
 classDiagram
-    class Post {
-        +id: int
-        +site_id: int
-        +author_id: int
-        +title: str
-        +slug: str
-        +content: str
-        +excerpt: str
-        +status: PostStatus
-        +featured_image_id: int
-        +scheduled_at: datetime
-        +published_at: datetime
-        +created_at: datetime
-        +updated_at: datetime
-        +submit_for_review() void
-        +publish() void
-        +schedule(dt: datetime) void
-        +return_to_draft(feedback: str) void
-        +archive() void
-        +trash() void
-        +generate_slug() str
-        +latest_revision() Revision
+    class ContentItem {
+      +UUID id
+      +String slug
+      +Status status
+      +submitForReview()
+      +publish()
+      +rollback(revisionId)
     }
-
-    class Page {
-        +id: int
-        +site_id: int
-        +author_id: int
-        +title: str
-        +slug: str
-        +content: str
-        +status: PageStatus
-        +template: str
-        +in_navigation: bool
-        +created_at: datetime
-        +updated_at: datetime
-        +publish() void
-        +unpublish() void
+    class ContentRevision {
+      +UUID id
+      +int version
+      +json body
+      +createdAt
     }
-
-    class Revision {
-        +id: int
-        +content_type: str
-        +content_id: int
-        +title: str
-        +content: str
-        +actor_id: int
-        +created_at: datetime
-        +diff_from(other: Revision) RevisionDiff
-        +restore() void
+    class WorkflowTask {
+      +UUID id
+      +State state
+      +assignee
+      +decide(decision)
     }
-
-    class MediaItem {
-        +id: int
-        +site_id: int
-        +uploader_id: int
-        +filename: str
-        +mime_type: str
-        +file_size: int
-        +original_url: str
-        +thumbnail_url: str
-        +medium_url: str
-        +large_url: str
-        +alt_text: str
-        +created_at: datetime
-        +generate_sizes() void
-        +cdn_url(size: str) str
-    }
-
-    class SEOMeta {
-        +id: int
-        +content_type: str
-        +content_id: int
-        +meta_title: str
-        +meta_description: str
-        +og_image_id: int
-        +canonical_url: str
-        +updated_at: datetime
-        +effective_title(post: Post) str
-        +effective_description(post: Post) str
-    }
-
-    Post "1" --> "many" Revision : captured_as
-    Page "1" --> "many" Revision : captured_as
-    Post "1" --> "1" SEOMeta : described_by
-    Page "1" --> "1" SEOMeta : described_by
-    Post "1" --> "1" MediaItem : featured
+    ContentItem "1" --> "many" ContentRevision
+    ContentItem "1" --> "many" WorkflowTask
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## Taxonomy Domain Classes
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-```mermaid
-classDiagram
-    class Category {
-        +id: int
-        +site_id: int
-        +name: str
-        +slug: str
-        +description: str
-        +parent_id: int
-        +created_at: datetime
-        +children() List~Category~
-        +ancestors() List~Category~
-        +post_count() int
-    }
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
-    class Tag {
-        +id: int
-        +site_id: int
-        +name: str
-        +slug: str
-        +created_at: datetime
-        +merge_into(target: Tag) void
-        +post_count() int
-    }
-
-    class PostCategory {
-        +post_id: int
-        +category_id: int
-    }
-
-    class PostTag {
-        +post_id: int
-        +tag_id: int
-    }
-
-    Category "1" --> "many" PostCategory : classifies
-    Tag "1" --> "many" PostTag : tags
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
-
-## Layout & Widget Domain Classes
-
-```mermaid
-classDiagram
-    class Theme {
-        +id: int
-        +site_id: int
-        +name: str
-        +version: str
-        +zones: Dict~str, ZoneDefinition~
-        +package_url: str
-        +is_active: bool
-        +installed_at: datetime
-        +activate() void
-        +deactivate() void
-        +preview_url() str
-        +defined_zones() List~str~
-    }
-
-    class Widget {
-        +id: int
-        +type: str
-        +name: str
-        +description: str
-        +config_schema: dict
-        +registered_by: str
-        +render(config: dict, context: RenderContext) str
-        +validate_config(config: dict) bool
-    }
-
-    class WidgetPlacement {
-        +id: int
-        +site_id: int
-        +theme_id: int
-        +zone_name: str
-        +widget_id: int
-        +position: int
-        +config: dict
-        +page_override_id: int
-        +update_config(config: dict) void
-        +move_to_zone(zone: str, position: int) void
-        +remove() void
-    }
-
-    class NavigationMenu {
-        +id: int
-        +site_id: int
-        +name: str
-        +zone: str
-        +created_at: datetime
-        +items() List~NavigationItem~
-        +add_item(item: NavigationItem) void
-        +reorder(item_ids: List~int~) void
-    }
-
-    class NavigationItem {
-        +id: int
-        +menu_id: int
-        +label: str
-        +url: str
-        +parent_id: int
-        +position: int
-        +children() List~NavigationItem~
-    }
-
-    Theme "1" --> "many" WidgetPlacement : hosts
-    Widget "1" --> "many" WidgetPlacement : instantiated_as
-    NavigationMenu "1" --> "many" NavigationItem : contains
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
 
----
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
 
-## User & Auth Domain Classes
-
-```mermaid
-classDiagram
-    class User {
-        +id: int
-        +email: str
-        +display_name: str
-        +bio: str
-        +avatar_url: str
-        +hashed_password: str
-        +is_active: bool
-        +twofa_enabled: bool
-        +twofa_secret: str
-        +created_at: datetime
-        +set_password(raw: str) void
-        +verify_password(raw: str) bool
-        +enable_2fa() str
-        +verify_2fa(token: str) bool
-    }
-
-    class SiteMembership {
-        +user_id: int
-        +site_id: int
-        +role: Role
-        +invited_at: datetime
-        +joined_at: datetime
-    }
-
-    class Invitation {
-        +id: int
-        +email: str
-        +site_id: int
-        +role: Role
-        +token: str
-        +expires_at: datetime
-        +accepted_at: datetime
-        +is_valid() bool
-        +accept(user: User) void
-    }
-
-    class Session {
-        +id: str
-        +user_id: int
-        +site_id: int
-        +refresh_token: str
-        +expires_at: datetime
-        +invalidate() void
-    }
-
-    User "1" --> "many" SiteMembership : has
-    User "1" --> "many" Session : owns
-    Invitation "many" --> "1" User : accepted_by
-```
-
----
-
-## Comment Domain Classes
-
-```mermaid
-classDiagram
-    class Comment {
-        +id: int
-        +post_id: int
-        +parent_id: int
-        +author_user_id: int
-        +author_name: str
-        +author_email: str
-        +body: str
-        +status: CommentStatus
-        +spam_score: float
-        +created_at: datetime
-        +approve() void
-        +reject() void
-        +mark_spam() void
-        +children() List~Comment~
-    }
-
-    class SpamCheckResult {
-        +comment_id: int
-        +score: float
-        +classification: str
-        +checked_at: datetime
-    }
-
-    Comment "1" --> "1" SpamCheckResult : checked_by
-    Comment "1" --> "many" Comment : replies
-```
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

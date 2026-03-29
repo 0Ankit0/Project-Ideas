@@ -1,35 +1,106 @@
 # Business Rules
 
-This document defines enforceable policy rules for **Content Management System** so command processing, asynchronous jobs, and operational actions behave consistently under normal and exceptional conditions.
+## Scope
+Executable policy catalog governing drafting, review, publishing, personalization, and compliance constraints.
 
-## Context
-- Domain focus: content management workflows.
-- Rule categories: lifecycle transitions, authorization, compliance, and resilience.
-- Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
+## Rule Sets
+### Editorial and Workflow
+- BR-ED-001: A draft can only move to `PENDING_REVIEW` when required metadata (`title`, `slug`, `summary`, `primaryTaxonomy`) is complete.
+- BR-ED-002: Reviewer cannot approve their own submission unless the site policy `allowSelfApproval=true`.
+- BR-ED-003: `SCHEDULED` publish time must be at least 2 minutes in the future to avoid race conditions with queue dispatch.
 
-## Enforceable Rules
-1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
-2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
-3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
-4. Manual overrides must include approver identity, rationale, and expiration timestamp.
-5. Retries and compensations must be idempotent and must not create duplicate business effects.
+### Publishing and URL Integrity
+- BR-PUB-001: Slug uniqueness is enforced per tenant and locale.
+- BR-PUB-002: A slug change after first publish requires redirect creation in the same transaction boundary.
+- BR-PUB-003: Rollback can only target revisions with rendering artifacts available in object storage.
 
-## Rule Evaluation Pipeline
+### Security and Compliance
+- BR-SEC-001: PII-bearing fields cannot be included in public search documents.
+- BR-SEC-002: Content deletion follows legal-hold policy; hard delete is blocked when hold token exists.
+
+
+## Mermaid Diagram
 ```mermaid
 flowchart TD
-    A[Incoming Command] --> B[Validate Payload]
-    B --> C{Authorized Actor?}
-    C -- No --> C1[Reject + Security Audit]
-    C -- Yes --> D{Business Rules Pass?}
-    D -- No --> D1[Reject + Rule Violation Event]
-    D -- Yes --> E{State Transition Allowed?}
-    E -- No --> E1[Return Conflict]
-    E -- Yes --> F[Commit Transaction]
-    F --> G[Publish Domain Event]
-    G --> H[Update Read Models and Alerts]
+    A[Author submits command] --> B[Policy Engine]
+    B --> C{Rule outcome}
+    C -->|Pass| D[Persist state]
+    C -->|Fail| E[Validation error contract]
+    D --> F[Outbox event]
+    F --> G[Audit + Monitoring]
 ```
 
-## Exception and Override Handling
-- Overrides are restricted to approved exception classes and require dual logging (business + security audit).
-- Override windows automatically expire and trigger follow-up verification tasks.
-- Repeated override patterns are reviewed for policy redesign and automation improvements.
+## Detailed Flow
+1. Author action enters command API with tenant and policy context.
+2. Policy engine loads role matrix, content-type constraints, and rollout flags.
+3. Violations are returned with machine-readable codes and remediation hints.
+4. Valid commands persist state and emit domain events for downstream processors.
+5. Audit subsystem records actor, rule version, decision, and evidence hash.
+
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
+
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
+
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
+```
+
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
+```
+
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
+
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

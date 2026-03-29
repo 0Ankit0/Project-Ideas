@@ -1,123 +1,100 @@
 # Deployment Diagram
 
-## Overview
-The deployment diagram maps CMS software components to the infrastructure nodes they run on.
+## Scope
+Environment topology, CI/CD promotion, and release safety mechanisms.
 
----
+## Deployment Strategy
+1. Build immutable container images with SBOM.
+2. Run integration + contract + migration checks in staging.
+3. Execute canary release (5% traffic, 20 min health window).
+4. Auto-promote or auto-rollback based on SLO guardrails.
 
-## Container-Based Deployment (Kubernetes)
 
+## Mermaid Diagram
 ```mermaid
-graph TB
-    subgraph "User Devices"
-        Browser[Browser / PWA]
-        MobileApp[Mobile Browser]
-    end
-
-    subgraph "Edge Layer"
-        CDN[CDN<br>CloudFront / Fastly<br>Static assets, cached pages, feeds]
-        WAF[WAF / DDoS Protection<br>AWS Shield / Cloudflare]
-    end
-
-    subgraph "Kubernetes Cluster"
-        subgraph "Ingress"
-            Ingress[Nginx Ingress Controller<br>TLS termination, routing]
-        end
-
-        subgraph "Application Pods"
-            APIPod1[CMS API Pod 1<br>FastAPI<br>container: cms-api:latest]
-            APIPod2[CMS API Pod 2<br>FastAPI<br>container: cms-api:latest]
-            APIPodN[CMS API Pod N<br>HPA auto-scaled]
-            WorkerPod1[Background Worker Pod 1<br>Celery / ARQ<br>container: cms-worker:latest]
-            WorkerPod2[Background Worker Pod 2]
-            WSPod[WebSocket Pod<br>Async ASGI<br>container: cms-ws:latest]
-        end
-
-        subgraph "Frontend Pods"
-            FrontendPod[Public Frontend Pod<br>Next.js SSR<br>container: cms-frontend:latest]
-            AdminPod[Admin SPA Pod<br>Nginx serving static build<br>container: cms-admin:latest]
-        end
-    end
-
-    subgraph "Managed Data Services"
-        PGPrimary[(PostgreSQL Primary<br>RDS / Cloud SQL)]
-        PGReplica[(PostgreSQL Read Replica<br>Scale read-heavy queries)]
-        RedisCluster[(Redis Cluster<br>ElastiCache / Memorystore<br>Sessions, queue, cache)]
-        SearchNode[(Meilisearch<br>Self-hosted or managed<br>Search index)]
-    end
-
-    subgraph "Storage"
-        S3[(Object Storage<br>S3 / GCS<br>Media, themes, exports)]
-    end
-
-    subgraph "External Services"
-        EmailSvc[Email Provider<br>SES / SendGrid]
-        SpamSvc[Spam Filter API]
-        OAuthProvider[OAuth2 Provider]
-    end
-
-    Browser --> CDN
-    MobileApp --> CDN
-    CDN --> WAF
-    WAF --> Ingress
-
-    Ingress --> APIPod1
-    Ingress --> APIPod2
-    Ingress --> APIPodN
-    Ingress --> FrontendPod
-    Ingress --> AdminPod
-    Ingress --> WSPod
-
-    APIPod1 --> PGPrimary
-    APIPod1 --> PGReplica
-    APIPod1 --> RedisCluster
-    APIPod1 --> SearchNode
-    APIPod1 --> S3
-
-    WorkerPod1 --> PGPrimary
-    WorkerPod1 --> RedisCluster
-    WorkerPod1 --> S3
-    WorkerPod1 --> EmailSvc
-    WorkerPod1 --> CDN
-
-    APIPod1 --> SpamSvc
-    APIPod1 --> OAuthProvider
-
-    FrontendPod --> APIPod1
-    FrontendPod --> CDN
+flowchart TD
+    Dev[Dev] --> QA[QA]
+    QA --> Staging[Staging]
+    Staging --> Prod[Production]
+    CICD[CI/CD Pipeline] --> Dev
+    CICD --> QA
+    CICD --> Staging
+    CICD --> Prod
+    Prod --> Canary[Canary Slice]
+    Canary --> Full[Full Rollout]
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## Deployment Node Specifications
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-| Component | Node Type | Replicas | Notes |
-|-----------|-----------|----------|-------|
-| CMS API | Kubernetes Deployment | 2–10 (HPA) | CPU/memory-based autoscaling |
-| Background Worker | Kubernetes Deployment | 2–5 (HPA) | Queue-length-based autoscaling |
-| WebSocket Server | Kubernetes Deployment | 1–3 | Sticky sessions via ingress annotation |
-| Public Frontend | Kubernetes Deployment | 2–4 | SSR pods; most pages CDN-cached |
-| Admin SPA | Kubernetes Deployment | 1–2 | Static files served by Nginx |
-| PostgreSQL | Managed RDS / Cloud SQL | 1 primary + 1 replica | Multi-AZ failover |
-| Redis | Managed ElastiCache | 3-node cluster | Cluster mode for queue and sessions |
-| Meilisearch | Self-hosted StatefulSet | 1–2 | Persistent volume for index |
-| Object Storage | S3 / GCS | — | Managed service; CDN-fronted |
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
----
-
-## CI/CD Pipeline
-
-```mermaid
-graph LR
-    Dev[Developer Push] --> GH[GitHub Repository]
-    GH --> CI[CI Pipeline<br>GitHub Actions]
-    CI --> Lint[Lint & Type Check]
-    Lint --> Test[Unit & Integration Tests]
-    Test --> Build[Docker Image Build]
-    Build --> Push[Push to Container Registry]
-    Push --> StagingDeploy[Deploy to Staging<br>Helm upgrade]
-    StagingDeploy --> SmokeTest[Smoke Tests]
-    SmokeTest --> ProdApproval[Manual Approval]
-    ProdApproval --> ProdDeploy[Deploy to Production<br>Rolling update]
-    ProdDeploy --> Monitor[Health Check & Rollback Gate]
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
+
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
+```
+
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
+
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

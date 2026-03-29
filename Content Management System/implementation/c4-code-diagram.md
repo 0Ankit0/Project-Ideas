@@ -1,221 +1,93 @@
 # C4 Code Diagram
 
-## Overview
-C4 Level 4 code diagrams illustrate the internal class-level structure of the most complex CMS subsystems.
+## Scope
+Code-level module relationships and ownership map for core services.
 
----
-
-## Publishing Workflow — Code Level
-
+## Mermaid Diagram
 ```mermaid
-classDiagram
-    class PublishingRouter {
-        +submit(post_id: int, user: User) PostResponse
-        +publish(post_id: int, user: User) PostResponse
-        +schedule(post_id: int, dt: datetime, user: User) PostResponse
-        +return_to_draft(post_id: int, feedback: str, user: User) PostResponse
-    }
-
-    class WorkflowEngine {
-        -post_repo: PostRepository
-        -event_log: WorkflowEventLog
-        -notifier: PublishEventNotifier
-        +transition(post: Post, to: PostStatus, actor: User, ctx: dict) Post
-        -validate_transition(from: PostStatus, to: PostStatus, role: Role) void
-        -record_event(post_id: int, event: WorkflowEvent) void
-    }
-
-    class PostRepository {
-        +get(post_id: int, site_id: int) Post
-        +save(post: Post) Post
-        +list(site_id: int, status: PostStatus, page: int) List~Post~
-        +list_due_scheduled(now: datetime) List~Post~
-    }
-
-    class WorkflowEventLog {
-        +record(post_id: int, from_status: PostStatus, to_status: PostStatus, actor_id: int) void
-        +get_history(post_id: int) List~WorkflowEvent~
-    }
-
-    class PublishEventNotifier {
-        -notification_store: NotificationStore
-        -email_queue: EmailQueue
-        +notify_editors(post: Post) void
-        +notify_author_published(post: Post) void
-        +notify_author_returned(post: Post, feedback: str) void
-        +dispatch_subscriber_digest(post: Post) void
-    }
-
-    class FeedGenerator {
-        -post_repo: PostRepository
-        -cdn_invalidator: CDNInvalidator
-        +regenerate(site_id: int) void
-        -build_rss_xml(posts: List~Post~) str
-        -build_atom_xml(posts: List~Post~) str
-    }
-
-    class SitemapBuilder {
-        -post_repo: PostRepository
-        -page_repo: PageRepository
-        -cdn_invalidator: CDNInvalidator
-        +rebuild(site_id: int) void
-        -render_sitemap_xml(urls: List~SitemapEntry~) str
-    }
-
-    class ScheduleService {
-        -queue: RedisQueue
-        +enqueue_publish_job(post: Post) void
-        +cancel_publish_job(post: Post) void
-    }
-
-    PublishingRouter --> WorkflowEngine : calls
-    WorkflowEngine --> PostRepository : reads/writes
-    WorkflowEngine --> WorkflowEventLog : records
-    WorkflowEngine --> PublishEventNotifier : notifies
-    WorkflowEngine --> FeedGenerator : triggers
-    WorkflowEngine --> SitemapBuilder : triggers
-    WorkflowEngine --> ScheduleService : schedules
+flowchart LR
+    subgraph src/content
+      H[handlers]
+      A[application]
+      D[domain]
+      I[infrastructure]
+    end
+    H --> A --> D --> I
+    A --> EVT[event_publishers]
+    I --> DB[(db adapters)]
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## Widget Layout — Code Level
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-```mermaid
-classDiagram
-    class WidgetRouter {
-        +place(zone: str, widget_type: str, config: dict, position: int) PlacementResponse
-        +update_config(placement_id: int, config: dict) PlacementResponse
-        +remove(placement_id: int) void
-        +reorder(zone: str, placement_ids: List~int~) void
-        +save_layout() void
-    }
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
-    class ZonePlacementService {
-        -placement_repo: PlacementRepository
-        -widget_registry: WidgetRegistry
-        -theme_service: ThemeService
-        -cache_invalidator: CacheInvalidator
-        +place_widget(site_id: int, zone: str, widget_type: str, config: dict, pos: int) Placement
-        +update_config(placement_id: int, config: dict) Placement
-        +remove(placement_id: int) void
-        +reorder(zone: str, ids: List~int~) void
-        +save_and_invalidate(site_id: int) void
-    }
-
-    class WidgetRegistry {
-        -widgets: Dict~str, Type~BaseWidget~~
-        +register(type: str) Decorator
-        +get(type: str) BaseWidget
-        +list_all() List~WidgetMeta~
-        +validate_config(type: str, config: dict) bool
-    }
-
-    class BaseWidget {
-        <<abstract>>
-        +type: str
-        +name: str
-        +config_schema: Type~BaseModel~
-        +render(config: dict, context: RenderContext) str*
-        +validate_config(config: dict) bool
-    }
-
-    class RecentPostsWidget {
-        +type: str = "recent_posts"
-        +render(config: RecentPostsConfig, context: RenderContext) str
-    }
-
-    class TagCloudWidget {
-        +type: str = "tag_cloud"
-        +render(config: TagCloudConfig, context: RenderContext) str
-    }
-
-    class SearchBoxWidget {
-        +type: str = "search_box"
-        +render(config: SearchBoxConfig, context: RenderContext) str
-    }
-
-    class CustomHTMLWidget {
-        +type: str = "custom_html"
-        +render(config: CustomHTMLConfig, context: RenderContext) str
-    }
-
-    class LayoutRenderer {
-        -zone_svc: ZonePlacementService
-        -widget_registry: WidgetRegistry
-        -cache: RedisCache
-        +render_zone(site_id: int, zone_name: str, context: RenderContext) str
-        -cache_key(site_id: int, zone: str, theme_id: int) str
-    }
-
-    class CacheInvalidator {
-        -cdn: CDNClient
-        -cache: RedisCache
-        +invalidate_zone(site_id: int, zone_name: str) void
-        +invalidate_site(site_id: int) void
-    }
-
-    WidgetRouter --> ZonePlacementService : calls
-    ZonePlacementService --> WidgetRegistry : validates
-    ZonePlacementService --> CacheInvalidator : triggers
-    WidgetRegistry --> BaseWidget : manages
-    BaseWidget <|-- RecentPostsWidget
-    BaseWidget <|-- TagCloudWidget
-    BaseWidget <|-- SearchBoxWidget
-    BaseWidget <|-- CustomHTMLWidget
-    LayoutRenderer --> ZonePlacementService : resolves
-    LayoutRenderer --> WidgetRegistry : renders
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
-
-## Comment Moderation — Code Level
-
-```mermaid
-classDiagram
-    class CommentRouter {
-        +submit(post_id: int, body: CommentCreate) CommentResponse
-        +list_approved(post_id: int, page: int) List~CommentResponse~
-        +approve(comment_id: int, moderator: User) CommentResponse
-        +reject(comment_id: int, moderator: User) void
-        +mark_spam(comment_id: int, moderator: User) void
-    }
-
-    class CommentService {
-        -comment_repo: CommentRepository
-        -spam_client: SpamFilterClient
-        -moderation_svc: ModerationService
-        -notifier: CommentNotifier
-        +submit(post: Post, author_info: AuthorInfo, body: str) Comment
-        -classify(comment: Comment, score: float) CommentStatus
-    }
-
-    class SpamFilterClient {
-        -api_url: str
-        -api_key: str
-        +check(body: str, author: AuthorInfo, ip: str) SpamCheckResult
-    }
-
-    class ModerationService {
-        -comment_repo: CommentRepository
-        +approve(comment: Comment, moderator: User) Comment
-        +reject(comment: Comment, moderator: User) void
-        +mark_spam(comment: Comment, moderator: User) void
-        +list_pending(site_id: int, page: int) List~Comment~
-        +bulk_approve(ids: List~int~, moderator: User) void
-    }
-
-    class CommentNotifier {
-        -notification_store: NotificationStore
-        -email_queue: EmailQueue
-        +notify_post_author(comment: Comment) void
-        +notify_parent_commenter(reply: Comment) void
-        +notify_moderators(comment: Comment) void
-    }
-
-    CommentRouter --> CommentService : calls
-    CommentService --> SpamFilterClient : checks
-    CommentService --> ModerationService : delegates
-    CommentService --> CommentNotifier : notifies
-    CommentRouter --> ModerationService : moderate actions
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
+
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
+
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

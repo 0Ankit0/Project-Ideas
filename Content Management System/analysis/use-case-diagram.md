@@ -1,410 +1,107 @@
 # Use Case Diagram
 
-## Overview
-This document contains use case diagrams for all major actors in the CMS: Reader, Author, Editor, Administrator, and Super Admin.
+## Scope
+Capability map linking actors to primary system use cases.
 
----
-
-## Complete System Use Case Diagram
-
+## Mermaid Diagram
 ```mermaid
-graph TB
+flowchart LR
     subgraph Actors
-        Reader((Reader))
-        Author((Author))
-        Editor((Editor))
-        Admin((Admin))
-        SuperAdmin((Super Admin))
-        EmailProvider((Email Provider))
-        SpamFilter((Spam Filter))
-        SearchEngine((Search Engine))
+      A[Author]
+      E[Editor]
+      R[Reader]
+      O[Operations]
     end
-
-    subgraph "CMS Platform"
-        UC1[Browse & Search Content]
-        UC2[Comment on Posts]
-        UC3[Subscribe to Newsletter]
-        UC4[Manage Reader Profile]
-
-        UC10[Create & Edit Posts]
-        UC11[Upload Media]
-        UC12[Submit for Review]
-        UC13[View Revisions]
-        UC14[View Author Analytics]
-
-        UC20[Review Submissions]
-        UC21[Publish / Schedule Posts]
-        UC22[Return Post to Draft]
-        UC23[Manage Taxonomies]
-
-        UC30[Manage Themes & Widgets]
-        UC31[Manage Navigation Menus]
-        UC32[Manage Users & Roles]
-        UC33[Moderate Comments]
-        UC34[Manage Plugins]
-        UC35[View Site Analytics]
-        UC36[Manage Redirects]
-
-        UC40[Manage Sites]
-        UC41[View Network Analytics]
-        UC42[Push Global Updates]
+    subgraph CMS Use Cases
+      U1((Create Draft))
+      U2((Submit for Review))
+      U3((Approve/Reject))
+      U4((Schedule Publish))
+      U5((Rollback Publication))
+      U6((Moderate Comments))
+      U7((Manage Taxonomy))
     end
-
-    Reader --> UC1
-    Reader --> UC2
-    Reader --> UC3
-    Reader --> UC4
-
-    Author --> UC10
-    Author --> UC11
-    Author --> UC12
-    Author --> UC13
-    Author --> UC14
-
-    Editor --> UC20
-    Editor --> UC21
-    Editor --> UC22
-    Editor --> UC23
-    Editor --> UC10
-    Editor --> UC11
-
-    Admin --> UC30
-    Admin --> UC31
-    Admin --> UC32
-    Admin --> UC33
-    Admin --> UC34
-    Admin --> UC35
-    Admin --> UC36
-    Admin --> UC20
-    Admin --> UC21
-
-    SuperAdmin --> UC40
-    SuperAdmin --> UC41
-    SuperAdmin --> UC42
-    SuperAdmin --> UC32
-
-    UC2 --> SpamFilter
-    UC3 --> EmailProvider
-    UC1 --> SearchEngine
+    A --> U1
+    A --> U2
+    E --> U3
+    E --> U4
+    O --> U5
+    E --> U6
+    A --> U7
+    R --> U6
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## Reader Use Cases
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-```mermaid
-graph LR
-    Reader((Reader))
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
-    subgraph "Account"
-        UC1[Register]
-        UC2[Login / Logout]
-        UC3[Reset Password]
-        UC4[Manage Profile]
-        UC5[Enable 2FA]
-    end
-
-    subgraph "Discovery"
-        UC6[Browse Posts by Category]
-        UC7[Search Posts]
-        UC8[View Author Profile]
-        UC9[Browse by Tag]
-        UC10[Read Post]
-    end
-
-    subgraph "Engagement"
-        UC11[Leave Comment]
-        UC12[Reply to Comment]
-        UC13[Subscribe to Newsletter]
-        UC14[Subscribe to RSS Feed]
-        UC15[Manage Notification Preferences]
-    end
-
-    Reader --> UC1
-    Reader --> UC2
-    Reader --> UC3
-    Reader --> UC4
-    Reader --> UC5
-    Reader --> UC6
-    Reader --> UC7
-    Reader --> UC8
-    Reader --> UC9
-    Reader --> UC10
-    Reader --> UC11
-    Reader --> UC12
-    Reader --> UC13
-    Reader --> UC14
-    Reader --> UC15
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
-
-## Author Use Cases
-
-```mermaid
-graph LR
-    Author((Author))
-
-    subgraph "Account"
-        UC1[Accept Invitation]
-        UC2[Setup Profile & Bio]
-        UC3[Enable 2FA]
-    end
-
-    subgraph "Content Creation"
-        UC4[Create Post]
-        UC5[Edit Post Draft]
-        UC6[Upload Media]
-        UC7[Embed Media in Post]
-        UC8[Assign Categories & Tags]
-        UC9[Set SEO Metadata]
-        UC10[Preview Post]
-        UC11[Set Featured Image]
-    end
-
-    subgraph "Publishing"
-        UC12[Save as Draft]
-        UC13[Submit for Review]
-        UC14[Edit Returned Post]
-    end
-
-    subgraph "Revisions"
-        UC15[View Revision History]
-        UC16[Compare Revisions]
-        UC17[Restore Revision]
-    end
-
-    subgraph "Analytics"
-        UC18[View Post Performance]
-        UC19[View Comment Notifications]
-    end
-
-    Author --> UC1
-    Author --> UC2
-    Author --> UC3
-    Author --> UC4
-    Author --> UC5
-    Author --> UC6
-    Author --> UC7
-    Author --> UC8
-    Author --> UC9
-    Author --> UC10
-    Author --> UC11
-    Author --> UC12
-    Author --> UC13
-    Author --> UC14
-    Author --> UC15
-    Author --> UC16
-    Author --> UC17
-    Author --> UC18
-    Author --> UC19
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
 
----
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
 
-## Editor Use Cases
-
-```mermaid
-graph LR
-    Editor((Editor))
-
-    subgraph "Review Queue"
-        UC1[View Pending Submissions]
-        UC2[Preview Submitted Post]
-        UC3[Add Inline Comments]
-        UC4[Approve & Publish Post]
-        UC5[Return Post to Draft]
-        UC6[Schedule Post]
-        UC7[Edit Post Directly]
-    end
-
-    subgraph "Taxonomy Management"
-        UC8[Create Category]
-        UC9[Edit Category]
-        UC10[Delete Category]
-        UC11[Create Tag]
-        UC12[Merge Tags]
-    end
-
-    subgraph "Content Management"
-        UC13[Archive Post]
-        UC14[Trash Post]
-        UC15[Restore Trashed Post]
-        UC16[Manage Media Library]
-    end
-
-    Editor --> UC1
-    Editor --> UC2
-    Editor --> UC3
-    Editor --> UC4
-    Editor --> UC5
-    Editor --> UC6
-    Editor --> UC7
-    Editor --> UC8
-    Editor --> UC9
-    Editor --> UC10
-    Editor --> UC11
-    Editor --> UC12
-    Editor --> UC13
-    Editor --> UC14
-    Editor --> UC15
-    Editor --> UC16
-```
-
----
-
-## Administrator Use Cases
-
-```mermaid
-graph LR
-    Admin((Admin))
-
-    subgraph "Site Configuration"
-        UC1[Configure Site Settings]
-        UC2[Install Theme]
-        UC3[Activate Theme]
-        UC4[Preview Theme]
-        UC5[Configure Widget Zones]
-        UC6[Add/Remove Widgets]
-        UC7[Configure Widget Instance]
-        UC8[Build Navigation Menu]
-        UC9[Assign Menu to Zone]
-        UC10[Manage Redirects]
-    end
-
-    subgraph "User Management"
-        UC11[Invite Author/Editor]
-        UC12[Change User Role]
-        UC13[Suspend User]
-        UC14[Delete User Account]
-        UC15[View Audit Log]
-    end
-
-    subgraph "Moderation"
-        UC16[Approve Comments]
-        UC17[Reject / Spam Comments]
-        UC18[Configure Spam Filter]
-        UC19[Manage Comment Allowlist/Blocklist]
-    end
-
-    subgraph "Plugins"
-        UC20[Install Plugin]
-        UC21[Activate Plugin]
-        UC22[Configure Plugin]
-        UC23[Deactivate Plugin]
-        UC24[Update Plugin]
-        UC25[Uninstall Plugin]
-    end
-
-    subgraph "Analytics & Reporting"
-        UC26[View Site Dashboard]
-        UC27[View Author Performance]
-        UC28[Export Subscriber List]
-        UC29[Generate Reports]
-    end
-
-    Admin --> UC1
-    Admin --> UC2
-    Admin --> UC3
-    Admin --> UC4
-    Admin --> UC5
-    Admin --> UC6
-    Admin --> UC7
-    Admin --> UC8
-    Admin --> UC9
-    Admin --> UC10
-    Admin --> UC11
-    Admin --> UC12
-    Admin --> UC13
-    Admin --> UC14
-    Admin --> UC15
-    Admin --> UC16
-    Admin --> UC17
-    Admin --> UC18
-    Admin --> UC19
-    Admin --> UC20
-    Admin --> UC21
-    Admin --> UC22
-    Admin --> UC23
-    Admin --> UC24
-    Admin --> UC25
-    Admin --> UC26
-    Admin --> UC27
-    Admin --> UC28
-    Admin --> UC29
-```
-
----
-
-## Super Admin Use Cases
-
-```mermaid
-graph LR
-    SuperAdmin((Super Admin))
-
-    subgraph "Multi-Site"
-        UC1[Create Site]
-        UC2[Configure Site Domain]
-        UC3[Assign Site Owner]
-        UC4[Deactivate Site]
-        UC5[Delete Site]
-    end
-
-    subgraph "Network Analytics"
-        UC6[View Network Dashboard]
-        UC7[View Per-Site Breakdown]
-        UC8[Export Network Report]
-    end
-
-    subgraph "Global Management"
-        UC9[Manage Global Users]
-        UC10[Disable Account Globally]
-        UC11[Push Plugin Updates to All Sites]
-        UC12[Push Theme Updates to All Sites]
-        UC13[View Global Audit Log]
-    end
-
-    SuperAdmin --> UC1
-    SuperAdmin --> UC2
-    SuperAdmin --> UC3
-    SuperAdmin --> UC4
-    SuperAdmin --> UC5
-    SuperAdmin --> UC6
-    SuperAdmin --> UC7
-    SuperAdmin --> UC8
-    SuperAdmin --> UC9
-    SuperAdmin --> UC10
-    SuperAdmin --> UC11
-    SuperAdmin --> UC12
-    SuperAdmin --> UC13
-```
-
----
-
-## Use Case Relationships
-
-```mermaid
-graph TB
-    subgraph "Include Relationships"
-        SubmitPost[Submit Post for Review] -->|includes| ValidateTaxonomy[Validate Taxonomy Assignment]
-        SubmitPost -->|includes| NotifyEditor[Notify Assigned Editor]
-
-        PublishPost[Publish Post] -->|includes| GenerateFeed[Update RSS/Atom Feed]
-        PublishPost -->|includes| UpdateSitemap[Update sitemap.xml]
-        PublishPost -->|includes| NotifySubscribers[Notify Subscribers]
-
-        PlaceWidget[Place Widget in Zone] -->|includes| ValidateZone[Validate Zone Exists in Theme]
-        PlaceWidget -->|includes| SaveLayout[Save Widget Layout]
-    end
-
-    subgraph "Extend Relationships"
-        CreatePost[Create Post] -.->|extends| SetScheduledDate[Set Scheduled Publish Date]
-        CreatePost -.->|extends| SetFeaturedImage[Set Featured Image]
-
-        BrowsePosts[Browse Posts] -.->|extends| FilterByTag[Filter by Tag]
-        BrowsePosts -.->|extends| FilterByAuthor[Filter by Author]
-
-        ModerateComment[Moderate Comment] -.->|extends| FlagAsSpam[Flag as Spam]
-        ModerateComment -.->|extends| BanCommenter[Ban Commenter IP]
-    end
-```
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

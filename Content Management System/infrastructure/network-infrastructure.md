@@ -1,133 +1,98 @@
-# Network Infrastructure Diagram
+# Network Infrastructure
 
-## Overview
-This document describes the network topology and security boundaries for the CMS platform deployment.
+## Scope
+VPC segmentation, ingress/egress controls, and service-to-service communication policy.
 
----
+## Network Controls
+- mTLS enforced for east-west service communication.
+- Security groups follow default-deny; allow-list by service identity.
+- Egress to third-party APIs restricted through dedicated NAT and firewall rules.
+- Admin access via bastion with short-lived credentials and session recording.
 
-## Network Topology
 
+## Mermaid Diagram
 ```mermaid
-graph TB
-    Internet((Internet))
-
-    subgraph "Edge / CDN"
-        CDN[CDN<br>CloudFront / Fastly<br>Global PoPs]
-        WAF[WAF<br>Rate limiting, IP blocking, OWASP rules]
-    end
-
-    subgraph "AWS / GCP Region"
-        subgraph "Public Subnet"
-            ALB[Application Load Balancer<br>HTTPS :443 only]
-            NATGateway[NAT Gateway<br>Outbound only for private subnets]
-        end
-
-        subgraph "Private Subnet A — Application"
-            APIPods[CMS API Pods<br>Port 8000 internal]
-            WorkerPods[Background Worker Pods<br>No inbound]
-            WSPods[WebSocket Pods<br>Port 8001 internal]
-            FrontendPods[Public Frontend Pods<br>Port 3000 internal]
-        end
-
-        subgraph "Private Subnet B — Data"
-            PGPrimary[(PostgreSQL Primary<br>Port 5432)]
-            PGReplica[(PostgreSQL Replica<br>Port 5432 read-only)]
-            Redis[(Redis Cluster<br>Port 6379)]
-            Meilisearch[(Meilisearch<br>Port 7700)]
-        end
-
-        subgraph "Isolated Subnet — Admin"
-            AdminPods[Admin SPA Pods<br>Port 80 internal]
-        end
-    end
-
-    subgraph "External Services"
-        EmailSvc[Email Provider<br>api.sendgrid.com :443]
-        SpamSvc[Spam Filter API<br>:443]
-        OAuthProvider[OAuth2 Provider<br>accounts.google.com :443]
-        S3[Object Storage<br>s3.amazonaws.com :443]
-    end
-
-    Internet --> CDN
-    CDN --> WAF
-    WAF --> ALB
-
-    ALB --> APIPods
-    ALB --> FrontendPods
-    ALB --> WSPods
-    ALB --> AdminPods
-
-    APIPods --> PGPrimary
-    APIPods --> PGReplica
-    APIPods --> Redis
-    APIPods --> Meilisearch
-
-    WorkerPods --> PGPrimary
-    WorkerPods --> Redis
-    WorkerPods --> NATGateway
-
-    APIPods --> NATGateway
-
-    NATGateway --> EmailSvc
-    NATGateway --> SpamSvc
-    NATGateway --> OAuthProvider
-    NATGateway --> S3
+flowchart LR
+    Internet --> WAF[WAF]
+    WAF --> LB[Public Load Balancer]
+    LB --> WebSubnet[Private App Subnet]
+    WebSubnet --> DataSubnet[Private Data Subnet]
+    DataSubnet --> DB[(PostgreSQL)]
+    WebSubnet --> NAT[NAT Gateway]
+    NAT --> External[External APIs]
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## Security Groups / Firewall Rules
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-| Resource | Inbound | Outbound |
-|----------|---------|----------|
-| ALB | 443 from internet | 8000, 3000, 8001, 80 to private subnet |
-| CMS API Pods | 8000 from ALB only | 5432 to PG, 6379 to Redis, 7700 to Meilisearch, 443 via NAT |
-| Worker Pods | None | 5432 to PG, 6379 to Redis, 443 via NAT |
-| WebSocket Pods | 8001 from ALB only | 5432 to PG, 6379 to Redis |
-| Frontend Pods | 3000 from ALB only | 8000 to API Pods |
-| PostgreSQL | 5432 from API/Worker pods only | None |
-| Redis | 6379 from API/Worker pods only | None |
-| Meilisearch | 7700 from API pods only | None |
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
----
-
-## DNS Configuration
-
-```mermaid
-graph LR
-    Domain["example.com (A record → CDN)"]
-    API["api.example.com (A record → ALB)"]
-    Admin["admin.example.com (A record → ALB)"]
-    Media["media.example.com (CNAME → CDN origin)"]
-    WS["ws.example.com (A record → ALB, WebSocket upgrade)"]
-
-    Domain --> CDN[CDN]
-    API --> ALB[ALB]
-    Admin --> ALB
-    Media --> CDN
-    WS --> ALB
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
+```
 
-## TLS / Certificate Strategy
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
 
-| Domain | Certificate | Renewal |
-|--------|-------------|---------|
-| `example.com` | ACM / Let's Encrypt wildcard | Auto-renew |
-| `api.example.com` | ACM / Let's Encrypt | Auto-renew |
-| `admin.example.com` | ACM / Let's Encrypt | Auto-renew |
-| `media.example.com` | CDN-managed | Auto-renew |
-| All | TLS 1.2 minimum, TLS 1.3 preferred | — |
-
----
-
-## Network Monitoring
-
-| Tool | Purpose |
-|------|---------|
-| VPC Flow Logs | Capture all traffic for security audit |
-| CloudWatch / Cloud Monitoring | Metrics for ALB, API pods, DB connections |
-| WAF Logs | Log blocked requests; alert on anomalies |
-| Uptime Checks | Synthetic monitoring every 60 s from multiple regions |
-| PagerDuty | Alerting for P1 availability and security incidents |
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

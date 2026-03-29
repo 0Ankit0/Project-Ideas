@@ -1,196 +1,125 @@
 # Sequence Diagrams
 
-## Overview
-Internal sequence diagrams show the interactions between objects and services inside the CMS for key scenarios.
+## Scope
+Detailed orchestration with retries, idempotency, and compensation.
 
----
-
-## 1. Author Submits Post for Review
-
+## Create Draft Sequence
 ```mermaid
 sequenceDiagram
-    participant API as Publishing Router
-    participant PostSvc as Post Service
-    participant RevisionSvc as Revision Service
-    participant NotifySvc as Notification Service
+    participant UI as Editor
+    participant API as Gateway
+    participant CS as Content Service
     participant DB as PostgreSQL
-    participant Queue as Redis Queue
-
-    API->>PostSvc: submit_for_review(post_id, user)
-    PostSvc->>DB: SELECT post WHERE id=post_id AND author_id=user.id
-    DB-->>PostSvc: Post (status=draft)
-    PostSvc->>PostSvc: validate state transition (draft → pending_review)
-    PostSvc->>RevisionSvc: capture_revision(post)
-    RevisionSvc->>DB: INSERT revision
-    DB-->>RevisionSvc: revision_id
-    PostSvc->>DB: UPDATE post SET status=pending_review
-    PostSvc->>NotifySvc: notify_editors(post, event=submitted)
-    NotifySvc->>DB: INSERT notification records for editors
-    NotifySvc->>Queue: enqueue email job (editor notification)
-    PostSvc-->>API: PostResponse(status=pending_review)
+    UI->>API: POST /v1/content
+    API->>CS: createDraft
+    CS->>DB: insert content_item + content_revision
+    DB-->>CS: ids + versions
+    CS-->>API: draft response
 ```
 
----
-
-## 2. Editor Publishes a Post
-
+## Rollback Sequence
 ```mermaid
 sequenceDiagram
-    participant API as Publishing Router
-    participant PostSvc as Post Service
-    participant FeedSvc as Feed Service
-    participant SitemapSvc as Sitemap Service
-    participant SearchSvc as Search Indexer
-    participant NotifySvc as Notification Service
-    participant DB as PostgreSQL
-    participant Queue as Redis Queue
-    participant CDN as CDN Invalidator
-
-    API->>PostSvc: publish(post_id, editor)
-    PostSvc->>DB: SELECT post WHERE id=post_id
-    DB-->>PostSvc: Post (status=pending_review or scheduled)
-    PostSvc->>PostSvc: validate editor permission
-    PostSvc->>DB: UPDATE post SET status=published, published_at=now()
-    PostSvc->>FeedSvc: regenerate_feed(site_id)
-    FeedSvc->>DB: SELECT recent published posts
-    FeedSvc->>FeedSvc: build RSS/Atom XML
-    FeedSvc->>CDN: invalidate /feed.xml and /atom.xml
-    PostSvc->>SitemapSvc: rebuild_sitemap(site_id)
-    SitemapSvc->>DB: SELECT all published posts and pages
-    SitemapSvc->>CDN: invalidate /sitemap.xml
-    PostSvc->>SearchSvc: index_post(post)
-    SearchSvc->>SearchSvc: upsert document in search index
-    PostSvc->>NotifySvc: dispatch_publish_notifications(post)
-    NotifySvc->>DB: SELECT confirmed subscribers
-    NotifySvc->>Queue: enqueue newsletter digest jobs (batched)
-    NotifySvc->>DB: INSERT notification for post author
-    PostSvc-->>API: PostResponse(status=published, published_at)
-```
-
----
-
-## 3. Admin Places Widget in Zone
-
-```mermaid
-sequenceDiagram
-    participant API as Layout Router
-    participant ZoneSvc as Zone Placement Service
-    participant WidgetReg as Widget Registry
-    participant ThemeSvc as Theme Service
-    participant CacheInv as Cache Invalidator
-    participant DB as PostgreSQL
+    participant Ops as Ops Console
+    participant PUB as Publishing Service
+    participant CS as Content Service
     participant CDN as CDN
-
-    API->>ZoneSvc: place_widget(site_id, zone_name, widget_type, config, position)
-    ZoneSvc->>ThemeSvc: get_active_theme(site_id)
-    ThemeSvc->>DB: SELECT active theme
-    DB-->>ThemeSvc: Theme {zones: [...]}
-    ThemeSvc-->>ZoneSvc: Theme
-    ZoneSvc->>ZoneSvc: validate zone_name exists in theme
-    ZoneSvc->>WidgetReg: get_widget(widget_type)
-    WidgetReg->>DB: SELECT widget WHERE type=widget_type
-    DB-->>WidgetReg: Widget
-    WidgetReg->>WidgetReg: validate_config(config, widget.config_schema)
-    ZoneSvc->>DB: INSERT widget_placement (zone, widget_id, config, position)
-    DB-->>ZoneSvc: placement_id
-    ZoneSvc->>CacheInv: invalidate_zone_pages(site_id, zone_name)
-    CacheInv->>CDN: purge affected page cache entries
-    CDN-->>CacheInv: purge confirmed
-    ZoneSvc-->>API: WidgetPlacementResponse(placement_id)
+    Ops->>PUB: rollback(publicationId)
+    PUB->>CS: restoreRevision(targetRevision)
+    PUB->>CDN: purge old cache keys
+    PUB-->>Ops: rollback completed
 ```
 
----
 
-## 4. Comment Submitted and Moderated
-
+## Mermaid Diagram
 ```mermaid
 sequenceDiagram
-    participant API as Comment Router
-    participant CommentSvc as Comment Service
-    participant SpamSvc as Spam Filter Client
-    participant NotifySvc as Notification Service
-    participant DB as PostgreSQL
-    participant Queue as Redis Queue
-
-    API->>CommentSvc: submit_comment(post_id, author_info, body)
-    CommentSvc->>DB: SELECT post WHERE id=post_id AND status=published
-    DB-->>CommentSvc: Post
-    CommentSvc->>SpamSvc: check_spam(body, author_info)
-    SpamSvc-->>CommentSvc: SpamCheckResult {score, classification}
-    CommentSvc->>DB: INSERT comment (status=pending, spam_score)
-
-    alt High spam score
-        CommentSvc->>DB: UPDATE comment SET status=spam
-        CommentSvc-->>API: 202 Accepted (silent discard)
-    else Low score + trusted reader
-        CommentSvc->>DB: UPDATE comment SET status=approved
-        CommentSvc->>NotifySvc: notify_author(post.author_id, comment)
-        NotifySvc->>Queue: enqueue email notification
-        CommentSvc-->>API: 201 Created (comment published)
-    else Medium score
-        CommentSvc->>NotifySvc: notify_moderators(site_id, comment)
-        NotifySvc->>DB: INSERT moderator notification records
-        NotifySvc->>Queue: enqueue email to moderators
-        CommentSvc-->>API: 202 Accepted (pending moderation)
-    end
+    participant UI as Author UI
+    participant API as API Gateway
+    participant CS as Content Service
+    participant WF as Workflow Service
+    participant PUB as Publishing Service
+    participant CDN as CDN
+    UI->>API: POST /v1/content/{id}/submit
+    API->>CS: submitForReview(command)
+    CS->>WF: createReviewTask(event)
+    WF-->>UI: task created
+    UI->>API: POST /v1/workflow/tasks/{id}/decision approve
+    API->>PUB: publish(contentId, revisionId)
+    PUB->>CDN: invalidate(paths)
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## 5. Media Upload and Processing
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-```mermaid
-sequenceDiagram
-    participant API as Media Router
-    participant MediaSvc as Media Service
-    participant Processor as Image Processor
-    participant Storage as Object Storage
-    participant DB as PostgreSQL
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
-    API->>MediaSvc: upload_media(site_id, uploader_id, file)
-    MediaSvc->>MediaSvc: validate mime_type and file_size
-    MediaSvc->>Storage: put_object(original, path=media/{site_id}/{uuid}/original)
-    Storage-->>MediaSvc: original_url
-    MediaSvc->>Processor: generate_sizes(original_url)
-    Processor->>Processor: resize to thumbnail (150x150)
-    Processor->>Storage: put_object(thumbnail)
-    Storage-->>Processor: thumbnail_url
-    Processor->>Processor: resize to medium (640x480)
-    Processor->>Storage: put_object(medium)
-    Storage-->>Processor: medium_url
-    Processor->>Processor: resize to large (1280x960)
-    Processor->>Storage: put_object(large)
-    Storage-->>Processor: large_url
-    Processor-->>MediaSvc: {thumbnail_url, medium_url, large_url}
-    MediaSvc->>DB: INSERT media_items record
-    DB-->>MediaSvc: media_id
-    MediaSvc-->>API: MediaItemResponse(media_id, all variant URLs)
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
-
-## 6. Scheduled Post Auto-Published by Worker
-
-```mermaid
-sequenceDiagram
-    participant Scheduler as Job Scheduler
-    participant Worker as Background Worker
-    participant PostSvc as Post Service
-    participant FeedSvc as Feed Service
-    participant NotifySvc as Notification Service
-    participant DB as PostgreSQL
-    participant Queue as Redis Queue
-
-    Scheduler->>Worker: trigger_scheduled_publish_check (every minute)
-    Worker->>DB: SELECT posts WHERE status=scheduled AND scheduled_at <= now()
-    DB-->>Worker: [Post, ...]
-
-    loop For each due post
-        Worker->>PostSvc: publish(post, actor=system)
-        PostSvc->>DB: UPDATE post SET status=published, published_at=now()
-        PostSvc->>FeedSvc: regenerate_feed(site_id)
-        PostSvc->>NotifySvc: dispatch_publish_notifications(post)
-        NotifySvc->>Queue: enqueue subscriber digest batch
-        NotifySvc->>DB: INSERT author notification
-    end
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
+
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
+
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)
