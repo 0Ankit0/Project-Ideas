@@ -1,47 +1,75 @@
 # Identity and Access Management Platform Design Documentation
 
-> Comprehensive system design documentation for authentication, federation, authorization policy evaluation, SCIM, and recovery.
+## Purpose
+This documentation set is implementation-ready guidance for delivering a multi-tenant IAM platform with secure authentication, authorization, federation, lifecycle management, and auditability.
 
-## Documentation Structure
-
-| Phase | Folder | Description |
+## Documentation Map
+| Layer | Folder | Implementation intent |
 |---|---|---|
-| 1 | [requirements](./requirements/) | Scope, FR/NFR, acceptance criteria, and user stories |
-| 2 | [analysis](./analysis/) | Actors, use cases, context boundaries, activity/swimlane flows |
-| 3 | [high-level-design](./high-level-design/) | Architecture decisions, domain model, sequence and DFD views |
-| 4 | [detailed-design](./detailed-design/) | Internal components, data models, APIs, lifecycle/state behavior |
-| 5 | [infrastructure](./infrastructure/) | Deployment topology, networking, security, cloud primitives |
-| 6 | [implementation](./implementation/) | Delivery plan, code organization, and backend capability matrix |
+| Requirements | `requirements/` | Hard constraints, acceptance criteria, actor outcomes |
+| Analysis | `analysis/` | Business semantics, events, context, workflow decomposition |
+| High-level Design | `high-level-design/` | Architecture topology, trust boundaries, data movement |
+| Detailed Design | `detailed-design/` | API/schema/component/state and execution details |
+| Infrastructure | `infrastructure/` | Runtime topology, network controls, resiliency model |
+| Implementation | `implementation/` | Delivery sequencing, readiness matrix, code mapping |
+| Edge Cases | `edge-cases/` | Failure modes, recovery patterns, safety rails |
 
-## System Overview
+## Reference Implementation Scope
+- Authentication: passwordless + federated login, adaptive MFA, session management.
+- Authorization: policy decision point (PDP), policy administration point (PAP), policy enforcement points (PEP).
+- Identity lifecycle: onboarding, verification, entitlement grant/revoke, suspension, deprovisioning.
+- Federation/SCIM: enterprise IdP SSO, inbound SCIM, drift reconciliation.
+- Observability/compliance: immutable audit trail, decision explainability, operational SLO dashboards.
 
-### Actors
-- **End User** - participates in IAM workflows
-- **Identity Admin** - participates in IAM workflows
-- **Security Engineer** - participates in IAM workflows
-- **Application Owner** - participates in IAM workflows
-- **Auditor** - participates in IAM workflows
+## Cross-Cutting Implementation Baselines
 
-### Key Features
-- Authentication and session lifecycle with auditability and operational controls
-- Token issuance and revocation with auditability and operational controls
-- Federation login with auditability and operational controls
-- Scim provisioning and deprovisioning with auditability and operational controls
-- Policy decision evaluation with auditability and operational controls
+### Token and Session Standards
+- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
+- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
+- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
+- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
 
-## Diagram Generation
+### Policy Evaluation Standards
+- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
+- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
+- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
+- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
 
-Diagrams are authored in Mermaid where applicable; export via VS Code Mermaid preview, mermaid.live, or Mermaid CLI.
+### Identity Lifecycle Standards
+- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
+- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
+- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
+- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
 
-## Getting Started
+### Federation and SCIM Assumptions
+- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
+- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
+- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
+- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
 
-1. Read `requirements/requirements.md` and `requirements/user-stories.md` to confirm scope and release boundaries.
-2. Follow `analysis/` and `high-level-design/` to understand system boundaries, dependencies, and architecture choices.
-3. Use `detailed-design/` and `implementation/` to plan engineering breakdown, milestones, and readiness checks.
-4. Review `edge-cases/` before implementation to include detection and recovery logic in initial delivery.
+### Threat Model and Auditability
+- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
+- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
+- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
+- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
 
-## Documentation Status
 
-- ✅ Full Wave 1 documentation scaffold is present for this project.
-- ✅ Includes domain deep-dive (`detailed-design/policy-engine-and-federation.md`) and operational edge-case pack.
-- ⏳ Keep diagrams and status matrix synchronized with implementation changes.
+## Release Readiness Definition
+A feature is considered ready only when:
+1. API contract tests and integration tests pass.
+2. Audit events for all critical transitions are emitted and queryable.
+3. Runbook coverage exists for at least one severe failure mode.
+4. SLO metrics and alerts are configured before production enablement.
+
+## Implementation Deep-Dive Addendum
+
+### Delivery Tracks and Milestones
+- **Track A (Identity Core):** identity lifecycle, session management, token rotation, deprovisioning correctness.
+- **Track B (Policy Platform):** decision API, policy bundle lifecycle, simulation and canary rollout.
+- **Track C (Federation + SCIM):** enterprise SSO onboarding, claim mapping templates, drift recon pipeline.
+- **Track D (Operations + Compliance):** audit export, SLO dashboarding, incident runbooks, quarterly control attestation.
+
+### Definition of Done by Capability
+- Security controls validated with adversarial test cases.
+- Observability includes metrics, logs, traces, and alert runbook links.
+- Backfill/replay procedure documented for every asynchronous workflow.

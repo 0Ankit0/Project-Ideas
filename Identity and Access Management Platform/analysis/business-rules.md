@@ -1,35 +1,59 @@
 # Business Rules
 
-This document defines enforceable policy rules for **Identity and Access Management Platform** so command processing, asynchronous jobs, and operational actions behave consistently under normal and exceptional conditions.
+## Authorization Rules
+- BR-01: Default deny when no policy matches.
+- BR-02: Deny overrides permit for the same action/resource tuple.
+- BR-03: Privileged actions require recent MFA (`auth_time <= 15m`).
+- BR-04: Break-glass grants require dual approval and auto-expire within configured TTL.
 
-## Context
-- Domain focus: identity and access management workflows.
-- Rule categories: lifecycle transitions, authorization, compliance, and resilience.
-- Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
+## Identity and Lifecycle Rules
+- BR-05: A suspended or locked identity cannot receive new tokens.
+- BR-06: Deprovisioned identities must have zero active sessions.
+- BR-07: Workload identity secrets/certs must rotate before `rotation_due`.
 
-## Enforceable Rules
-1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
-2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
-3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
-4. Manual overrides must include approver identity, rationale, and expiration timestamp.
-5. Retries and compensations must be idempotent and must not create duplicate business effects.
+## Federation and Provisioning Rules
+- BR-08: Federated login denied if issuer or audience mismatch.
+- BR-09: Missing required mapping claims blocks JIT provisioning.
+- BR-10: SCIM source priority matrix decides attribute conflict winners.
 
-## Rule Evaluation Pipeline
-```mermaid
-flowchart TD
-    A[Incoming Command] --> B[Validate Payload]
-    B --> C{Authorized Actor?}
-    C -- No --> C1[Reject + Security Audit]
-    C -- Yes --> D{Business Rules Pass?}
-    D -- No --> D1[Reject + Rule Violation Event]
-    D -- Yes --> E{State Transition Allowed?}
-    E -- No --> E1[Return Conflict]
-    E -- Yes --> F[Commit Transaction]
-    F --> G[Publish Domain Event]
-    G --> H[Update Read Models and Alerts]
-```
+## Audit and Compliance Rules
+- BR-11: Critical admin changes require ticket reference and immutable event.
+- BR-12: Any policy publication must include approval metadata and diff checksum.
+## Cross-Cutting Implementation Baselines
 
-## Exception and Override Handling
-- Overrides are restricted to approved exception classes and require dual logging (business + security audit).
-- Override windows automatically expire and trigger follow-up verification tasks.
-- Repeated override patterns are reviewed for policy redesign and automation improvements.
+### Token and Session Standards
+- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
+- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
+- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
+- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
+
+### Policy Evaluation Standards
+- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
+- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
+- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
+- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
+
+### Identity Lifecycle Standards
+- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
+- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
+- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
+- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
+
+### Federation and SCIM Assumptions
+- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
+- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
+- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
+- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
+
+### Threat Model and Auditability
+- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
+- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
+- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
+- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
+
+## Implementation Deep-Dive Addendum
+
+### Rule Conflict Test Matrix
+- Deny-overrides with mixed policy sets.
+- Time-windowed policies across DST/timezone boundaries.
+- Group hierarchy cycles and maximum expansion depth protection.

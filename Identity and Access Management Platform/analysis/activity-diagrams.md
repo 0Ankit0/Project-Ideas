@@ -1,42 +1,67 @@
 # Activity Diagrams
 
-## Login with MFA
+## Login + Step-up Path
 ```mermaid
 flowchart TD
-    A[User submits credentials] --> B[Validate username/password]
-    B --> C{Valid?}
-    C -- No --> D[Increment failure counter]
-    D --> E{Threshold reached?}
-    E -- Yes --> F[Lock account + alert]
-    E -- No --> Z[Return auth failed]
-    C -- Yes --> G{MFA required?}
-    G -- No --> H[Issue session/token]
-    G -- Yes --> I[Challenge second factor]
-    I --> J{Factor verified?}
-    J -- No --> Z
-    J -- Yes --> H
+    A[Start Login] --> B[Redirect to IdP]
+    B --> C[Validate callback + nonce/state]
+    C --> D[Risk evaluate]
+    D -->|High risk| E[Trigger MFA challenge]
+    D -->|Normal| F[Create session]
+    E --> G{MFA success?}
+    G -->|No| H[Fail + increment fraud counter]
+    G -->|Yes| F
+    F --> I[Issue access + refresh tokens]
+    I --> J[Emit audit + metrics]
 ```
 
-## User Provisioning
+## Deprovisioning Workflow
 ```mermaid
 flowchart TD
-    A[Provisioning request] --> B[Validate tenant policy]
-    B --> C{Policy pass?}
-    C -- No --> D[Reject request]
-    C -- Yes --> E[Create identity record]
-    E --> F[Assign default roles/groups]
-    F --> G[Send activation invite]
-    G --> H[Publish UserProvisioned event]
+    T[Termination Event] --> U[Mark identity deprovisioning]
+    U --> V[Revoke sessions/tokens now]
+    V --> W[Queue entitlement cleanup jobs]
+    W --> X[Collect downstream acknowledgements]
+    X --> Y{All completed?}
+    Y -->|No| Z[Retry/backoff + escalate]
+    Y -->|Yes| AA[Finalize deprovisioned]
 ```
 
-## Access Review and Revocation
-```mermaid
-flowchart TD
-    A[Periodic access review starts] --> B[Generate entitlement report]
-    B --> C[Manager reviews entitlements]
-    C --> D{Revoke access?}
-    D -- No --> E[Mark review complete]
-    D -- Yes --> F[Disable roles/groups]
-    F --> G[Invalidate active sessions/tokens]
-    G --> H[Publish AccessRevoked event]
-```
+## Cross-Cutting Implementation Baselines
+
+### Token and Session Standards
+- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
+- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
+- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
+- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
+
+### Policy Evaluation Standards
+- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
+- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
+- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
+- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
+
+### Identity Lifecycle Standards
+- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
+- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
+- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
+- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
+
+### Federation and SCIM Assumptions
+- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
+- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
+- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
+- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
+
+### Threat Model and Auditability
+- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
+- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
+- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
+- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
+
+## Implementation Deep-Dive Addendum
+
+### Failure Semantics
+- Activity edges that call external systems must specify timeout, retry count, and backoff policy.
+- Compensating actions are explicit for partially completed deprovisioning operations.
+- Operator interventions are represented as terminal branches with owned runbooks.

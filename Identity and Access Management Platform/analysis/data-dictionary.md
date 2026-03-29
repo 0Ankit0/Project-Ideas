@@ -1,41 +1,54 @@
 # Data Dictionary
 
-This data dictionary is the canonical reference for **Identity and Access Management Platform**. It defines shared terminology, entity semantics, and governance controls required to keep identity and access management workflows consistent across teams and services.
-
-## Scope and Goals
-- Establish a stable vocabulary for architecture, API, analytics, and operations teams.
-- Define minimum required fields for core entities and expected relationship boundaries.
-- Document data quality and retention controls needed for production readiness.
-
-## Core Entities
-| Entity | Description | Required Attributes |
+| Entity | Key Fields | Notes |
 |---|---|---|
-| TenantOrOrganization | Top-level ownership boundary for data segregation | `org_id, name, status, region, created_at` |
-| UserOrActor | Human/system principal that performs actions | `actor_id, org_id, role, status, last_active_at` |
-| PrimaryRecord | Main lifecycle object handled by the platform | `record_id, org_id, state, owner_id, created_at, updated_at` |
-| ChildTransaction | Operational transaction or sub-step linked to primary record | `txn_id, record_id, txn_type, amount_or_value, occurred_at` |
-| PolicyOrRule | Versioned policy configuration that influences decisions | `policy_id, scope, version, effective_from, effective_to` |
-| AuditEvent | Append-only evidence for state changes and controls | `audit_id, record_id, actor_id, action, reason_code, occurred_at` |
+| Identity | `identity_id`, `tenant_id`, `status`, `subject_ref` | Human/workload principal record |
+| Session | `session_id`, `identity_id`, `status`, `auth_time`, `device_id` | Session source of truth |
+| TokenFamily | `family_id`, `session_id`, `latest_refresh_hash`, `revoked_at` | Rotation and reuse detection |
+| PolicyBundle | `policy_version`, `bundle_hash`, `activated_at`, `activated_by` | Immutable policy artifact metadata |
+| DecisionLog | `decision_id`, `policy_version`, `result`, `obligations` | Explainability and forensic evidence |
+| FederationConnection | `connection_id`, `protocol`, `issuer`, `jwks_uri`, `status` | Trust config |
+| ScimJob | `job_id`, `external_system`, `object_ref`, `attempt`, `result` | Provisioning pipeline telemetry |
 
-## Canonical Relationship Diagram
-```mermaid
-erDiagram
-    TENANTORORGANIZATION ||--o{ USERORACTOR : owns
-    TENANTORORGANIZATION ||--o{ PRIMARYRECORD : contains
-    PRIMARYRECORD ||--o{ CHILDTRANSACTION : has
-    POLICYORRULE ||--o{ PRIMARYRECORD : governs
-    PRIMARYRECORD ||--o{ AUDITEVENT : audited_by
-    USERORACTOR ||--o{ AUDITEVENT : performs
-```
+## Field Constraints
+- `tenant_id` is mandatory on all entities.
+- PII-bearing fields must be encrypted-at-rest and access-controlled.
+- Immutable fields are append-only through event sourcing patterns.
+## Cross-Cutting Implementation Baselines
 
-## Data Quality Controls
-1. All write paths enforce required-field validation and referential integrity for mandatory foreign keys.
-2. External imports must include provenance metadata (`source_system`, `source_ref`, `ingested_at`).
-3. Status/state fields use controlled vocabularies and reject unknown values.
-4. Duplicate detection runs on natural keys where business identity collisions are likely.
-5. Sensitive fields carry classification tags to drive masking, encryption, and export behavior.
+### Token and Session Standards
+- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
+- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
+- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
+- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
 
-## Retention and Audit
-- Operational records remain online for active workflow windows and support forensic queries.
-- Historical records move to archive tiers by policy without breaking traceability.
-- Audit events are immutable and linked through correlation ids for incident analysis.
+### Policy Evaluation Standards
+- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
+- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
+- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
+- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
+
+### Identity Lifecycle Standards
+- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
+- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
+- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
+- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
+
+### Federation and SCIM Assumptions
+- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
+- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
+- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
+- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
+
+### Threat Model and Auditability
+- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
+- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
+- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
+- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
+
+## Implementation Deep-Dive Addendum
+
+### Data Stewardship
+- Ownership is defined per entity for schema changes and data quality alarms.
+- PII classification tier is stored for each field with masking/redaction policy.
+- Lineage tags link user-facing decisions back to source entities and policy versions.

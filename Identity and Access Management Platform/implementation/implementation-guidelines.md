@@ -1,25 +1,56 @@
 # Implementation Guidelines
 
-## Purpose
-Define the implementation guidelines artifacts for the **Identity and Access Management Platform** with implementation-ready detail.
+## Engineering Standards
+- Use explicit domain modules: auth, session, token, policy, lifecycle, federation, audit.
+- Enforce idempotency keys on all mutating external APIs.
+- All external calls must define timeout, retry policy, and circuit breaker.
 
-## Domain Context
-- Domain: IAM
-- Core entities: Identity, Session, Token, Policy, Role, Federation Connection, SCIM Provisioning Job
-- Primary workflows: authentication and session lifecycle, token issuance and revocation, federation login, SCIM provisioning and deprovisioning, policy decision evaluation
+## Test Strategy
+- Unit tests for state transitions and policy precedence semantics.
+- Integration tests for federation handshake, SCIM drift handling, and token reuse detection.
+- Contract tests for event schemas and decision API payloads.
+- Chaos tests for cache outages and queue lag behavior.
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Secure Delivery Controls
+- Required checks: SAST, dependency scan, IaC scan, secret scan.
+- Feature flags for risky rollout with kill-switch behavior.
+- Production change requires runbook link and rollback plan.
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+## Cross-Cutting Implementation Baselines
 
+### Token and Session Standards
+- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
+- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
+- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
+- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
 
-## Delivery Emphasis
-- Milestones mapped to slices that are testable end-to-end.
-- CI quality gates include lint, unit/integration tests, and contract checks.
-- Backend status matrix tracks readiness by capability and release wave.
+### Policy Evaluation Standards
+- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
+- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
+- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
+- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
+
+### Identity Lifecycle Standards
+- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
+- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
+- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
+- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
+
+### Federation and SCIM Assumptions
+- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
+- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
+- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
+- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
+
+### Threat Model and Auditability
+- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
+- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
+- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
+- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
+
+## Implementation Deep-Dive Addendum
+
+### Engineering Workflow Controls
+- PR templates require threat-impact and audit-impact statements.
+- Release trains include migration rehearsals in staging with production-like datasets.
+- Incident learnings feed into coding standards and test regressions.
