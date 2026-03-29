@@ -1,14 +1,30 @@
 # Backend Status Matrix
 
-| Capability | Module | Dev | Stage | Prod | API Contract | Data Readiness | Test Gate | Owner |
-|---|---|---|---|---|---|---|---|---|
-| Catalog & availability | `catalog-service` | ✅ | ✅ | ⏳ | v1 locked | Seed + migration ready | Contract + load | Core Platform |
-| Reservation orchestration | `reservation-service` | ✅ | ✅ | ⏳ | v1 locked | Conflict model ready | Concurrency + E2E | Booking Team |
-| Fulfillment operations | `fulfillment-service` | ✅ | ⏳ | ⏳ | v1 beta | Event replay ready | Workflow + offline sync | Ops Engineering |
-| Settlement & billing | `settlement-service` | ✅ | ⏳ | ⏳ | v1 beta | Reconciliation pipelines ready | Ledger + exception tests | Finance Eng |
-| Incident/dispute | `incident-service` | ✅ | ⏳ | ⏳ | v0.9 | Evidence retention baseline | Policy + approval tests | Trust & Safety |
+Execution guidance for sprint delivery, release readiness, and production operations.
 
-## Go-Live Risks to Burn Down
-- Backpressure handling under flash-demand bursts.
-- Manual-review SLA for high-value disputes.
-- Cross-region failover for critical reservation writes.
+## Artifact-Specific Objectives
+- Convert design artifacts into sprint-ready tasks and milestones.
+- Define quality gates for CI, staging, and production promotion.
+- Track operational readiness (runbooks, alerts, dashboards, ownership).
+
+## Delivery Governance
+
+| Milestone | Mandatory Evidence | Release Gate Owner |
+|---|---|---|
+| Feature complete | Unit/integration test reports + schema diffs | Engineering lead |
+| Staging ready | Load test + security scan + rollback test | SRE lead |
+| Production ready | Runbook signoff + on-call handover + compliance attestation | Platform manager |
+
+## Lifecycle and Governance Specifics
+
+- **Provisioning in Backend Status Matrix**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in Backend Status Matrix**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in Backend Status Matrix**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in Backend Status Matrix**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
+
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.

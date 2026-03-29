@@ -1,22 +1,30 @@
 # Use Case Descriptions
 
-## UC-01 Reserve Resource
-- **Actors:** Consumer, Booking Service
-- **Preconditions:** Resource exists; policy allows reservation.
-- **Main Flow:** search availability -> place hold -> confirm reservation.
-- **Alternates:** hold expires; conflict on allocation; payment authorization fails.
-- **Postconditions:** reservation in `CONFIRMED` or terminal failure reason recorded.
+Behavior and process analysis artifact used to validate operational correctness before build.
 
-## UC-02 Fulfill and Return
-- **Actors:** Fulfillment Agent, Operations Service
-- **Preconditions:** reservation confirmed and within fulfillment window.
-- **Main Flow:** check-out -> in-use -> check-in -> inspection.
-- **Alternates:** partial return; incident reported; offline event sync conflict.
-- **Postconditions:** fulfillment closed and settlement inputs captured.
+## Artifact-Specific Objectives
+- Capture real process actors, triggers, and state handoffs.
+- Enumerate alternate/exceptional behavior with explicit owner transitions.
+- Produce artifacts that can be converted directly into test scenarios.
 
-## UC-03 Settle Account
-- **Actors:** Settlement Service, Finance Analyst
-- **Preconditions:** usage/inspection events finalized.
-- **Main Flow:** compute charges -> apply adjustments -> post ledger entries -> close.
-- **Alternates:** dispute opened; gateway mismatch; manual review required.
-- **Postconditions:** settlement posted with reconciliation status.
+## Analysis-to-Implementation Mapping
+
+| Analysis Output | Engineering Consumer | Implementation Deliverable |
+|---|---|---|
+| Actor and trigger model | API/service owners | Endpoint commands + auth scopes |
+| Exception branches | SRE and operations | Incident runbooks + alert rules |
+| Policy boundaries | Governance/compliance | Policy-as-code rules and approvals |
+
+## Lifecycle and Governance Specifics
+
+- **Provisioning in Use Case Descriptions**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in Use Case Descriptions**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in Use Case Descriptions**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in Use Case Descriptions**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
+
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.

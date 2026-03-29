@@ -1,12 +1,42 @@
 # Cloud Architecture
 
-## Cloud-Agnostic Capabilities
-- Compute orchestration (containers/serverless workers)
-- Managed transactional datastore + read replicas
-- Eventing backbone with dead-letter support
-- Observability stack (metrics, logs, traces)
+Runtime platform specification for secure, resilient, and observable deployment.
 
-## Reliability Posture
-- Cross-zone failover for reservation critical path
-- Automated backups and PITR for transactional stores
-- Regional DR runbook for controlled recovery objectives
+## Artifact-Specific Objectives
+- Define environment topology, trust boundaries, and security controls.
+- Specify HA, backup, and disaster-recovery parameters.
+- Map observability pipelines and alert responsibilities.
+
+## Platform Control Matrix
+
+| Infrastructure Area | Required Control | Validation Method |
+|---|---|---|
+| Network | Segmented subnets + least-privilege ACLs | IaC policy checks + penetration tests |
+| Data | HA database, encryption, backups | failover drill + restore verification |
+| Operations | telemetry + centralized SIEM | alert test + incident simulation |
+
+## Lifecycle and Governance Specifics
+
+- **Provisioning in Cloud Architecture**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in Cloud Architecture**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in Cloud Architecture**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in Cloud Architecture**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
+
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.
+
+## Mermaid Diagram
+
+```mermaid
+flowchart LR
+  Dev --> Shared
+  Stage --> Shared
+  Prod --> Shared
+  Shared --> IAM
+  Shared --> KMS
+  Prod --> DR
+```

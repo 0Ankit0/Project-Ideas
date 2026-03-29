@@ -1,14 +1,41 @@
 # Class Diagrams
 
+Low-level engineering specification that can be implemented directly by backend/integration teams.
+
+## Artifact-Specific Objectives
+- Specify concrete schemas, state transitions, and component interfaces.
+- Define transaction boundaries, idempotency keys, and retry semantics.
+- Include migration and backward compatibility constraints.
+
+## Engineering Detail Matrix
+
+| Component Concern | Required Detail | Done When |
+|---|---|---|
+| API contracts | request/response/error schemas with examples | OpenAPI/proto merged and linted |
+| Persistence | normalized schema/indexing/retention | migration tested on production-like dataset |
+| State logic | transition guards + compensation | state-machine and chaos tests pass |
+
+## Lifecycle and Governance Specifics
+
+- **Provisioning in Class Diagrams**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in Class Diagrams**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in Class Diagrams**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in Class Diagrams**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
+
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.
+
+## Mermaid Diagram
+
 ```mermaid
 classDiagram
-  class Resource {+id +type +status +provision() +retire()}
-  class ResourceRequest {+id +requester +state}
-  class LifecyclePolicy {+id +rule +evaluate()}
-  class ApprovalRecord {+id +approver +decision}
-  class ResourceCost {+id +period +amount}
-  ResourceRequest --> Resource
-  Resource --> LifecyclePolicy
-  Resource --> ResourceCost
-  ResourceRequest --> ApprovalRecord
+  class Resource{+id +state +policyProfile}
+  class Allocation{+startAt +endAt +priority}
+  class ExceptionCase{+severity +owner +dueAt}
+  Resource --> Allocation
+  Resource --> ExceptionCase
 ```

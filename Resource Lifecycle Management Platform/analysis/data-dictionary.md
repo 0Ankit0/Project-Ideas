@@ -1,41 +1,30 @@
 # Data Dictionary
 
-This data dictionary is the canonical reference for **Resource Lifecycle Management Platform**. It defines shared terminology, entity semantics, and governance controls required to keep resource lifecycle management workflows consistent across teams and services.
+Behavior and process analysis artifact used to validate operational correctness before build.
 
-## Scope and Goals
-- Establish a stable vocabulary for architecture, API, analytics, and operations teams.
-- Define minimum required fields for core entities and expected relationship boundaries.
-- Document data quality and retention controls needed for production readiness.
+## Artifact-Specific Objectives
+- Capture real process actors, triggers, and state handoffs.
+- Enumerate alternate/exceptional behavior with explicit owner transitions.
+- Produce artifacts that can be converted directly into test scenarios.
 
-## Core Entities
-| Entity | Description | Required Attributes |
+## Analysis-to-Implementation Mapping
+
+| Analysis Output | Engineering Consumer | Implementation Deliverable |
 |---|---|---|
-| TenantOrOrganization | Top-level ownership boundary for data segregation | `org_id, name, status, region, created_at` |
-| UserOrActor | Human/system principal that performs actions | `actor_id, org_id, role, status, last_active_at` |
-| PrimaryRecord | Main lifecycle object handled by the platform | `record_id, org_id, state, owner_id, created_at, updated_at` |
-| ChildTransaction | Operational transaction or sub-step linked to primary record | `txn_id, record_id, txn_type, amount_or_value, occurred_at` |
-| PolicyOrRule | Versioned policy configuration that influences decisions | `policy_id, scope, version, effective_from, effective_to` |
-| AuditEvent | Append-only evidence for state changes and controls | `audit_id, record_id, actor_id, action, reason_code, occurred_at` |
+| Actor and trigger model | API/service owners | Endpoint commands + auth scopes |
+| Exception branches | SRE and operations | Incident runbooks + alert rules |
+| Policy boundaries | Governance/compliance | Policy-as-code rules and approvals |
 
-## Canonical Relationship Diagram
-```mermaid
-erDiagram
-    TENANTORORGANIZATION ||--o{ USERORACTOR : owns
-    TENANTORORGANIZATION ||--o{ PRIMARYRECORD : contains
-    PRIMARYRECORD ||--o{ CHILDTRANSACTION : has
-    POLICYORRULE ||--o{ PRIMARYRECORD : governs
-    PRIMARYRECORD ||--o{ AUDITEVENT : audited_by
-    USERORACTOR ||--o{ AUDITEVENT : performs
-```
+## Lifecycle and Governance Specifics
 
-## Data Quality Controls
-1. All write paths enforce required-field validation and referential integrity for mandatory foreign keys.
-2. External imports must include provenance metadata (`source_system`, `source_ref`, `ingested_at`).
-3. Status/state fields use controlled vocabularies and reject unknown values.
-4. Duplicate detection runs on natural keys where business identity collisions are likely.
-5. Sensitive fields carry classification tags to drive masking, encryption, and export behavior.
+- **Provisioning in Data Dictionary**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in Data Dictionary**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in Data Dictionary**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in Data Dictionary**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
 
-## Retention and Audit
-- Operational records remain online for active workflow windows and support forensic queries.
-- Historical records move to archive tiers by policy without breaking traceability.
-- Audit events are immutable and linked through correlation ids for incident analysis.
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.

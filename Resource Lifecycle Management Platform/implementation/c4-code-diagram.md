@@ -1,67 +1,39 @@
 # C4 Code Diagram
 
-This code-level view expands lifecycle orchestration modules for provisioning, updates, and retirement.
+Execution guidance for sprint delivery, release readiness, and production operations.
 
-## Code-Level Structure
+## Artifact-Specific Objectives
+- Convert design artifacts into sprint-ready tasks and milestones.
+- Define quality gates for CI, staging, and production promotion.
+- Track operational readiness (runbooks, alerts, dashboards, ownership).
+
+## Delivery Governance
+
+| Milestone | Mandatory Evidence | Release Gate Owner |
+|---|---|---|
+| Feature complete | Unit/integration test reports + schema diffs | Engineering lead |
+| Staging ready | Load test + security scan + rollback test | SRE lead |
+| Production ready | Runbook signoff + on-call handover + compliance attestation | Platform manager |
+
+## Lifecycle and Governance Specifics
+
+- **Provisioning in C4 Code Diagram**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in C4 Code Diagram**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in C4 Code Diagram**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in C4 Code Diagram**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
+
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.
+
+## Mermaid Diagram
+
 ```mermaid
-flowchart TB
-  subgraph Interface
-    ResourceRequestController
-    LifecycleController
-    ApprovalController
-  end
-
-  subgraph Application
-    ResourceRequestAppService
-    LifecycleAppService
-    ApprovalAppService
-    WorkflowAppService
-  end
-
-  subgraph Domain
-    ResourceRequestAggregate
-    ResourceAggregate
-    LifecyclePolicy
-    ApprovalRule
-  end
-
-  subgraph Infrastructure
-    ResourceRepository
-    RequestRepository
-    CloudProvisioningAdapter
-    CMDBAdapter
-    EventPublisher
-  end
-
-  ResourceRequestController --> ResourceRequestAppService --> ResourceRequestAggregate
-  LifecycleController --> LifecycleAppService --> ResourceAggregate
-  ApprovalController --> ApprovalAppService --> ApprovalRule
-  LifecycleAppService --> WorkflowAppService --> LifecyclePolicy
-  ResourceRequestAppService --> RequestRepository
-  LifecycleAppService --> ResourceRepository
-  WorkflowAppService --> CloudProvisioningAdapter
-  LifecycleAppService --> CMDBAdapter
-  LifecycleAppService --> EventPublisher
+flowchart LR
+  api --> application --> domain
+  application --> policy
+  application --> infrastructure
 ```
-
-## Critical Runtime Sequence: Provision Resource
-```mermaid
-sequenceDiagram
-  autonumber
-  actor Requestor
-  participant API as ResourceRequestController
-  participant APP as LifecycleAppService
-  participant CLOUD as CloudProvisioningAdapter
-  participant CMDB as CMDBAdapter
-
-  Requestor->>API: request provision
-  API->>APP: validate + start workflow
-  APP->>CLOUD: provision resource
-  CLOUD-->>APP: resource identifiers
-  APP->>CMDB: register asset
-  APP-->>API: provision complete
-```
-
-## Notes
-- Persist workflow state transitions for replay and audit.
-- Keep cloud adapter actions idempotent using request correlation identifiers.

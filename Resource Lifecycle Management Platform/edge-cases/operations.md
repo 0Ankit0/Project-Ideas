@@ -1,13 +1,30 @@
 # Operations Edge Cases
 
-## Failure Mode
-Regional outage prevents live check-in/check-out updates for field teams.
+Failure-mode specification describing detection, containment, recovery, and audit evidence.
 
-## Impact
-Operational backlog, delayed availability refresh, and potential allocation errors.
+## Artifact-Specific Objectives
+- Define non-happy-path behavior with concrete containment actions.
+- Assign severity, owner, and SLA for each scenario.
+- Provide deterministic recovery and reconciliation steps.
 
-## Detection
-Heartbeat and sync-lag monitors identify prolonged offline mode thresholds by region.
+## Edge-Case Response Matrix
 
-## Recovery / Mitigation
-Enable offline queueing with signed local events, controlled replay windows, and post-recovery reconciliation runbooks.
+| Scenario Type | Detection Signal | Immediate Containment | Recovery Path |
+|---|---|---|---|
+| Policy violation | denied decision / drift alert | freeze unsafe transition | correct policy context + replay command |
+| State mismatch | reconciliation mismatch event | quarantine resource | reconcile source-of-truth and backfill events |
+| Financial inconsistency | ledger mismatch | suspend settlement posting | rerun reconciliation and manual approval |
+
+## Lifecycle and Governance Specifics
+
+- **Provisioning in Operations Edge Cases**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in Operations Edge Cases**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in Operations Edge Cases**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in Operations Edge Cases**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
+
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.

@@ -1,42 +1,30 @@
 # Event Catalog
 
-This catalog defines stable event contracts for **Resource Lifecycle Management Platform** to support event-driven integrations, auditability, and analytics across resource lifecycle management workflows.
+Behavior and process analysis artifact used to validate operational correctness before build.
 
-## Contract Conventions
-- Event naming: `<domain>.<aggregate>.<action>.v1`.
-- Required metadata: `event_id`, `occurred_at`, `correlation_id`, `producer`, `schema_version`, `tenant_context`.
-- Delivery mode: at-least-once with mandatory consumer idempotency.
-- Ordering guarantee: per aggregate key; no global ordering assumption.
+## Artifact-Specific Objectives
+- Capture real process actors, triggers, and state handoffs.
+- Enumerate alternate/exceptional behavior with explicit owner transitions.
+- Produce artifacts that can be converted directly into test scenarios.
 
-## Domain Events
-| Event Name | Payload Highlights | Typical Consumers |
+## Analysis-to-Implementation Mapping
+
+| Analysis Output | Engineering Consumer | Implementation Deliverable |
 |---|---|---|
-| `domain.record.created.v1` | record_id, actor_id, initial_state, occurred_at | orchestration, analytics |
-| `domain.record.state_changed.v1` | record_id, old_state, new_state, reason_code | notifications, reporting |
-| `domain.record.validation_failed.v1` | record_id, violated_rules, correlation_id | operations, quality dashboards |
-| `domain.record.override_applied.v1` | record_id, override_type, approver_id, expires_at | compliance, audit |
-| `domain.record.closed.v1` | record_id, terminal_state, closed_at | billing/settlement, archives |
+| Actor and trigger model | API/service owners | Endpoint commands + auth scopes |
+| Exception branches | SRE and operations | Incident runbooks + alert rules |
+| Policy boundaries | Governance/compliance | Policy-as-code rules and approvals |
 
-## Publish and Consumption Sequence
-```mermaid
-sequenceDiagram
-    participant API as Command Service
-    participant DB as Transaction Store
-    participant Outbox as Outbox Relay
-    participant Bus as Event Bus
-    participant Consumer as Downstream Consumer
-    API->>DB: Persist state change + outbox row
-    Outbox->>DB: Poll committed rows
-    Outbox->>Bus: Publish event
-    Bus-->>Consumer: Deliver event
-    Consumer->>Consumer: Idempotency check + process
-    alt Consumer failure
-        Consumer->>Bus: NACK
-        Bus-->>Consumer: Retry then DLQ
-    end
-```
+## Lifecycle and Governance Specifics
 
-## Operational SLOs
-- P95 commit-to-publish latency below 5 seconds for tier-1 events.
-- DLQ triage acknowledgement within 15 minutes for production incidents.
-- Schema changes remain backward compatible within the same major version.
+- **Provisioning in Event Catalog**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in Event Catalog**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in Event Catalog**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in Event Catalog**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
+
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.
