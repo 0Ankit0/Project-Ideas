@@ -507,3 +507,60 @@ sequenceDiagram
 | SD-05 | Provider Creates Resource | ResourceService, FileService, GeocodingService |
 | SD-06 | Booking Reminder | NotificationService, Scheduler, Providers |
 | SD-07 | Payment Webhook | WebhookController, PaymentService, BookingService |
+
+---
+## Implementation-Ready Sequence Diagram
+
+### Slot allocation rules in this document's context
+- Allocation decisions must be based on **resource calendar + operational policy + channel limits** before any payment action is attempted.
+- All provisional allocations require an explicit **hold record with expiry**, and expiry must be visible to clients.
+- Shared-capacity resources must use atomic decrement semantics; exclusive resources must enforce single-active-booking constraints.
+
+### Conflict resolution in this document's context
+- Competing writes must use deterministic conflict handling (optimistic version checks or transactional locks as documented here).
+- API and admin paths must converge on one canonical conflict reason taxonomy (`SLOT_TAKEN`, `STALE_VERSION`, `PROVIDER_BLOCKED`, `PAYMENT_STATE_MISMATCH`).
+- Every conflict rejection must emit structured audit telemetry including actor, correlation ID, and rule version.
+
+### Payment coupling / decoupling behavior
+- **Coupled flow**: booking moves to confirmed only after successful authorization/capture.
+- **Decoupled flow**: booking can be confirmed with `PAYMENT_PENDING`, but with a bounded grace window and auto-cancel guardrail.
+- Compensation is mandatory for split-brain outcomes (payment succeeded but booking failed, or inverse).
+
+### Cancellation and refund policy detail
+- Refund outcomes depend on lead time, policy tier, no-show status, and jurisdiction-specific fee constraints.
+- Refund processing must be idempotent and expose lifecycle states (`REQUESTED`, `INITIATED`, `SETTLED`, `FAILED`, `MANUAL_REVIEW`).
+- Cancellation side effects must include slot reallocation and downstream notification consistency.
+
+### Observability and incident playbook focus
+- Monitor: availability latency, hold expiry lag, conflict rate, payment callback success, refund aging.
+- Alerts must map to operator runbooks with first-response steps and data reconciliation queries.
+- Post-incident review must record policy gaps and required control changes for this documentation area.
+
+### Detailed implementation contracts
+- Transaction boundaries for hold, confirm, cancel, and refund actions.
+- Outbox/inbox idempotency strategy for webhook and event replay safety.
+- Data model constraints and indexes required to prevent overlap anomalies.
+
+
+### Mermaid saga sequence for confirm and compensation
+```mermaid
+sequenceDiagram
+  participant API
+  participant Book as BookingSvc
+  participant Pay as PaymentSvc
+  participant Ref as RefundSvc
+  API->>Book: confirm(holdId)
+  Book->>Pay: authorize(intent)
+  alt authorized
+    Pay-->>Book: ok
+    Book-->>API: BOOKED
+  else authorized-but-book-fail
+    Pay-->>Book: ok
+    Book->>Ref: createCompensation
+    Ref-->>Book: REFUND_INITIATED
+    Book-->>API: RECONCILING
+  else failed
+    Pay-->>Book: failed
+    Book-->>API: PAYMENT_FAILED
+  end
+```
