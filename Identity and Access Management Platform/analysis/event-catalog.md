@@ -1,42 +1,53 @@
 # Event Catalog
 
-This catalog defines stable event contracts for **Identity and Access Management Platform** to support event-driven integrations, auditability, and analytics across identity and access management workflows.
+| Event | Producer | Consumers | Delivery | Idempotency Key |
+|---|---|---|---|---|
+| `auth.session.started` | Auth Service | Audit, Risk, Analytics | at-least-once | session_id |
+| `auth.step_up.required` | Risk Engine | Auth UI, Alerting | at-least-once | challenge_id |
+| `token.revoked` | Token Service | Gateway cache, RP webhooks | at-least-once | token_family_id |
+| `identity.deprovision.requested` | Lifecycle Service | Provisioning workers | at-least-once | identity_id + version |
+| `policy.bundle.activated` | Policy Admin | PDP cache, Audit | exactly-once logical | policy_version |
+| `scim.drift.detected` | Reconciler | Admin Console, Ticketing | at-least-once | external_id + drift_hash |
 
-## Contract Conventions
-- Event naming: `<domain>.<aggregate>.<action>.v1`.
-- Required metadata: `event_id`, `occurred_at`, `correlation_id`, `producer`, `schema_version`, `tenant_context`.
-- Delivery mode: at-least-once with mandatory consumer idempotency.
-- Ordering guarantee: per aggregate key; no global ordering assumption.
+## Event Handling Requirements
+- Every consumer is retry-safe and records dedupe token.
+- Dead-letter queues include replay tooling and reason classification.
+- Event schema versioning is backward compatible for 2 minor versions.
+## Cross-Cutting Implementation Baselines
 
-## Domain Events
-| Event Name | Payload Highlights | Typical Consumers |
-|---|---|---|
-| `domain.record.created.v1` | record_id, actor_id, initial_state, occurred_at | orchestration, analytics |
-| `domain.record.state_changed.v1` | record_id, old_state, new_state, reason_code | notifications, reporting |
-| `domain.record.validation_failed.v1` | record_id, violated_rules, correlation_id | operations, quality dashboards |
-| `domain.record.override_applied.v1` | record_id, override_type, approver_id, expires_at | compliance, audit |
-| `domain.record.closed.v1` | record_id, terminal_state, closed_at | billing/settlement, archives |
+### Token and Session Standards
+- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
+- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
+- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
+- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
 
-## Publish and Consumption Sequence
-```mermaid
-sequenceDiagram
-    participant API as Command Service
-    participant DB as Transaction Store
-    participant Outbox as Outbox Relay
-    participant Bus as Event Bus
-    participant Consumer as Downstream Consumer
-    API->>DB: Persist state change + outbox row
-    Outbox->>DB: Poll committed rows
-    Outbox->>Bus: Publish event
-    Bus-->>Consumer: Deliver event
-    Consumer->>Consumer: Idempotency check + process
-    alt Consumer failure
-        Consumer->>Bus: NACK
-        Bus-->>Consumer: Retry then DLQ
-    end
-```
+### Policy Evaluation Standards
+- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
+- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
+- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
+- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
 
-## Operational SLOs
-- P95 commit-to-publish latency below 5 seconds for tier-1 events.
-- DLQ triage acknowledgement within 15 minutes for production incidents.
-- Schema changes remain backward compatible within the same major version.
+### Identity Lifecycle Standards
+- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
+- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
+- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
+- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
+
+### Federation and SCIM Assumptions
+- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
+- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
+- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
+- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
+
+### Threat Model and Auditability
+- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
+- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
+- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
+- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
+
+## Implementation Deep-Dive Addendum
+
+### Event Governance
+- Every event schema has an owner, version policy, and deprecation timeline.
+- Breaking changes require dual-publish migration window and compatibility report.
+- Consumer lag SLOs are monitored per event family with replay readiness indicators.

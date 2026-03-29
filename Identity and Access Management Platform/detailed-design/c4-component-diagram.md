@@ -2,49 +2,74 @@
 
 ```mermaid
 flowchart TB
-    subgraph Users
-      EndUser
-      TenantAdmin
-      SecurityAnalyst
+    subgraph AuthService
+      LoginOrchestrator
+      SessionManager
+      TokenIssuer
+      RiskAdapter
     end
 
-    subgraph IAM[IAM Application Container]
-      UIBFF[Admin Console + BFF]
-      AuthCmp[Authentication Component]
-      AuthzCmp[Authorization Component]
-      IdentityCmp[Identity Lifecycle Component]
-      TokenCmp[Token Issuance Component]
-      FederationCmp[Federation Component]
-      AuditCmp[Audit/Compliance Component]
+    subgraph PolicyService
+      ContextBuilder
+      RuleCompiler
+      DecisionEngine
+      ExplainFormatter
     end
 
-    subgraph Infra[Infra Containers]
-      OLTP[(IAM DB)]
-      Cache[(Redis)]
-      Bus[(Event Bus)]
-      SIEM[(SIEM)]
+    subgraph FederationService
+      OIDCAdapter
+      SAMLAdapter
+      SCIMConnector
+      MappingEngine
     end
 
-    EndUser --> AuthCmp
-    TenantAdmin --> UIBFF
-    SecurityAnalyst --> AuditCmp
-
-    UIBFF --> IdentityCmp
-    UIBFF --> AuthzCmp
-    UIBFF --> FederationCmp
-
-    AuthCmp --> TokenCmp
-    AuthCmp --> AuthzCmp
-
-    IdentityCmp --> OLTP
-    AuthCmp --> OLTP
-    TokenCmp --> OLTP
-    AuthzCmp --> Cache
-
-    IdentityCmp --> Bus
-    AuthCmp --> Bus
-    TokenCmp --> Bus
-
-    AuditCmp --> OLTP
-    AuditCmp --> SIEM
+    LoginOrchestrator --> SessionManager --> TokenIssuer
+    LoginOrchestrator --> RiskAdapter
+    DecisionEngine --> ExplainFormatter
+    OIDCAdapter --> MappingEngine
+    SAMLAdapter --> MappingEngine
+    SCIMConnector --> MappingEngine
 ```
+
+## Component Responsibilities
+- `LoginOrchestrator`: end-to-end flow control and failure handling.
+- `DecisionEngine`: deterministic policy evaluation with precedence model.
+- `MappingEngine`: claim/attribute transformation with versioned mapping rules.
+## Cross-Cutting Implementation Baselines
+
+### Token and Session Standards
+- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
+- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
+- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
+- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
+
+### Policy Evaluation Standards
+- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
+- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
+- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
+- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
+
+### Identity Lifecycle Standards
+- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
+- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
+- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
+- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
+
+### Federation and SCIM Assumptions
+- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
+- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
+- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
+- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
+
+### Threat Model and Auditability
+- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
+- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
+- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
+- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
+
+## Implementation Deep-Dive Addendum
+
+### Component-Level NFRs
+- `DecisionEngine` must be deterministic and side-effect free.
+- `SessionManager` guarantees monotonic state transitions.
+- `MappingEngine` supports test fixtures for each enterprise IdP template.

@@ -1,29 +1,71 @@
 # Use Case Diagram
 
 ```mermaid
-flowchart LR
-    User[End User]
-    Admin[Tenant Admin]
-    SecOps[SecOps]
-    Dev[App Developer]
+flowchart TB
+    EndUser((End User))
+    Admin((Identity Admin))
+    Sec((Security Engineer))
+    AppOwner((Application Owner))
+    Auditor((Auditor))
 
-    UC1((Sign Up / Sign In))
-    UC2((MFA Enrollment))
-    UC3((Password Reset))
-    UC4((Manage Roles & Permissions))
-    UC5((Provision/Deprovision User))
-    UC6((Issue OAuth Tokens))
-    UC7((Review Audit Events))
-    UC8((Configure SSO Federation))
+    UC1[Authenticate + Start Session]
+    UC2[Step-up Authentication]
+    UC3[Evaluate Authorization Policy]
+    UC4[Provision/Deprovision Identity]
+    UC5[Federated SSO + JIT Provision]
+    UC6[Revoke Token/Session]
+    UC7[Review Audit Evidence]
 
-    User --> UC1
-    User --> UC2
-    User --> UC3
-
+    EndUser --> UC1
+    EndUser --> UC2
     Admin --> UC4
-    Admin --> UC5
-    Admin --> UC8
-
-    Dev --> UC6
-    SecOps --> UC7
+    Admin --> UC6
+    Sec --> UC3
+    Sec --> UC6
+    AppOwner --> UC3
+    Auditor --> UC7
+    UC5 --> UC1
 ```
+
+## Narrative Depth
+- `Authenticate + Start Session` includes risk scoring, challenge orchestration, and token issuance.
+- `Evaluate Authorization Policy` includes context assembly, policy fetch, decision explain, and obligation return.
+- `Provision/Deprovision` includes source-of-truth arbitration and asynchronous reconciliation.
+## Cross-Cutting Implementation Baselines
+
+### Token and Session Standards
+- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
+- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
+- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
+- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
+
+### Policy Evaluation Standards
+- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
+- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
+- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
+- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
+
+### Identity Lifecycle Standards
+- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
+- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
+- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
+- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
+
+### Federation and SCIM Assumptions
+- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
+- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
+- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
+- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
+
+### Threat Model and Auditability
+- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
+- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
+- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
+- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
+
+## Implementation Deep-Dive Addendum
+
+### Diagram Contract
+- Every use case node corresponds to at least one public API operation and one audit event family.
+- Actor-to-use-case links imply authorization boundary checks, not UI-only navigation.
+- Externalized activities (IdP, SIEM, ticketing) are considered failure-prone dependencies with retries/timeouts.
