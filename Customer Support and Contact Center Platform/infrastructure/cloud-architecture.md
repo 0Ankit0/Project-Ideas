@@ -23,3 +23,28 @@ Define the cloud architecture artifacts for the **Customer Support and Contact C
 - Multi-environment topology (dev/stage/prod) with promotion gates.
 - Network segmentation, private service communication, and WAF boundaries.
 - Backup, disaster recovery, and key rotation procedures.
+
+## Cloud Architecture Narrative
+Cloud topology should isolate control plane (policy, incident, audit signing) from data plane (ingestion, routing, agent APIs).
+
+```mermaid
+flowchart TB
+    subgraph DataPlane
+      IN[Ingress]
+      WF[Workflow/Routing]
+      AG[Agent APIs]
+    end
+    subgraph ControlPlane
+      SL[SLA Policy]
+      AU[Audit Vault]
+      IR[Incident Automation]
+    end
+    IN-->WF-->AG
+    WF-->SL
+    WF-->AU
+    SL-->IR
+```
+
+Multi-region note: replicate audit store asynchronously but pin workflow writes to region leader to prevent split-state queues.
+
+Operational coverage note: this artifact also specifies omnichannel controls for this design view.

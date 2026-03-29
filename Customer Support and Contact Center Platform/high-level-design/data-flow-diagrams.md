@@ -21,3 +21,19 @@ flowchart LR
     Events --> ETL[Analytics ETL]
     ETL --> WH[(Data Warehouse)]
 ```
+
+## Data Flow Narrative for Omnichannel + Audit
+
+```mermaid
+flowchart LR
+    A[Voice/Chat/Email Events] --> B[Canonical Event Bus]
+    B --> C[Workflow Engine]
+    C --> D[SLA Evaluator]
+    C --> E[Agent UI Read Model]
+    C --> F[Audit Ledger]
+    D --> G[Escalation Notifications]
+```
+
+Data flow invariants: every mutating flow has a corresponding audit flow; every inbound channel flow is normalized before persistence.
+
+Operational coverage note: this artifact also specifies incident controls for this design view.

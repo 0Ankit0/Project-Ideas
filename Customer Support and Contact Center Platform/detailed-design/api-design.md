@@ -23,3 +23,28 @@ Define the api design artifacts for the **Customer Support and Contact Center Pl
 - Table/entity constraints and invariants are explicit.
 - Failure semantics for retries/timeouts are defined per integration.
 - Versioning strategy documented for APIs, events, and data migrations.
+
+## API Deep Technical Narrative
+
+```mermaid
+sequenceDiagram
+    participant C as Channel API
+    participant G as API Gateway
+    participant R as Routing API
+    participant S as SLA API
+    participant A as Audit API
+    C->>G: POST /v1/interactions
+    G->>R: normalize + enqueue
+    R->>S: start clocks
+    S-->>R: checkpoint IDs
+    R->>A: write immutable audit
+    R-->>C: 202 Accepted + correlation_id
+```
+
+- `POST /v1/interactions`: idempotent by `Idempotency-Key`; returns queue reference.
+- `POST /v1/cases/{id}/escalations`: requires `reason_code`, `severity`, and `escalation_target`.
+- `POST /v1/cases/{id}/state-transitions`: rejects illegal workflow moves with machine-readable error.
+- `GET /v1/audit/events?conversation_id=`: paginated tamper-evident history for compliance.
+- Incident mode endpoint `POST /v1/ops/degraded-mode` guarded by break-glass RBAC and dual-approval audit entries.
+
+Operational coverage note: this artifact also specifies omnichannel controls for this design view.

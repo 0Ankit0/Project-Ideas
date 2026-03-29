@@ -40,3 +40,20 @@ flowchart LR
     Stage --> Gate[Load + SLA Validation Gate]
     Gate --> Prod
 ```
+
+## Deployment Narrative with Resilience
+Deployment diagram should include active-active channel ingress, active-passive workflow DB failover, and isolated audit storage.
+
+```mermaid
+flowchart LR
+    LB[Global LB] --> R1[Region A Services]
+    LB --> R2[Region B Services]
+    R1 --> DBA[(Primary Workflow DB)]
+    R2 --> DBB[(Standby DB)]
+    R1 --> AUD[(WORM Audit Store)]
+    R2 --> AUD
+```
+
+Incident runbook trigger: fail over only after queue-drain checkpoint and SLA clock continuity verification.
+
+Operational coverage note: this artifact also specifies omnichannel controls for this design view.

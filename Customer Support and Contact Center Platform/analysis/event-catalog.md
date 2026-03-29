@@ -40,3 +40,25 @@ sequenceDiagram
 - P95 commit-to-publish latency below 5 seconds for tier-1 events.
 - DLQ triage acknowledgement within 15 minutes for production incidents.
 - Schema changes remain backward compatible within the same major version.
+
+## Event Catalog Deep Narrative
+
+```mermaid
+sequenceDiagram
+    participant Ch as Channel Connector
+    participant In as Ingestion Bus
+    participant Rt as Routing Engine
+    participant Sl as SLA Service
+    participant Au as Audit Stream
+    Ch->>In: message.received
+    In->>Rt: interaction.normalized
+    Rt->>Sl: queue.entered
+    Sl-->>Rt: sla.checkpoint.created
+    Rt->>Au: assignment.decided
+    Rt->>Au: escalation.triggered (optional)
+```
+
+- Required high-value events: `queue.entered`, `assignment.accepted`, `customer.waiting`, `sla.warning`, `sla.breached`, `escalation.acknowledged`, `case.closed`.
+- Every event includes `tenant_id`, `conversation_id`, `event_time`, and idempotency key.
+- For omnichannel reliability, producers must retry with the same idempotency key and consumers must remain replay-safe.
+- Incident handling depends on catalog completeness: missing `sla.breached` events are Sev2 telemetry defects.

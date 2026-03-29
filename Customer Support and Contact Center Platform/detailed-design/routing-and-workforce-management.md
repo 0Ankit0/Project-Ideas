@@ -23,3 +23,21 @@ This document details architecture and operational controls for **routing and wo
 - Timeout handling with bounded retries and dead-letter workflows.
 - Human-in-the-loop escalation path for unrecoverable conflicts.
 - Post-incident replay/backfill procedure with verification checklist.
+
+## Routing and Workforce Deep Narrative
+Routing score formula combines skill match, customer tier, language, backlog age, and agent occupancy. Workforce planner constraints (shift, concurrency cap, certification) are hard filters before scoring.
+
+```mermaid
+flowchart LR
+    I[Incoming Case] --> F[Filter Eligible Agents]
+    F --> S[Compute Composite Score]
+    S --> P{Breach Risk High?}
+    P -- yes --> H[Priority Queue Boost]
+    P -- no --> N[Normal Queue]
+    H --> A[Assignment Commit]
+    N --> A
+```
+
+Escalation chain: queue lead -> duty manager -> incident commander, with auto-escalation when acknowledgment SLA is missed.
+
+Operational coverage note: this artifact also specifies omnichannel controls for this design view.

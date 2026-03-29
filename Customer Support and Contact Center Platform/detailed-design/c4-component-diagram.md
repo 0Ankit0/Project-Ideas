@@ -49,3 +49,28 @@ flowchart TB
     Bus --> Search
     RoutingCmp --> Cache
 ```
+
+## C4 Component Deep Narrative
+
+```mermaid
+flowchart LR
+    subgraph Core
+      RT[Routing Component]
+      SL[SLA Component]
+      WF[Workflow State Component]
+      OM[Omnichannel Normalizer]
+      AU[Audit Writer]
+      IR[Incident Control]
+    end
+    OM-->RT-->WF
+    WF-->SL
+    WF-->AU
+    SL-->IR
+```
+
+Component boundaries:
+- Routing decides queue and assignee.
+- Workflow owns state machine invariants.
+- SLA computes timers and escalation triggers.
+- Audit Writer is append-only and asynchronous with guaranteed delivery.
+- Incident Control toggles safe-mode features with change records.

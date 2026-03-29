@@ -45,3 +45,20 @@ flowchart TB
     Bus --> BI
     Jobs --> Notify
 ```
+
+## Architecture Narrative (Operational Focus)
+High-level architecture should depict control planes for routing, SLA policy, and incident orchestration alongside data planes.
+
+```mermaid
+flowchart TB
+    CH[Channel Adapters] --> IN[Ingestion + Normalization]
+    IN --> ORCH[Queue Workflow Orchestrator]
+    ORCH --> WKS[Agent Workspace]
+    ORCH --> POL[SLA & Escalation Policy]
+    ORCH --> AUD[Audit/Compliance Store]
+    POL --> IR[Incident Automation]
+```
+
+Design requirement: no component can bypass orchestrator-owned workflow transitions; direct writes are forbidden to preserve auditability.
+
+Operational coverage note: this artifact also specifies omnichannel controls for this design view.

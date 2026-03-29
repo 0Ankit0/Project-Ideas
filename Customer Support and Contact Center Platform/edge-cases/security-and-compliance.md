@@ -12,3 +12,19 @@
 ## Verification
 - Quarterly access reviews and key rotation checks.
 - Automated policy tests in CI for critical authorization paths.
+
+## Security/Compliance Edge Narratives
+- Break-glass access can view but not mutate queue priority unless dual authorization is present.
+- Escalation changes on regulated queues require reason taxonomy and immutable evidence.
+- Omnichannel ingestion must run malware and PII classifiers before storage.
+
+```mermaid
+flowchart TD
+    I[Inbound Content] --> P[PII + Threat Scan]
+    P --> C{Compliant?}
+    C -- no --> Q[Quarantine Queue]
+    C -- yes --> N[Normal Queue]
+    Q --> A[Security Audit + Incident Ticket]
+```
+
+Operational coverage note: this artifact also specifies sla controls for this design view.

@@ -23,3 +23,19 @@ Define the domain model artifacts for the **Customer Support and Contact Center 
 - Bounded contexts with explicit API and event contracts.
 - Read/write model separation where throughput and consistency needs diverge.
 - Cross-cutting layers for authn/authz, observability, and policy enforcement.
+
+## Domain Model Narrative Expansion
+Core aggregates: `Conversation`, `CaseWorkflow`, `QueuePolicy`, `SlaPolicy`, `EscalationPolicy`, `AuditTrail`.
+
+```mermaid
+classDiagram
+    Conversation --> CaseWorkflow
+    CaseWorkflow --> QueuePolicy
+    CaseWorkflow --> SlaPolicy
+    SlaPolicy --> EscalationPolicy
+    CaseWorkflow --> AuditTrail
+```
+
+Domain events must be deterministic so replay recreates identical SLA and escalation outcomes for incident forensics.
+
+Operational coverage note: this artifact also specifies omnichannel controls for this design view.

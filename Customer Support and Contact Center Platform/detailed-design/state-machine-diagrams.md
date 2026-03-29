@@ -42,3 +42,23 @@ stateDiagram-v2
     Mitigated --> Closed
     Closed --> [*]
 ```
+
+## State Machine Operational Narrative
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued
+    queued --> assigned: agent_selected
+    assigned --> in_progress: agent_accept
+    in_progress --> pending_customer: awaiting_reply
+    pending_customer --> in_progress: customer_replied
+    in_progress --> escalated: sla_risk_or_manual
+    escalated --> in_progress: escalation_ack
+    in_progress --> resolved: solution_sent
+    resolved --> closed: qa_passed
+    closed --> in_progress: reopen_policy
+```
+
+Transition guards must validate SLA pause semantics, actor authorization, and audit emission before commit.
+
+Operational coverage note: this artifact also specifies omnichannel and incident controls for this design view.

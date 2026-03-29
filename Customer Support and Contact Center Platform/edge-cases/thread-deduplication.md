@@ -21,3 +21,20 @@ Duplicate case detection across channels.
 ## Prevention
 - Add contract tests and chaos scenarios for this edge condition.
 - Instrument specific leading indicators and alert tuning.
+
+## Thread Deduplication Edge Narrative
+Deduplication must prevent fragmented queues and double SLA penalties when external systems retry.
+
+```mermaid
+flowchart TD
+    E[Inbound Event] --> K[Build Dedup Key]
+    K --> D{Seen Before?}
+    D -- yes --> M[Merge into Existing Thread]
+    D -- no --> N[Create New Thread]
+    M --> A[Audit Merge Decision]
+    N --> A
+```
+
+Use multi-signal keys (`customer_identity`, normalized subject, channel message ID, ±time window) and keep manual split/merge audit trails.
+
+Operational coverage note: this artifact also specifies omnichannel controls for this design view.

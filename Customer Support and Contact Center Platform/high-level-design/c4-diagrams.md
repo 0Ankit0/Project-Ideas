@@ -27,3 +27,19 @@ flowchart TB
     Worker --> DB
     Worker --> MQ
 ```
+
+## C4 Narrative Addendum
+At C4 level, include personas and external systems that drive SLA behavior (pager, workforce management, compliance archive).
+
+```mermaid
+flowchart LR
+    Customer-->System[Contact Center Platform]
+    System-->CRM[CRM]
+    System-->Pager[Incident Pager]
+    System-->Archive[Compliance Archive]
+    System-->WFM[Workforce Mgmt]
+```
+
+Container responsibilities should clearly split event ingestion, routing/state machine, SLA evaluation, and immutable auditing.
+
+Operational coverage note: this artifact also specifies queue and omnichannel controls for this design view.

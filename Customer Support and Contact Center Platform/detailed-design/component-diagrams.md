@@ -55,3 +55,25 @@ flowchart LR
     MQ --> Search
     RoutingSvc --> Cache
 ```
+
+## Component Diagram Narrative: Runtime Behavior
+
+```mermaid
+flowchart TD
+    IN[Ingress Adapters] --> NOR[Normalization Service]
+    NOR --> QUE[Queue Orchestrator]
+    QUE --> ASSIGN[Assignment Engine]
+    QUE --> SLAM[SLA Monitor]
+    ASSIGN --> AGUI[Agent Workspace APIs]
+    SLAM --> ESC[Escalation Engine]
+    ESC --> NOTIF[Pager/Notification]
+    QUE --> AUDIT[Audit Pipeline]
+```
+
+Each component must declare failure semantics:
+- Normalizer: retry + dedup.
+- Queue orchestrator: optimistic lock on queue item.
+- SLA monitor: deterministic timer recalculation on replay.
+- Escalation engine: once-only escalation using durable idempotency token.
+
+Operational coverage note: this artifact also specifies omnichannel and incident controls for this design view.
