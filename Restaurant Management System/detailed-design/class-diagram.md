@@ -100,3 +100,45 @@ classDiagram
     Branch "1" --> "many" CashDrawerSession
     Branch "1" --> "many" PurchaseOrder
 ```
+
+## Additional Classes for Cross-Flow Controls
+
+```mermaid
+classDiagram
+    class PolicyDecision {
+      +UUID id
+      +string scope
+      +string outcome
+      +string reasonCode
+      +UUID approvedBy
+      +datetime decidedAt
+    }
+
+    class PaymentIntent {
+      +UUID id
+      +string providerRef
+      +decimal amount
+      +string status
+      +string idempotencyKey
+    }
+
+    class LoadTierSnapshot {
+      +UUID id
+      +string tier
+      +decimal queueLagScore
+      +decimal paymentWaitScore
+      +datetime evaluatedAt
+    }
+
+    class CancellationRequest {
+      +UUID id
+      +string scope
+      +string reasonCode
+      +string status
+    }
+
+    Bill "1" --> "many" PaymentIntent
+    CancellationRequest "1" --> "one" PolicyDecision
+    Branch "1" --> "many" LoadTierSnapshot
+    CancellationRequest "many" --> "one" Order
+```

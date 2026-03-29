@@ -63,3 +63,63 @@
 - Guest-facing APIs are limited to reservations, waitlists, and scoped order-status touchpoints.
 - Waiters, hosts, chefs, cashiers, and inventory managers operate within branch-scoped permissions.
 - Refunds, post-close adjustments, accounting exports, and policy changes require elevated roles and audit logging.
+
+## Implementation-Ready Endpoint Expansion
+
+### Ordering and Kitchen
+| Method | Endpoint | Idempotency | Notes |
+|--------|----------|-------------|-------|
+| POST | `/api/v1/orders/{orderId}/draft-lines` | No | versioned draft mutation |
+| POST | `/api/v1/orders/{orderId}/submit` | Yes | creates immutable ticket fan-out |
+| POST | `/api/v1/orders/{orderId}/cancellations` | Yes | stage-aware cancellation entrypoint |
+| GET | `/api/v1/kitchen/stations/{stationId}/queue` | No | prioritized active queue |
+| PATCH | `/api/v1/kitchen/tickets/{ticketId}/state` | Yes | accepted/in_preparation/ready/delayed |
+
+### Slot and Table Management
+| Method | Endpoint | Idempotency | Notes |
+|--------|----------|-------------|-------|
+| POST | `/api/v1/waitlist/entries` | Yes | create waitlist token |
+| POST | `/api/v1/slots/quote` | Yes | ETA and confidence response |
+| POST | `/api/v1/tables/{tableId}/release` | Yes | transitions occupied->cleaning/blocked |
+| POST | `/api/v1/tables/merge` | Yes | preserves check lineage |
+
+### Payments and Reversals
+| Method | Endpoint | Idempotency | Notes |
+|--------|----------|-------------|-------|
+| POST | `/api/v1/checks/{checkId}/splits` | Yes | deterministic split generation |
+| POST | `/api/v1/checks/{checkId}/payment-intents` | Yes | create tender-specific intents |
+| POST | `/api/v1/checks/{checkId}/refunds` | Yes | threshold-aware refund orchestration |
+| GET | `/api/v1/reconciliation/sessions/{sessionId}` | No | settlement variance view |
+
+## Canonical Error Contract
+
+```json
+{
+  "errorCode": "ORDER_VERSION_CONFLICT",
+  "message": "Order version mismatch. Refresh and retry with merge.",
+  "correlationId": "corr_78a",
+  "retryable": true,
+  "details": {
+    "expectedVersion": 8,
+    "receivedVersion": 7
+  }
+}
+```
+
+## Webhook/Async Callback Contract (Payment Provider)
+
+```json
+{
+  "eventType": "payment.intent.updated",
+  "providerReference": "pay_9912",
+  "status": "captured",
+  "amount": 68.50,
+  "currency": "USD",
+  "occurredAt": "2026-03-28T18:47:02Z",
+  "signature": "<provider-signature>",
+  "metadata": {
+    "branchId": "br_01",
+    "checkId": "chk_884"
+  }
+}
+```

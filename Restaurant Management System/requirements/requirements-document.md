@@ -151,3 +151,109 @@ Build a production-ready restaurant management platform that unifies guest seati
 - 100% of manual stock adjustments, voids, refunds, and reconciliations are auditable.
 - Branch managers can identify sales, delays, stock risk, and staffing gaps from one dashboard.
 - Inventory variance between expected and counted stock remains measurable and explainable by ledger events.
+
+## 6. Cross-Cutting Detailed Operational Flows
+
+### 6.1 Ordering Flow (Dine-In and Takeaway)
+1. Host/waiter opens table or takeaway context and system attaches active menu, pricing profile, tax profile, and branch policy.
+2. Waiter captures seat-level items, modifiers, allergy notes, and course preferences.
+3. System performs synchronous validations: item availability, modifier cardinality, discount eligibility, and approval-restricted actions.
+4. Draft order is auto-saved with optimistic versioning to prevent concurrent overwrite.
+5. On submit, order lines are split into station-bound production tasks and acknowledged back to POS with immutable ticket IDs.
+6. Service timeline starts SLA clocks for first-fire, all-items-ready, and table-turn benchmarks.
+
+### 6.2 Kitchen Orchestration Flow
+1. Ticket router evaluates station mapping, prep-time estimates, and branch capacity weights.
+2. Kitchen display queues tasks by priority bands (VIP/expedite, standard, delayed/recovery).
+3. Chef marks states (`queued -> accepted -> in_preparation -> ready_at_pass -> served`).
+4. Pass controller enforces course synchronization so mains are not released before configured appetizer dependencies.
+5. Delay/stockout flags are published to waiter tablets with suggested alternatives and expected-ready-time recomputation.
+6. Refire events require reason tagging and manager visibility for waste and QoS analytics.
+
+### 6.3 Table/Slot Management Flow
+1. Reservation engine assigns slots using party size, duration forecasts, and table combinability constraints.
+2. Host dashboard continuously reconciles reservations, waitlist, walk-ins, and no-show timers.
+3. Seating action binds party to table graph node(s), waiter zone, and service SLA profile.
+4. Mid-service split/merge operations rebalance check ownership while preserving audit chain from original reservation or walk-in.
+5. Release flow marks table as `cleaning` then `ready`, with optional blocker if unpaid balances or incident notes exist.
+
+### 6.4 Payment and Settlement Flow
+1. Bill composer locks order lines, computes taxes/fees/discounts, and exposes split dimensions (equal, by seat, by item).
+2. Cashier executes one or more tenders (cash, card, wallet, house-account) with idempotent payment intents.
+3. Partial settlement keeps check open while paid components become non-voidable except through supervised refund flow.
+4. Final settlement closes check, updates table state, posts ledger entries, and increments cashier session totals.
+5. Day-close pipeline validates drawer totals, unresolved refunds, and export readiness before reconciliation sign-off.
+
+### 6.5 Cancellation and Reversal Flow
+1. Cancellation request is categorized: reservation cancel, pre-fire order cancel, post-fire void, payment reversal, or no-show closure.
+2. Policy engine checks cancellation window, actor permissions, and fraud/abuse heuristics.
+3. Approved cancellations emit compensating events (inventory rollback when allowed, kitchen ticket cancel, payment void/refund intent).
+4. Guest/staff notifications include reason, financial impact, and next valid action.
+5. All reversals remain linked to origin transaction for audit and dispute handling.
+
+### 6.6 Peak-Load Operational Controls
+1. Capacity monitor computes real-time load indices from active tables, pending tickets, station queue depth, and payment queue time.
+2. When thresholds are crossed, system activates controls: reservation throttling, auto-quoted wait times, menu simplification profiles, and batching hints.
+3. Kitchen load-shedding may defer long-prep items or cap concurrent fires per station.
+4. POS applies guardrails (manager approval for non-critical modifiers/discounts during surge if policy enabled).
+5. Recovery mode automatically rolls back throttles once queue depth and SLA breach probability return below branch-defined limits.
+
+### 6.7 Implementation-Ready Control Points and Acceptance Criteria
+
+#### 6.7.1 Canonical State Models
+
+| Domain | Mandatory States | Terminal States | Notes |
+|-------|------------------|-----------------|-------|
+| Order Line | `draft`, `submitted`, `queued`, `in_preparation`, `ready`, `served`, `voided` | `served`, `voided` | Forward-only except controlled reversal via compensating events |
+| Table | `available`, `reserved`, `occupied`, `cleaning`, `blocked` | `available`, `blocked` | `blocked` requires incident reason and manager clear action |
+| Check | `open`, `partially_paid`, `paid`, `refund_pending`, `refunded`, `voided` | `paid`, `refunded`, `voided` | `voided` only pre-settlement unless override granted |
+| Payment Intent | `initiated`, `authorized`, `captured`, `failed`, `voided`, `refunded` | `captured`, `failed`, `voided`, `refunded` | Idempotent retries must not create duplicate capture |
+
+#### 6.7.2 Event Contract Minimums
+- Every cross-service event shall include: `event_id`, `event_type`, `occurred_at`, `branch_id`, `actor_id`, `entity_id`, `entity_version`, and `correlation_id`.
+- Cancellation/reversal events shall include mandatory `reason_code` and `policy_decision_id`.
+- Kitchen events shall include `station_id`, `ticket_priority`, and `promised_ready_at`.
+- Payment events shall include `tender_type`, `amount`, `currency`, and `provider_reference`.
+
+#### 6.7.3 Operational SLA Gates (per branch)
+
+| Flow | SLO Target | Breach Trigger | Required Automated Response |
+|------|------------|----------------|-----------------------------|
+| Order submit to station queue | p95 < 2s | 3 consecutive 5-min windows above threshold | Trigger surge tier `watch`, alert manager console |
+| First course fire time | p90 < 12 min (configurable) | >20% open tickets exceeding branch SLA | Enable station rebalance recommendations |
+| Payment authorization | p95 < 4s | Provider timeout rate > 5% over 10 min | Auto-switch to retry-safe fallback path |
+| Reservation quote accuracy | ETA error < +/- 8 min p90 | ETA drift > 10 min for 15 min | Inflate ETA model confidence bounds |
+
+#### 6.7.4 Mandatory Audit Evidence
+1. Every cancellation, void, and refund shall be reconstructable from origin event to final financial impact.
+2. Peak-load mode transitions shall be auditable with threshold values and operator/system trigger source.
+3. Table merge/split history shall preserve original check lineage for dispute and tax traceability.
+4. Any manager override shall store before/after values and approval justification text.
+
+### 6.8 Flow-to-Requirement Traceability Matrix
+
+| Flow Segment | Primary Requirement IDs | Supporting NFR IDs | Required Evidence Artifact |
+|--------------|--------------------------|--------------------|----------------------------|
+| Order draft/submit/route | FR-ORD-001, FR-ORD-002, FR-KIT-001 | NFR-P-001, NFR-P-002 | Submit latency dashboard + ticket routing audit |
+| Kitchen execution and pass | FR-KIT-002, FR-KIT-003, FR-KIT-004 | NFR-P-002, NFR-UX-001 | Station SLA report + delay reason log |
+| Slot allocation and seating | FR-RES-001, FR-RES-002, FR-RES-003 | NFR-P-001, NFR-S-001 | Slot conflict report + waitlist ETA accuracy |
+| Billing and settlement | FR-BIL-001, FR-BIL-002, FR-BIL-003 | NFR-P-003, NFR-SEC-002 | Settlement variance report + payment idempotency log |
+| Cancellations and reversals | FR-ORD-005, FR-BIL-002, FR-OPS-004 | NFR-SEC-002 | Approval trail + compensating-event chain |
+| Peak-load controls | FR-OPS-001, FR-OPS-002, FR-WFM-003 | NFR-A-001, NFR-OPS-001 | Tier transition history + SLA breach timeline |
+
+### 6.9 Flow Governance Diagram
+
+```mermaid
+flowchart TD
+    A[Operational Event] --> B{Flow family?}
+    B -->|Ordering| C[Apply FR-ORD + FR-KIT policy checks]
+    B -->|Slots| D[Apply FR-RES capacity + waitlist rules]
+    B -->|Payments| E[Apply FR-BIL settlement + tender rules]
+    B -->|Cancellation| F[Apply approval + reversal policies]
+    B -->|Peak Load| G[Apply FR-OPS surge controls]
+    C --> H[Emit audit evidence + SLO telemetry]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+```

@@ -39,3 +39,22 @@ erDiagram
 | settlements | Payment and split-bill outcomes |
 | cash_drawer_sessions | Cashier open/close and balancing sessions |
 | accounting_exports | Reconciliation handoff artifacts |
+
+## Extended Tables for Implementation Readiness
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| payment_intents | provider-facing payment lifecycle | id, check_id, provider_ref, status, idempotency_key, amount |
+| policy_decisions | approval outcomes for protected operations | id, scope, outcome, approver_id, reason_code, decided_at |
+| cancellation_requests | lifecycle-aware cancellation/reversal requests | id, scope, target_id, reason_code, status, decision_id |
+| load_tier_snapshots | branch load state and trigger metrics | id, branch_id, tier, queue_lag_score, evaluated_at |
+
+## ERD Extension (Mermaid)
+
+```mermaid
+erDiagram
+    BILL ||--o{ PAYMENT_INTENT : has
+    CANCELLATION_REQUEST }o--|| POLICY_DECISION : resolved_by
+    BRANCH ||--o{ LOAD_TIER_SNAPSHOT : records
+    CANCELLATION_REQUEST }o--|| ORDER : targets
+```

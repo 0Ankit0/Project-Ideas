@@ -33,3 +33,20 @@ flowchart TD
 - Overrides are restricted to approved exception classes and require dual logging (business + security audit).
 - Override windows automatically expire and trigger follow-up verification tasks.
 - Repeated override patterns are reviewed for policy redesign and automation improvements.
+
+## Cross-Flow Rule Set (Operationally Critical)
+
+| Rule ID | Rule | Applies To | Enforcement Point |
+|---------|------|------------|-------------------|
+| BR-ORD-PEAK-001 | During surge/critical tiers, non-essential modifiers may require manager override | Ordering | Order command validators |
+| BR-KIT-ROUTE-002 | Ticket reroute requires compatible station capability profile | Kitchen orchestration | Kitchen orchestrator |
+| BR-SLOT-003 | No slot confirmation without atomic capacity lock | Slot management | Seating transaction boundary |
+| BR-PAY-004 | Duplicate payment captures are forbidden under all retry paths | Payments | Billing payment adapter |
+| BR-CAN-005 | Post-prep cancellation must capture reason and compensation policy outcome | Cancellations | Policy + order services |
+| BR-OPS-006 | Tier de-escalation requires sustained recovery window and no active critical incident | Peak-load controls | Load control engine |
+
+## Rule Conflict Resolution Order
+1. Safety/compliance rules.
+2. Financial integrity rules.
+3. Inventory and kitchen feasibility rules.
+4. Experience/SLA optimization rules.

@@ -77,3 +77,44 @@ flowchart TB
 | Billing and Settlement Service | Bills, taxes, split settlement, refunds, drawer sessions |
 | Workforce Scheduling Service | Shift planning, attendance, operational staffing visibility |
 | Accounting Export Service | Reconciliation outputs and external finance handoff |
+
+## Runtime Interaction View for Requested Flows
+
+```mermaid
+sequenceDiagram
+    participant FOH as Host/Waiter/Cashier Apps
+    participant Gateway as API Gateway
+    participant Order as Order Service
+    participant Kitchen as Kitchen Routing Service
+    participant Seating as Seating Service
+    participant Billing as Billing Service
+    participant Policy as Policy/Approval Service
+    participant Load as Peak Load Control
+    participant Bus as Event Bus
+
+    FOH->>Gateway: reservation/order/payment/cancel commands
+    Gateway->>Seating: slot + table operations
+    Gateway->>Order: draft/submit/modify order
+    Order->>Kitchen: route ticket batches
+    Gateway->>Billing: settle/split/refund operations
+    Gateway->>Policy: approval checks for protected actions
+    Seating->>Load: occupancy + queue metrics
+    Kitchen->>Load: station backlog + SLA risk
+    Billing->>Load: payment queue latency
+    Order->>Bus: order lifecycle events
+    Kitchen->>Bus: ticket lifecycle events
+    Billing->>Bus: settlement/reversal events
+    Policy->>Bus: approval/override events
+```
+
+## NFR Allocation by Component
+
+| Component | Primary NFR Responsibility | Measurement |
+|-----------|----------------------------|-------------|
+| API Gateway | low-latency ingress and rate protection | p95 request latency + rejection rate |
+| Seating Service | no-overbook and ETA quality | slot conflict rate + ETA error |
+| Order Service | consistency under concurrent edits | optimistic lock conflict recovery success |
+| Kitchen Routing Service | station fairness and freshness | ticket queue lag + overdue ratio |
+| Billing Service | financial correctness + idempotency | settlement mismatch + duplicate-capture count |
+| Policy Service | approval integrity | policy decision latency + override audit completeness |
+| Peak Load Control | automatic adaptation | tier transition correctness and recovery time |

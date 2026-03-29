@@ -33,3 +33,27 @@ erDiagram
     RECIPE ||--o{ INGREDIENT : consumes
     BILL ||--o{ SETTLEMENT : settles
 ```
+
+## Domain Invariants (Must Hold)
+
+- A table cannot be `available` while an associated check is open unless explicitly transferred.
+- A check cannot move to `paid` if any linked payment intent is unresolved.
+- A kitchen ticket must reference exactly one order line and one target station.
+- A cancellation/reversal must link to a policy decision record.
+- A peak-load tier change must reference measured trigger metrics.
+
+## Cross-Flow Domain Lifecycle Map
+
+```mermaid
+flowchart TD
+    A[Slot/Reservation] --> B[Table Occupied]
+    B --> C[Order Draft/Submit]
+    C --> D[Kitchen Ticket Lifecycle]
+    D --> E[Service Completion]
+    E --> F[Billing + Settlement]
+    F --> G[Table Release]
+    C --> H[Cancellation/Reversal Branch]
+    D --> H
+    F --> H
+    H --> I[Compensation + Audit Closure]
+```

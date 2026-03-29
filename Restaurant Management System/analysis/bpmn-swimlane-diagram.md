@@ -48,3 +48,51 @@ flowchart LR
 - Front-of-house, kitchen, inventory, and cashiering are intentionally linked as one operational chain.
 - Inventory visibility is not a back-office afterthought; it feeds ordering and kitchen decisions in real time.
 - Manager approvals remain explicit for operational exceptions such as voids, stock overrides, and settlement issues.
+
+## Detailed Swimlane with Exception and Cancellation Paths
+
+```mermaid
+flowchart LR
+    subgraph G[Guest]
+        gA[Request reservation/walk-in]
+        gB[Confirm order preferences]
+        gC[Approve bill split]
+        gD[Receive refund/cancellation notice]
+    end
+
+    subgraph H[Host]
+        hA[Evaluate slot/waitlist options]
+        hB[Seat or reassign table]
+        hC[Initiate reservation cancellation]
+    end
+
+    subgraph W[Waiter]
+        wA[Capture draft order]
+        wB[Submit/adjust order]
+        wC[Serve and request settlement]
+    end
+
+    subgraph K[Kitchen]
+        kA[Accept ticket]
+        kB[Prepare/synchronize courses]
+        kC[Delay/refire exception handling]
+    end
+
+    subgraph C[Cashier]
+        cA[Settle multi-tender payment]
+        cB[Handle reversal/refund]
+    end
+
+    subgraph M[Manager/Policy]
+        mA[Approve protected actions]
+        mB[Activate/deactivate surge controls]
+    end
+
+    gA --> hA --> hB --> wA --> wB --> kA --> kB --> wC --> cA --> gC
+    kB -->|issue| kC --> wB
+    hC --> mA --> cB --> gD
+    wB -->|void/discount needed| mA
+    cA -->|timeout/decline| cB
+    hA -->|load high| mB
+    mB --> hA
+```

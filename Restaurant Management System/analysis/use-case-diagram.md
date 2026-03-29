@@ -41,3 +41,20 @@ flowchart LR
     uc4 --> uc5
     uc5 --> uc6
 ```
+
+## Extended Cross-Flow Use Cases (Implementation Scope)
+
+```mermaid
+flowchart LR
+    host[Host] --> uc11([Manage slot throttling during surge])
+    waiter[Waiter] --> uc12([Resolve order version conflicts])
+    chef[Chef/Expediter] --> uc13([Handle station degradation and reroute])
+    cashier[Cashier] --> uc14([Process split tenders and reversals])
+    manager[Branch Manager] --> uc15([Approve protected cancellations/overrides])
+
+    uc11 --> uc2
+    uc12 --> uc3
+    uc13 --> uc4
+    uc14 --> uc6
+    uc15 --> uc14
+```

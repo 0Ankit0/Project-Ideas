@@ -48,3 +48,18 @@
 
 - **US-ADM-001**: As an admin, I want to configure branch policies, menus, taxes, and payment methods so the platform fits different restaurant needs.
 - **US-ADM-002**: As an admin, I want role templates and integration settings so operational surfaces remain secure and maintainable.
+
+## Cross-Flow Implementation Stories (Detailed)
+
+- **US-XFL-001 (Ordering under contention)**: As a waiter, I want version-aware order submit responses so I can resolve conflicts without losing valid line items.
+  - **Acceptance**: conflict response includes expectedVersion/currentVersion/diff summary.
+- **US-XFL-002 (Kitchen degradation handling)**: As an expediter, I want station degradation alerts with reroute options so service SLAs can still be met.
+  - **Acceptance**: reroute proposals appear within 5 seconds of degradation detection.
+- **US-XFL-003 (Slot throttling at peak)**: As a host, I want automatic slot throttle recommendations so quoted ETAs remain realistic.
+  - **Acceptance**: ETA confidence range is displayed and updated during surge tiers.
+- **US-XFL-004 (Safe multi-tender recovery)**: As a cashier, I want unresolved payment intents to reconcile asynchronously so check integrity is preserved during provider timeouts.
+  - **Acceptance**: check remains traceable and no duplicate capture occurs.
+- **US-XFL-005 (Policy-bound cancellation)**: As a manager, I want cancellation decisions to record reason and compensation linkage so audits are complete.
+  - **Acceptance**: cancellation cannot complete without policy decision ID.
+- **US-XFL-006 (Surge auto-recovery)**: As a branch manager, I want surge controls to auto-deactivate after stable recovery so operations normalize safely.
+  - **Acceptance**: de-escalation requires sustained healthy window and no active critical alerts.

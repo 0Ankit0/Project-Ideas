@@ -93,3 +93,34 @@ Restaurant Management System/
 - ✅ Infrastructure complete
 - ✅ Edge cases complete
 - ✅ Implementation complete
+
+## Cross-Subfolder Detailed Flow Coverage
+
+The following operational flows are now documented through requirements, analysis, high-level design, detailed design, infrastructure mapping, implementation slices, and edge-case stress scenarios:
+
+- Ordering lifecycle (draft, validation, submit, routing, fulfillment)
+- Kitchen orchestration (station routing, course synchronization, delay/refire handling)
+- Table/slot management (reservation fit, waitlist promotion, table lifecycle)
+- Payments (splits, multi-tender, reconciliation)
+- Cancellations/reversals (policy checks, compensating events, audit linkage)
+- Peak-load controls (surge tiers, throttling, load shedding, recovery)
+
+## Implementation-Readiness Index
+
+For build teams, use these sections together:
+- Requirements acceptance criteria and control points: `requirements/requirements-document.md` section **6.7**.
+- Detailed operational use-case recovery behavior: `analysis/use-case-descriptions.md` addendum for UC-09 to UC-12.
+- High-level ownership and latency budgets: `high-level-design/system-sequence-diagram.md` cross-flow boundaries and NFR budgets.
+- Detailed contracts and idempotency notes: `detailed-design/sequence-diagram.md` implementation contracts.
+- Delivery milestones and DoD: `implementation/implementation-playbook.md` sections **7-9**.
+- Infra SLO/DR/compliance guardrails: `infrastructure/cloud-architecture.md` implementation-ready guardrails.
+- Incident playbook expectations: `edge-cases/README.md` scenario-to-response matrix.
+
+## Diagram Index (Mermaid)
+
+- `analysis/use-case-descriptions.md`: operational activity and decision flows for ordering, slots, and cancellation.
+- `high-level-design/system-sequence-diagram.md`: sequence diagrams, collaboration map, and peak-load tier state model.
+- `detailed-design/sequence-diagram.md`: detailed sequences plus order/table/check lifecycle state diagrams and contract payloads.
+- `implementation/implementation-playbook.md`: program-level delivery gantt and service backlog decomposition.
+- `infrastructure/cloud-architecture.md`: reference deployment topology and failure-isolation guidance.
+- `edge-cases/README.md`: incident handling flow and simulation coverage expectations.
