@@ -1,23 +1,30 @@
 # Cycle Count Adjustments
 
 ## Scenario
-Count variances during active picking windows.
+Count variance occurs while active picks are in progress.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## Decision Matrix
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+| Condition | Action |
+|---|---|
+| Small variance within tolerance | supervisor approval + adjustment ledger |
+| Large variance / suspected loss | quarantine bin + investigation case |
+| Open pick tasks affected | pause impacted tasks + replan |
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
+## Safe Adjustment Sequence
+```mermaid
+sequenceDiagram
+    participant Counter
+    participant INV as Inventory Service
+    participant OPS as Operations Service
 
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+    Counter->>INV: submit recount result
+    INV->>INV: compare with active reservations
+    alt impacts active tasks
+      INV->>OPS: create investigation case
+      INV-->>Counter: tasks paused
+    else no impact
+      INV->>INV: write adjustment ledger
+      INV-->>Counter: adjustment confirmed
+    end
+```

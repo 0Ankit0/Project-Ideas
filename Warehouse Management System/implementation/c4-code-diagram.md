@@ -4,49 +4,48 @@
 flowchart TB
     subgraph Interface
       ReceivingController
-      InventoryController
-      TaskController
+      AllocationController
+      FulfillmentController
       ShippingController
+      ExceptionController
     end
 
     subgraph Application
       ReceivingAppService
-      InventoryAppService
-      TaskAppService
+      AllocationAppService
+      FulfillmentAppService
       ShippingAppService
+      ExceptionAppService
     end
 
     subgraph Domain
       ReceiptAggregate
-      StockAggregate
-      TaskAggregate
+      InventoryAggregate
+      ReservationAggregate
+      PickPackAggregate
       ShipmentAggregate
-      AllocationPolicy
+      ExceptionAggregate
+      StateGuard
     end
 
     subgraph Infrastructure
-      ReceiptRepository
-      StockRepository
-      TaskRepository
+      Repositories
+      OutboxPublisher
       CarrierAdapter
       ScannerAdapter
-      EventPublisher
+      MetricsAudit
     end
 
-    ReceivingController --> ReceivingAppService --> ReceiptAggregate
-    InventoryController --> InventoryAppService --> StockAggregate
-    TaskController --> TaskAppService --> TaskAggregate
-    ShippingController --> ShippingAppService --> ShipmentAggregate
-
-    InventoryAppService --> AllocationPolicy
-    TaskAppService --> AllocationPolicy
-
-    ReceivingAppService --> ReceiptRepository
-    InventoryAppService --> StockRepository
-    TaskAppService --> TaskRepository
+    Interface --> Application --> Domain
+    Domain --> StateGuard
+    Application --> Repositories
+    Application --> OutboxPublisher
     ShippingAppService --> CarrierAdapter
-    TaskAppService --> ScannerAdapter
-
-    ReceivingAppService --> EventPublisher
-    ShippingAppService --> EventPublisher
+    FulfillmentAppService --> ScannerAdapter
+    Application --> MetricsAudit
 ```
+
+## Code-Level Notes
+- Aggregates own invariants; services orchestrate transactions.
+- StateGuard library is reused by API and worker handlers.
+- OutboxPublisher is invoked only after commit.

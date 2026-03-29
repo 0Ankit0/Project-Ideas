@@ -2,65 +2,73 @@
 
 ```mermaid
 classDiagram
-    class Warehouse {
-      +UUID id
-      +String code
-      +String timezone
+    class Receipt {
+      +receiptId
+      +asnLineId
+      +receivedQty
+      +status
+      +confirm()
+      +reject(reason)
     }
 
-    class Location {
-      +UUID id
-      +UUID warehouseId
-      +String aisle
-      +String bin
-      +LocationType type
-    }
-
-    class InventoryItem {
-      +UUID id
-      +String sku
-      +String lot
-      +Date expiryDate
-    }
-
-    class StockBalance {
-      +UUID id
-      +UUID itemId
-      +UUID locationId
-      +Decimal quantity
+    class InventoryBalance {
+      +warehouseId
+      +sku
+      +binId
+      +onHand
+      +reserved
       +reserve(qty)
       +release(qty)
-      +adjust(qty)
+      +assertNonNegativeATP()
     }
 
-    class Order {
-      +UUID id
-      +String orderNo
-      +OrderStatus status
-      +allocate()
-      +ship()
+    class Reservation {
+      +reservationId
+      +orderLineId
+      +qty
+      +state
+      +activate()
+      +cancel()
+    }
+
+    class PickTask {
+      +taskId
+      +reservationId
+      +state
+      +confirmPick(qty)
+      +markShortPick()
+    }
+
+    class PackSession {
+      +packSessionId
+      +shipmentId
+      +reconcileLines()
+      +close()
     }
 
     class Shipment {
-      +UUID id
-      +UUID orderId
-      +String carrier
-      +String trackingNo
-      +manifest()
+      +shipmentId
+      +trackingNo
+      +status
+      +confirmHandoff()
     }
 
-    class Task {
-      +UUID id
-      +TaskType type
-      +TaskStatus status
-      +assign(userId)
-      +complete()
+    class ExceptionCase {
+      +caseId
+      +type
+      +state
+      +resolve(action)
     }
 
-    Warehouse "1" --> "many" Location
-    InventoryItem "1" --> "many" StockBalance
-    Location "1" --> "many" StockBalance
-    Order "1" --> "many" Task
-    Order "1" --> "0..1" Shipment
-    Task "many" --> "many" InventoryItem : moves
+    Receipt --> InventoryBalance : creates ledger movement
+    InventoryBalance --> Reservation : supports
+    Reservation --> PickTask : fulfilled by
+    PickTask --> PackSession : reconciled in
+    PackSession --> Shipment : generates
+    PickTask --> ExceptionCase : may raise
 ```
+
+## Domain Rules in Classes
+- `InventoryBalance.assertNonNegativeATP()` maps BR-7.
+- `PackSession.close()` must fail on reconciliation mismatch (BR-8).
+- `ExceptionCase.resolve()` requires evidence for override path (BR-4).

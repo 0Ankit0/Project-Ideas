@@ -2,33 +2,41 @@
 
 ```mermaid
 flowchart LR
-    subgraph Actors
-      Picker[Warehouse Picker]
-      Supervisor[Warehouse Supervisor]
-      Planner[Inventory Planner]
-      Carrier[Carrier Operator]
+    subgraph InternalActors
+      Picker[Picker]
+      Supervisor[Supervisor]
+      Planner[Planner]
+      Transport[Transport Coordinator]
     end
 
     WMS[Warehouse Management System]
 
-    subgraph External
-      ERP[ERP]
+    subgraph ExternalSystems
       OMS[Order Management System]
-      TMS[Transportation Management]
-      Scanner[RF Scanner Devices]
-      BI[Analytics]
-      Vendor[Supplier Portals]
+      ERP[ERP / Procurement]
+      TMS[Transportation Mgmt System]
+      CARR[Carrier APIs]
+      SCN[Scanner Fleet Manager]
+      BI[BI / Data Platform]
+      IAM[Corporate IAM]
     end
 
     Picker --> WMS
     Supervisor --> WMS
     Planner --> WMS
-    Carrier --> WMS
+    Transport --> WMS
 
-    WMS <--> ERP
     WMS <--> OMS
+    WMS <--> ERP
     WMS <--> TMS
-    Scanner <--> WMS
+    WMS <--> CARR
+    WMS <--> SCN
     WMS --> BI
-    Vendor --> WMS
+    IAM --> WMS
 ```
+
+## Interface Contracts
+- OMS: order release, cancellation, backorder updates.
+- ERP: ASN/PO master data, inventory financial reconciliation.
+- Carrier APIs: manifest, label, tracking events.
+- Scanner manager: device identity, offline replay uploads.

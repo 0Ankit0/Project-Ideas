@@ -2,45 +2,50 @@
 
 ```mermaid
 flowchart TB
-    Channels[RF Scanners, Web UI, OMS/ERP Integrations] --> Edge[API Gateway]
+    Channels[RF Scanners, Web UI, OMS/ERP/TMS Integrations] --> Edge[API Gateway + Auth]
 
-    subgraph Services[WMS Domain Services]
-      Receiving
-      Inventory
-      Allocation
-      WavePlanning
-      TaskExecution
-      Shipping
-      Returns
+    subgraph CoreServices[WMS Core Services]
+      Receiving[Receiving Service]
+      Inventory[Inventory Service]
+      Allocation[Allocation + Wave Service]
+      Fulfillment[Pick/Pack Service]
+      Shipping[Shipping Service]
+      Exception[Exception Service]
     end
 
     Edge --> Receiving
     Edge --> Inventory
     Edge --> Allocation
-    Edge --> TaskExecution
+    Edge --> Fulfillment
     Edge --> Shipping
+    Edge --> Exception
 
-    subgraph Shared
-      Auth[AuthZ]
-      Audit[Audit Logging]
-      Jobs[Async Workers]
-      Rules[Slotting/Allocation Rules]
+    subgraph Platform[Platform Capabilities]
+      RuleEngine[Rule Engine]
+      Outbox[Outbox Relay]
+      Observability[Metrics/Logs/Tracing]
+      Policy[AuthZ + Approval Policy]
     end
 
-    Edge --> Auth
-    Allocation --> Rules
-    Services --> Audit
-    Shipping --> Jobs
+    Allocation --> RuleEngine
+    CoreServices --> Outbox
+    CoreServices --> Observability
+    Exception --> Policy
 
-    subgraph DataInfra
-      DB[(PostgreSQL)]
+    subgraph DataInfra[Data + Messaging]
+      DB[(PostgreSQL Cluster)]
       MQ[(Event Bus)]
       Cache[(Redis)]
-      BI[(Analytics Warehouse)]
+      Lake[(Analytics Lakehouse)]
     end
 
-    Services --> DB
-    Services --> MQ
-    Services --> Cache
-    MQ --> BI
+    CoreServices --> DB
+    CoreServices --> MQ
+    CoreServices --> Cache
+    MQ --> Lake
 ```
+
+## Architecture Decisions
+- Command-side consistency anchored in OLTP transactions + outbox.
+- Read models may lag; command truth remains deterministic per partition key.
+- Exception management is first-class service, not ad-hoc side effect.

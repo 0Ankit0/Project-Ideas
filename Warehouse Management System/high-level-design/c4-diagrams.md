@@ -1,28 +1,48 @@
 # C4 Diagrams
 
-## C1 Context
+## C1 - System Context
 ```mermaid
 flowchart LR
-    Operators[Warehouse Operators] --> WMS[Warehouse Management System]
+    Operators[Warehouse Operators] --> WMS[WMS]
+    Supervisors[Supervisors] --> WMS
     WMS <--> OMS[Order Management]
     WMS <--> ERP[ERP]
-    WMS <--> TMS[Transport Mgmt]
-    WMS --> BI[Analytics]
+    WMS <--> Carrier[Carrier/TMS]
+    WMS --> BI[Analytics Platform]
 ```
 
-## C2 Containers
+## C2 - Container View
 ```mermaid
 flowchart TB
-    UI[Warehouse UI/Scanner Clients]
-    API[WMS API]
-    Core[Core WMS Services]
-    Worker[Async Worker]
-    DB[(WMS DB)]
-    MQ[(Event Bus)]
+    UI[Scanner/Web Clients]
+    BFF[API Gateway / BFF]
+    CMD[Command Services]
+    WRK[Async Workers]
+    DB[(OLTP DB)]
+    BUS[(Event Bus)]
+    RM[Read Models]
 
-    UI --> API --> Core
-    Core --> DB
-    Core --> MQ
-    Worker --> DB
-    Worker --> MQ
+    UI --> BFF --> CMD
+    CMD --> DB
+    CMD --> BUS
+    WRK --> DB
+    WRK --> BUS
+    BUS --> RM
+    RM --> UI
 ```
+
+## C3 - Key Components (Allocation Container)
+```mermaid
+flowchart LR
+    AllocAPI[Allocation API] --> ReservationEngine
+    ReservationEngine --> PolicyEvaluator
+    ReservationEngine --> StockGateway
+    ReservationEngine --> OutboxWriter
+    StockGateway --> DB[(Inventory Tables)]
+    OutboxWriter --> Outbox[(Outbox Table)]
+```
+
+## Notes
+- C1 clarifies ownership boundaries.
+- C2 clarifies data flow and async split.
+- C3 identifies implementation units for allocation critical path.

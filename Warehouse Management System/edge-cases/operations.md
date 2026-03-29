@@ -1,12 +1,19 @@
-# Operations
+# Operations Edge Cases
 
-## Day-2 Readiness
-- SLO dashboard for availability, latency, and data freshness.
-- Runbooks for incident triage, rollback, replay, and backfill.
-- Capacity planning based on peak traffic and queue depth trends.
+## Incident Playbook by Scenario
 
-## Incident Lifecycle
-1. Detect and classify severity with ownership routing.
-2. Contain blast radius and communicate stakeholder impact.
-3. Recover service and data consistency.
-4. Publish postmortem with corrective actions and deadlines.
+| Scenario | Detect | Contain | Recover | Verify |
+|---|---|---|---|---|
+| Carrier outage | shipping retry spikes + circuit open | pause release on impacted carriers | reroute or queued retry | no pending aged shipments |
+| Queue backlog | lag > SLO threshold | scale workers + throttle wave release | drain queue with priority policy | lag returns to normal |
+| Reconciliation drift | ledger/balance mismatch alert | freeze adjustments for affected scope | replay + compensating ledger entries | invariants green |
+
+## Operational Command Chain
+1. Incident commander assigned automatically by domain ownership.
+2. Communications update every 15 minutes for Sev-1/2 incidents.
+3. Recovery completion requires explicit data-consistency verification query.
+
+## Post-Incident Requirements
+- Create corrective action with owner and due date.
+- Add/adjust synthetic alert to detect earlier.
+- Link incident to business rule if policy gap discovered.
