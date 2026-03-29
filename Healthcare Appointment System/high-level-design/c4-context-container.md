@@ -1,17 +1,86 @@
-# C4 Context Container
+# C4 Context and Container View
 
-## Objective
+## C1: System Context
+```mermaid
+flowchart LR
+  Patient[Patient App/Web] --> HAS[Healthcare Appointment System]
+  Staff[Front Desk Console] --> HAS
+  Provider[Provider Workspace] --> HAS
+  HAS --> EHR[EHR/EMR]
+  HAS --> Pay[Payment Gateway]
+  HAS --> Notify[Email/SMS Providers]
+  HAS --> IAM[Identity Provider]
+  HAS --> Analytics[BI/Warehouse]
+```
 
-This document captures c4 context container guidance for the **Healthcare Appointment System**.
+## C2: Container Diagram
+```mermaid
+flowchart TB
+  subgraph HAS[Healthcare Appointment System]
+    API[API Gateway + BFF]
+    SVC1[Scheduling Service]
+    SVC2[Availability Service]
+    SVC3[Notification Orchestrator]
+    SVC4[Billing & Refund Service]
+    SVC5[Patient Profile Service]
+    WF[Workflow/State Engine]
+    BUS[(Event Bus)]
+    DB1[(Appointment DB)]
+    DB2[(Patient DB)]
+    CACHE[(Redis Cache)]
+  end
 
-## Scope
+  API --> SVC1
+  API --> SVC5
+  SVC1 <--> SVC2
+  SVC1 --> WF
+  SVC1 --> DB1
+  SVC5 --> DB2
+  SVC1 --> BUS
+  BUS --> SVC3
+  BUS --> SVC4
+  SVC2 --> CACHE
+```
 
-- System: Healthcare Appointment System
-- Goal: Digital-first appointment scheduling, provider management, payments, and reminders for healthcare organizations.
-- Primary actors: Patients, Providers, Clinic Admin, Support Staff
+## Container Responsibilities
+- **Scheduling Service:** validates policies, performs atomic reservation, owns appointment aggregate.
+- **Availability Service:** provider templates, exceptions, capacity rules, waitlist recommendations.
+- **Notification Orchestrator:** template selection, channel routing, retry/dead-letter handling.
+- **Billing Service:** authorization, capture, refunds, fee policy enforcement.
 
-## Implementation Notes
+## Cross-Cutting Controls
+- Correlation IDs across sync/async boundaries.
+- Idempotency keys for command endpoints.
+- RBAC/ABAC checks at gateway and service boundaries.
 
-- Define functional and non-functional expectations clearly.
-- Include success criteria and measurable SLAs/SLOs where relevant.
-- Trace decisions back to requirements and edge-case controls.
+## Operational Policy Addendum
+
+### Scheduling Conflict Policies
+- Double-booking is prevented through atomic slot reservation (`provider_id + location_id + slot_start`) with optimistic locking (`slot_version`) and idempotency keys per booking command.
+- If concurrent requests target one slot, the first committed reservation succeeds; later requests return `409 SLOT_ALREADY_BOOKED` and include the top three alternatives.
+- Provider calendar updates (leave, clinic closure, emergency blocks) trigger revalidation and move impacted appointments to `REBOOK_REQUIRED`.
+- Any unresolved conflict older than 15 minutes creates an operations incident and outreach task.
+
+### Patient/Provider Workflow States
+- Patient lifecycle: `DRAFT -> PENDING_CONFIRMATION -> CONFIRMED -> CHECKED_IN -> IN_CONSULTATION -> COMPLETED` with terminal states `CANCELLED`, `NO_SHOW`, `EXPIRED`.
+- Provider slot lifecycle: `AVAILABLE -> RESERVED -> LOCKED_FOR_VISIT -> RELEASED`; exceptional states are `BLOCKED` and `SUSPENDED`.
+- Every state transition records actor, timestamp, reason code, and correlation id in immutable audit logs.
+- Invalid transitions are rejected and never mutate billing, notification, or reporting projections.
+
+### Notification Guarantees
+- Channel order is configurable (in-app, email, SMS if consented). Delivery is at-least-once; consumers enforce idempotency using message keys.
+- Critical events (`CONFIRMED`, `RESCHEDULED`, `CANCELLED`, `REBOOK_REQUIRED`) retry with exponential backoff for 24 hours.
+- Failed deliveries create `NOTIFICATION_ATTENTION_REQUIRED` tasks for manual outreach.
+- Template versions are pinned to event schema versions for deterministic rendering and compliance review.
+
+### Privacy Requirements
+- PHI/PII encryption: TLS 1.2+ in transit, AES-256 at rest, and customer-managed key support for regulated tenants.
+- Access control: least privilege RBAC/ABAC, MFA for privileged roles, and just-in-time elevation for production support.
+- Auditability: all create/read/update/export actions on clinical or billing data are logged with actor, purpose, and source IP.
+- Data minimization is mandatory for analytics exports, notifications, and non-production datasets.
+
+### Downtime Fallback Procedures
+- In degraded mode, read operations remain available while write commands are queued with ordering guarantees.
+- Clinics operate from offline rosters and manual check-in forms, then reconcile after recovery.
+- Recovery pipeline replays commands, revalidates slot conflicts, and issues reconciliation notifications.
+- Incident closure requires backlog drain, consistency checks, and a postmortem with corrective actions.
