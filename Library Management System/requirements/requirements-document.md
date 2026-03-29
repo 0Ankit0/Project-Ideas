@@ -139,3 +139,29 @@ Build a comprehensive library management platform for a multi-branch public or i
 - 100% of fine waivers and inventory write-offs are auditable.
 - Hold queue movement is visible and correct for all returned or canceled items.
 - Branch managers can identify overdue risk, missing stock, and transfer bottlenecks from one dashboard.
+
+## Borrowing & Reservation Lifecycle, Consistency, Penalties, and Exception Patterns
+
+### Artifact focus: Normative product requirements
+
+This section is intentionally tailored for this specific document so implementation teams can convert architecture and analysis into build-ready tasks.
+
+### Implementation directives for this artifact
+- Translate lifecycle and penalty logic into MUST/SHOULD requirements with measurable acceptance criteria.
+- Attach compliance and audit obligations to each high-risk requirement.
+- State compatibility constraints for multi-branch and consortium lending scenarios.
+
+### Lifecycle controls that must be reflected here
+- Borrowing must always enforce policy pre-checks, deterministic copy selection, and atomic loan/copy updates.
+- Reservation behavior must define queue ordering, allocation eligibility re-checks, and pickup expiry/no-show outcomes.
+- Fine and penalty flows must define accrual formula, cap behavior, and lost/damage adjudication paths.
+- Exception handling must define idempotency, conflict semantics, outbox reliability, and operator recovery procedures.
+
+### Traceability requirements
+- Every major rule in this document should map to at least one API contract, domain event, or database constraint.
+- Include policy decision codes and audit expectations wherever staff override or monetary adjustment is possible.
+
+### Definition of done for this artifact
+- Content is specific to this artifact type and not a generic duplicate.
+- Rules are testable (unit/integration/contract) and reference concrete data/events/errors.
+- Diagram semantics (if present) are consistent with textual constraints and lifecycle behavior.

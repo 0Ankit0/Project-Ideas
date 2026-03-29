@@ -33,3 +33,29 @@ Build a production-ready library management platform that supports catalog disco
 - [ ] Fine and waiver audit trails enabled
 - [ ] Inventory audit and transfer exceptions validated
 - [ ] Dashboards, alerts, and recovery runbooks enabled
+
+## Borrowing & Reservation Lifecycle, Consistency, Penalties, and Exception Patterns
+
+### Artifact focus: Execution playbook for delivery teams
+
+This section is intentionally tailored for this specific document so implementation teams can convert architecture and analysis into build-ready tasks.
+
+### Implementation directives for this artifact
+- Phase rollout by capabilities (checkout, return, holds, fines) with migration checkpoints.
+- Define contract-test gates for API/event compatibility before each release.
+- Include rollback and feature-flag strategy for high-risk policy changes.
+
+### Lifecycle controls that must be reflected here
+- Borrowing must always enforce policy pre-checks, deterministic copy selection, and atomic loan/copy updates.
+- Reservation behavior must define queue ordering, allocation eligibility re-checks, and pickup expiry/no-show outcomes.
+- Fine and penalty flows must define accrual formula, cap behavior, and lost/damage adjudication paths.
+- Exception handling must define idempotency, conflict semantics, outbox reliability, and operator recovery procedures.
+
+### Traceability requirements
+- Every major rule in this document should map to at least one API contract, domain event, or database constraint.
+- Include policy decision codes and audit expectations wherever staff override or monetary adjustment is possible.
+
+### Definition of done for this artifact
+- Content is specific to this artifact type and not a generic duplicate.
+- Rules are testable (unit/integration/contract) and reference concrete data/events/errors.
+- Diagram semantics (if present) are consistent with textual constraints and lifecycle behavior.
