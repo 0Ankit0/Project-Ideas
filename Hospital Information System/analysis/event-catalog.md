@@ -40,3 +40,66 @@ sequenceDiagram
 - P95 commit-to-publish latency below 5 seconds for tier-1 events.
 - DLQ triage acknowledgement within 15 minutes for production incidents.
 - Schema changes remain backward compatible within the same major version.
+
+---
+
+
+## Implementation-Ready Eventing Guidance
+### Versioning and Compatibility
+- Producers may add optional fields only; removing or changing semantics requires major event version bump.
+- Consumers must tolerate unknown fields and process by schema version contract.
+- Correlation metadata is mandatory in headers and payload envelope for replay investigations.
+
+### Event Contract Example
+```mermaid
+sequenceDiagram
+    participant S as Encounter Service
+    participant B as Event Bus
+    participant C as Claims Service
+    participant A as Audit Projector
+    S->>B: publish encounter.closed.v1
+    B->>C: deliver event (at-least-once)
+    C->>C: dedupe(event_id, aggregate_version)
+    B->>A: deliver event
+    A->>A: append immutable audit projection
+```
+
+### Replay Controls
+- Replay starts from signed checkpoint offsets with operator + approver identity.
+- During replay windows, side-effecting consumers run in dry-run unless explicitly promoted.
+- Post-replay reconciliation report is mandatory for incident closure.
+
+## File-Specific Implementation Boundaries
+This artifact is implementation-focused on **event contracts, versioning guarantees, and replay safety controls**. The boundaries below are specific to `analysis/event-catalog.md` and are intentionally not reused as generic filler text.
+
+| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
+|---|---|---|---|
+| Intake & Identity Analysis | Entry validation checkpoints and mismatch heuristics | UI widget design details | Data-quality metrics and EMPI false-positive rate |
+| Clinical Flow Analysis | Encounter/order sequence timing and critical path dependencies | Persistence implementation details | Throughput, wait-time, and bottleneck reporting |
+| Governance Analysis | Rule conformance and audit evidence completeness | Runtime policy engine internals | Compliance scorecards and control effectiveness trends |
+
+## Business Rules to API/Data/Operational Controls (File-Specific)
+| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
+|---|---|---|---|
+| Preconditions for `event-catalog` workflows must be validated before state mutation. | `GET /v1/analytics/operational-checkpoints` with explicit error taxonomy and correlation IDs. | `workflow_checkpoints, rule_decisions, observability_snapshots` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
+| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
+| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
+
+## Interoperability Assumptions for `event-catalog.md`
+- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
+- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
+- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
+
+### Interoperability and Control Flow
+```mermaid
+flowchart LR
+    A[analysis:event-catalog] --> B[API: GET /v1/analytics/operational-checkpoints]
+    B --> C[Data: workflow_checkpoints, rule_decisions, observability_snapshots]
+    C --> D[Control: Monitoring + Audit + Runbook]
+    D --> E[Recovery/Verification Loop]
+```
+
+## Compliance and Security Posture for this Artifact
+- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
+- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `event-catalog.md`.
+- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.
