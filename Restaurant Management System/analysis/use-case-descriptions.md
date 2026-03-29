@@ -104,3 +104,167 @@
 2. System validates conflicts and effective dates.
 3. Updated policies are versioned and applied according to scope.
 4. Audit logs capture actor, before/after state, and branch or global scope.
+
+---
+
+## UC-09: Manage Peak Seating Slots and Walk-In Spillover
+**Primary Actor**: Host / Reception
+**Supporting Actors**: Guest, Branch Manager
+
+**Preconditions**:
+- Slot duration rules, buffer windows, and table combinability are configured.
+- Peak-load thresholds are active for the branch.
+
+**Main Flow**:
+1. Host views next seating windows with predicted turnover and current queue pressure.
+2. System proposes best-fit slot/table options for reservation or walk-in intake.
+3. Host confirms booking or waitlist placement.
+4. System starts arrival/no-show timers and reserve-hold timers.
+5. If queue pressure rises, system suggests throttling and revised quoted wait times.
+
+**Exceptions**:
+- E1: Slot overbook risk -> require manager override or alternate slot.
+- E2: Guest late beyond grace period -> slot released and waitlist backfill executed.
+
+---
+
+## UC-10: Orchestrate Kitchen Under Mixed Ticket Load
+**Primary Actor**: Chef / Expediter
+
+**Main Flow**:
+1. System groups incoming items by station, course dependencies, and promise time.
+2. Expediter accepts batches and starts preparation waves.
+3. Station cooks update progress; system recalculates cross-station synchronization.
+4. Pass marks items ready only when course dependencies are satisfied.
+5. Waiters receive pickup prompts with table and seat mapping.
+
+**Exceptions**:
+- E1: Station overload -> dynamic reroute to secondary station where configured.
+- E2: Ingredient unavailable mid-prep -> propose substitute and pause dependent lines.
+- E3: Refire needed -> create linked refire ticket with root-cause tag.
+
+---
+
+## UC-11: Process Multi-Tender Payments with Splits
+**Primary Actor**: Cashier / Waiter
+
+**Main Flow**:
+1. Staff chooses split strategy (equal, item-based, seat-based, custom amount).
+2. System creates child checks and computes per-check taxes and charges.
+3. Each child check is settled via one or more tenders.
+4. System confirms settlement state and prints/sends receipts.
+5. Parent check closes when all child checks are fully paid.
+
+**Exceptions**:
+- E1: Payment provider timeout -> retain pending intent and offer safe retry.
+- E2: Partial decline -> keep unpaid residue open on specific child check.
+
+---
+
+## UC-12: Cancel Reservation/Order/Payment Safely
+**Primary Actor**: Host, Waiter, Cashier, Manager (depends on stage)
+
+**Main Flow**:
+1. Actor selects entity to cancel and provides reason code.
+2. System evaluates lifecycle stage and required approval level.
+3. If approved, system executes compensating actions (release slot/table, cancel ticket, create void/refund record).
+4. Affected stakeholders receive status updates.
+5. Audit log records actor, timestamp, policy basis, and financial/stock impact.
+
+**Exceptions**:
+- E1: Post-prep cancellation with non-recoverable cost -> manager-only flow with waste capture.
+- E2: Refund exceeds threshold -> dual approval required.
+
+---
+
+## UC-09 to UC-12 Implementation Detail Addendum
+
+### Shared Preconditions
+- Branch day-open checklist is complete and no blocking incident is active.
+- Menu version, pricing profile, and tax profile are effective for current service window.
+- Queue, slot, and payment provider health checks are green or in tolerated degraded mode.
+
+### Shared Postconditions
+- All state changes are persisted with monotonic version increments.
+- User-visible timelines (host/waiter/cashier views) are updated within near-real-time sync budget.
+- Compliance audit envelope is emitted for policy-bound actions.
+
+### Alternate and Recovery Flows
+
+| Use Case | Alternate Flow | Recovery Rule |
+|----------|----------------|---------------|
+| UC-09 | Guest requests accessibility table not in immediate inventory | Promote next compatible slot and apply hold extension |
+| UC-10 | Cross-station dependency misses promise time | Expediter initiates partial-serve policy or replans fire sequence |
+| UC-11 | Network flap during capture confirmation | Hold intent in `pending_reconcile` and run async provider reconciliation job |
+| UC-12 | Duplicate cancellation request received | Reject as idempotent replay and return original decision reference |
+
+### Data Captured Per Use Case
+
+| Use Case | Required Data Points |
+|----------|----------------------|
+| UC-09 | `slot_id`, `party_size`, `quoted_eta`, `table_group`, `hold_expires_at` |
+| UC-10 | `ticket_id`, `station_id`, `priority_band`, `course_dependency`, `delay_reason_code` |
+| UC-11 | `check_id`, `child_check_id`, `payment_intent_id`, `tender_mix`, `provider_status` |
+| UC-12 | `cancellation_scope`, `reason_code`, `approval_actor`, `compensation_action`, `financial_delta` |
+
+### Business Rule Traceability
+- UC-09 aligns with slot fairness, no-show grace, and anti-overbooking rules.
+- UC-10 aligns with kitchen SLA and refire governance rules.
+- UC-11 aligns with tender idempotency and reconciliation rules.
+- UC-12 aligns with cancellation window, refund threshold, and override governance rules.
+
+---
+
+## Cross-Flow Operational Diagrams (Mermaid)
+
+### 1) Ordering + Kitchen + Service Completion Activity
+```mermaid
+flowchart TD
+    A[Open table or takeaway context] --> B[Capture seat-level items/modifiers/notes]
+    B --> C{Validation pass?}
+    C -- No --> C1[Return actionable validation errors]
+    C1 --> B
+    C -- Yes --> D[Persist draft with version]
+    D --> E[Submit order command]
+    E --> F[Fan-out station tickets]
+    F --> G[Kitchen accepts and starts prep]
+    G --> H{Course dependencies satisfied?}
+    H -- No --> G1[Hold at pass and synchronize]
+    G1 --> H
+    H -- Yes --> I[Mark ready and notify waiter]
+    I --> J[Serve items]
+    J --> K[Advance order lines to served]
+```
+
+### 2) Table/Slot Allocation Decision Flow
+```mermaid
+flowchart TD
+    A[Reservation/Walk-in request] --> B[Fetch candidate slots + table graph]
+    B --> C{Capacity + policy fit?}
+    C -- Yes --> D[Offer slot with ETA confidence]
+    D --> E{Guest accepts?}
+    E -- Yes --> F[Create reservation hold]
+    E -- No --> G[Offer alternates or waitlist]
+    C -- No --> G
+    G --> H{Waitlist accepted?}
+    H -- Yes --> I[Create waitlist token + dynamic ETA]
+    H -- No --> J[Close request]
+    F --> K[Arrival/no-show timer active]
+    I --> K
+```
+
+### 3) Cancellation/Reversal Policy Evaluation
+```mermaid
+flowchart TD
+    A[Cancellation/Reversal request] --> B[Determine scope + lifecycle stage]
+    B --> C[Evaluate role and threshold policy]
+    C --> D{Approval required?}
+    D -- Yes --> E[Route to manager or dual approval queue]
+    E --> F{Approved?}
+    F -- No --> X[Reject with reason and audit]
+    F -- Yes --> G[Execute compensating actions]
+    D -- No --> G
+    G --> H[Publish financial/operational updates]
+    H --> I[Notify stakeholders]
+    I --> J[Close with immutable audit record]
+```

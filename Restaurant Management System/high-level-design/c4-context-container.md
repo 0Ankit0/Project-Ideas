@@ -59,3 +59,14 @@ flowchart TB
     queue --> workers
     queue --> projector
 ```
+
+## Container Responsibilities for Cross-Flows
+
+| Container | Primary Responsibilities | Cross-Flow Notes |
+|-----------|--------------------------|------------------|
+| REST API | command intake, validation, authorization | enforces idempotency keys and branch scope |
+| Background Workers | outbox publish, retries, compensations | critical for reversals and degraded recovery |
+| Reporting Projector | near-real-time operational views | powers host/kitchen/cashier situational awareness |
+| PostgreSQL | authoritative transactions | source of truth for orders, settlements, approvals |
+| Message Bus | async decoupling and fan-out | enables kitchen, notifications, and audit projections |
+| Reporting Store | analytical read models | SLA/queue/variance reporting and peak analytics |

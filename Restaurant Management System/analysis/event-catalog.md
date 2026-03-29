@@ -40,3 +40,27 @@ sequenceDiagram
 - P95 commit-to-publish latency below 5 seconds for tier-1 events.
 - DLQ triage acknowledgement within 15 minutes for production incidents.
 - Schema changes remain backward compatible within the same major version.
+
+## Implementation-Ready Event Definitions (Cross-Flow)
+
+| Event Name | Required Domain Fields | Idempotency Key Suggestion |
+|------------|------------------------|----------------------------|
+| `order.submitted.v1` | order_id, table_id, item_count, submitted_by | order_id + version |
+| `kitchen.ticket.routed.v1` | ticket_id, station_id, priority_band, promised_ready_at | ticket_id + state |
+| `seating.slot.confirmed.v1` | slot_id, table_group, quoted_eta, hold_expires_at | slot_id + version |
+| `billing.payment.captured.v1` | check_id, payment_intent_id, amount, tender_type | payment_intent_id + status |
+| `policy.cancellation.approved.v1` | decision_id, scope, reason_code, approved_by | decision_id |
+| `ops.load_tier.changed.v1` | branch_id, from_tier, to_tier, trigger_metric | branch_id + to_tier + window |
+
+## Event Lineage Diagram
+
+```mermaid
+flowchart LR
+    CMD[Command Accepted] --> TX[Transactional Commit]
+    TX --> OUT[Outbox Record]
+    OUT --> BUS[Event Bus]
+    BUS --> PROJ[Operational Projections]
+    BUS --> AUD[Audit Store]
+    BUS --> NOTI[Notifications]
+    BUS --> REP[Reporting]
+```

@@ -32,3 +32,39 @@ flowchart LR
 | Billing and Settlement | Bills, payments, refunds, drawer sessions |
 | Shift and Attendance | Scheduling, attendance, staffing visibility |
 | Reporting | Sales, delays, variance, operational dashboards |
+
+## Component Interaction Diagram for Operational Flows
+
+```mermaid
+flowchart TB
+    POS[Host/Waiter/Cashier Apps] --> OrderC[Order Component]
+    POS --> SeatC[Seating Component]
+    POS --> BillC[Billing Component]
+    POS --> PolicyC[Policy/Approval Component]
+
+    OrderC --> KitchenC[Kitchen Component]
+    OrderC --> InventoryC[Inventory Component]
+    SeatC --> LoadC[Load Control Component]
+    KitchenC --> LoadC
+    BillC --> LoadC
+
+    OrderC --> EventC[(Event Stream)]
+    KitchenC --> EventC
+    BillC --> EventC
+    PolicyC --> EventC
+    LoadC --> EventC
+
+    EventC --> AuditC[Audit Component]
+    EventC --> NotifyC[Notification Component]
+    EventC --> ReportC[Reporting Component]
+```
+
+## Component Contracts (Minimum)
+
+| Producer -> Consumer | Contract Requirement |
+|----------------------|----------------------|
+| Order -> Kitchen | station-ready ticket bundle with dependency metadata |
+| Kitchen -> POS projection | line-level state transition with station and ETA context |
+| Billing -> Reconciliation | immutable settlement rows with tender breakdown |
+| Policy -> Domain services | decision object with scope, threshold, and approval lineage |
+| Load Control -> Seating/Menu/Kitchen | tiered throttle directives with effective window |
