@@ -1,74 +1,145 @@
-# Class Diagrams
+# Class Diagrams (Implementation Ready)
 
+## 1. Domain Model Classes
 ```mermaid
 classDiagram
-    class CustomerAccount {
-      +UUID id
-      +String email
-      +AccountStatus status
-      +updateBillingProfile()
+    class Plan {
+      +UUID planId
+      +String code
+      +PlanStatus status
+      +publishVersion()
+      +deprecate()
     }
 
-    class Plan {
-      +UUID id
-      +String code
+    class PlanVersion {
+      +UUID planVersionId
+      +int versionNo
+      +DateTime effectiveFrom
+      +DateTime effectiveTo
+      +MigrationPolicy migrationPolicy
+      +Checksum checksum
+    }
+
+    class PriceComponentVersion {
+      +UUID priceComponentVersionId
+      +String metricKey
       +BillingCadence cadence
-      +Money basePrice
-      +isActive()
+      +Money unitAmount
+      +String currency
+      +RoundingMode roundingMode
     }
 
     class Subscription {
-      +UUID id
-      +UUID accountId
-      +UUID planId
+      +UUID subscriptionId
       +SubscriptionStatus status
-      +DateTime currentPeriodStart
-      +DateTime currentPeriodEnd
+      +DateTime periodStart
+      +DateTime periodEnd
       +activate()
-      +changePlan()
+      +pause()
       +cancel()
     }
 
+    class SubscriptionItem {
+      +UUID subscriptionItemId
+      +UUID planVersionId
+      +int quantity
+      +amend()
+    }
+
+    class SubscriptionAmendment {
+      +UUID amendmentId
+      +ChangeType changeType
+      +ProrationPolicy policy
+      +DateTime effectiveAt
+      +String idempotencyKey
+    }
+
     class Invoice {
-      +UUID id
-      +UUID subscriptionId
+      +UUID invoiceId
+      +InvoiceStatus status
       +Money subtotal
       +Money tax
       +Money total
-      +InvoiceStatus status
       +finalize()
+      +issue()
       +markPaid()
     }
 
-    class PaymentAttempt {
-      +UUID id
-      +UUID invoiceId
+    class InvoiceLine {
+      +UUID invoiceLineId
+      +LineType type
+      +Decimal quantity
+      +Money unitAmount
+      +Money lineTotal
+      +UUID sourceId
+    }
+
+    class Payment {
+      +UUID paymentId
       +PaymentStatus status
-      +String failureCode
-      +recordAttempt()
+      +Money amount
+      +Money fees
+      +settle()
     }
 
     class EntitlementGrant {
-      +UUID id
-      +UUID subscriptionId
+      +UUID entitlementId
       +String featureKey
-      +EntitlementStatus status
+      +EntitlementState state
+      +int quotaLimit
+      +DateTime graceUntil
       +grant()
+      +suspend()
       +revoke()
     }
 
-    class Coupon {
-      +UUID id
-      +String code
-      +DiscountType type
-      +Decimal amountOrPercent
-      +isValid()
+    class ReconRun {
+      +UUID reconRunId
+      +ReconType runType
+      +ReconStatus status
+      +execute()
+      +publishReport()
     }
 
-    CustomerAccount "1" --> "many" Subscription
-    Plan "1" --> "many" Subscription
+    class ReconDrift {
+      +UUID driftId
+      +DriftClass driftClass
+      +String objectType
+      +String objectId
+      +Decimal amountDelta
+      +openIncident()
+    }
+
+    class RecoveryAction {
+      +UUID actionId
+      +ActionType actionType
+      +boolean dryRun
+      +ActionStatus status
+      +approve()
+      +execute()
+      +verify()
+    }
+
+    Plan "1" --> "many" PlanVersion
+    PlanVersion "1" --> "many" PriceComponentVersion
+    Subscription "1" --> "many" SubscriptionItem
+    SubscriptionItem "1" --> "many" SubscriptionAmendment
+    SubscriptionItem "many" --> "1" PlanVersion
     Subscription "1" --> "many" Invoice
-    Invoice "1" --> "many" PaymentAttempt
-    Subscription "1" --> "many" EntitlementGrant
-    Coupon "0..many" --> "many" Subscription : applies to
+    Invoice "1" --> "many" InvoiceLine
+    Invoice "1" --> "many" Payment
+    SubscriptionItem "1" --> "many" EntitlementGrant
+    ReconRun "1" --> "many" ReconDrift
+    ReconDrift "1" --> "many" RecoveryAction
 ```
+
+## 2. Aggregate Ownership and Transaction Boundaries
+- **Catalog Aggregate**: `Plan`, `PlanVersion`, `PriceComponentVersion` (immutable post-publish).
+- **Subscription Aggregate**: `Subscription`, `SubscriptionItem`, `SubscriptionAmendment`.
+- **Billing Aggregate**: `Invoice`, `InvoiceLine`, `Payment` with state transition logs.
+- **Integrity Aggregate**: `ReconRun`, `ReconDrift`, `RecoveryAction`.
+
+## 3. Invariants at Class Level
+- `PlanVersion` cannot mutate economic fields after publish.
+- `InvoiceLine` mutations are disallowed when parent invoice is finalized or later.
+- `RecoveryAction.execute()` requires approved status unless `dryRun=true`.
