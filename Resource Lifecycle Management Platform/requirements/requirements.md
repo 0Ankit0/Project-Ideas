@@ -1,58 +1,30 @@
 # Requirements
 
-## 1. Product Scope
-The platform standardizes resource lifecycle operations for sectors where a finite
-resource must be discovered, reserved, fulfilled, used, returned/closed, and
-financially settled.
+Implementation-ready requirement artifact with measurable constraints and acceptance conditions.
 
-### In Scope
-- Catalog and availability management
-- Reservation and allocation workflows
-- Contract/policy enforcement
-- Fulfillment and return operations
-- Settlement, adjustments, and dispute handling
-- Audit and compliance reporting
+## Artifact-Specific Objectives
+- Define mandatory controls as testable statements (MUST/SHALL).
+- Attach each requirement to owner team and compliance policy source.
+- Identify pass/fail evidence expected at release gate.
 
-### Out of Scope
-- Vertical-specific UI branding and content workflows
-- Hardware telemetry protocols (supported via adapter APIs)
+## Requirement Decomposition
 
-## 2. Functional Requirements
+| Area | Detailed Requirement | Verification Method |
+|---|---|---|
+| Provisioning | Tenant, entitlement, and template validation must occur before resource creation. | Contract tests + policy simulation suite |
+| Allocation | Allocation must enforce no-overlap, quota, and priority ordering. | Concurrency test matrix |
+| Decommissioning | Terminal closure requires financial closure and retention lock. | End-to-end closure test + audit log review |
 
-### FR-1 Catalog & Availability
-- Support resource templates, variants, and unit-level inventory.
-- Maintain availability windows with holds, blackout windows, and buffers.
-- Support cross-channel availability synchronization.
+## Lifecycle and Governance Specifics
 
-### FR-2 Reservation Lifecycle
-- Create, amend, cancel, and expire reservations.
-- Support configurable hold TTLs and confirmation policies.
-- Prevent double allocation through deterministic conflict handling.
+- **Provisioning in Requirements**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in Requirements**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in Requirements**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in Requirements**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
 
-### FR-3 Fulfillment & Return
-- Track check-out/check-in lifecycle with actor and timestamp evidence.
-- Support partial fulfillment and partial returns at unit/component level.
-- Capture condition and incident evidence artifacts.
+## Implementation Checklist
 
-### FR-4 Settlement & Billing
-- Generate charges from policy/pricing rules.
-- Support deposits, penalties, waivers, and refunds.
-- Reconcile external gateway outcomes to internal ledger entries.
-
-### FR-5 Governance
-- Record immutable lifecycle audit events.
-- Enforce tenant-scoped data isolation and policy controls.
-- Provide regulator- and auditor-consumable reports.
-
-## 3. Non-Functional Requirements
-- Availability: 99.95% for reservation APIs.
-- Performance: P95 < 250ms for search/availability reads.
-- Integrity: idempotent writes and exactly-once settlement posting semantics.
-- Security: encryption at rest/in transit, scoped credentials, audit immutability.
-- Operability: SLO dashboards, runbooks, and replay tooling.
-
-## 4. Sector Specialization Notes
-- **Rental management:** deposits, damage claims, extension requests.
-- **Library/lending:** waitlists, due-date policy, renewal windows.
-- **Slot/appointment:** capacity pools, no-show and grace-period rules.
-- **Asset allocation/workforce:** assignment priorities and utilization controls.
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.

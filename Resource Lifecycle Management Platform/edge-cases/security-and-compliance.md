@@ -1,13 +1,30 @@
 # Security and Compliance Edge Cases
 
-## Failure Mode
-Privileged lifecycle override endpoint is invoked without full justification metadata.
+Failure-mode specification describing detection, containment, recovery, and audit evidence.
 
-## Impact
-Weak auditability and non-compliance with internal control policy.
+## Artifact-Specific Objectives
+- Define non-happy-path behavior with concrete containment actions.
+- Assign severity, owner, and SLA for each scenario.
+- Provide deterministic recovery and reconciliation steps.
 
-## Detection
-Control monitor flags privileged actions missing ticket reference or approver chain.
+## Edge-Case Response Matrix
 
-## Recovery / Mitigation
-Block incomplete override requests, require policy-bound reason codes, and enforce immutable approval logging.
+| Scenario Type | Detection Signal | Immediate Containment | Recovery Path |
+|---|---|---|---|
+| Policy violation | denied decision / drift alert | freeze unsafe transition | correct policy context + replay command |
+| State mismatch | reconciliation mismatch event | quarantine resource | reconcile source-of-truth and backfill events |
+| Financial inconsistency | ledger mismatch | suspend settlement posting | rerun reconciliation and manual approval |
+
+## Lifecycle and Governance Specifics
+
+- **Provisioning in Security and Compliance Edge Cases**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in Security and Compliance Edge Cases**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in Security and Compliance Edge Cases**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in Security and Compliance Edge Cases**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
+
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.

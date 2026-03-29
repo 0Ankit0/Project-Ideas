@@ -1,16 +1,30 @@
 # User Stories
 
-## Consumer / Requestor
-- As a user, I want to discover available resources for a target time window so I can place a reservation.
-- As a user, I want to modify or cancel a reservation under policy rules so I can adapt to changing needs.
+Implementation-ready requirement artifact with measurable constraints and acceptance conditions.
 
-## Operator / Provider
-- As an operator, I want to define inventory, calendars, and policies so supply is controlled consistently.
-- As an operator, I want to execute fulfillment and return workflows so lifecycle transitions are auditable.
+## Artifact-Specific Objectives
+- Define mandatory controls as testable statements (MUST/SHALL).
+- Attach each requirement to owner team and compliance policy source.
+- Identify pass/fail evidence expected at release gate.
 
-## Finance / Compliance
-- As finance, I want automated settlement with reconciliation so accounting remains accurate.
-- As compliance, I want immutable audit logs and report exports so I can satisfy governance obligations.
+## Requirement Decomposition
 
-## Platform Engineering
-- As an engineer, I want reliable event-driven orchestration and compensation patterns so failures recover safely.
+| Area | Detailed Requirement | Verification Method |
+|---|---|---|
+| Provisioning | Tenant, entitlement, and template validation must occur before resource creation. | Contract tests + policy simulation suite |
+| Allocation | Allocation must enforce no-overlap, quota, and priority ordering. | Concurrency test matrix |
+| Decommissioning | Terminal closure requires financial closure and retention lock. | End-to-end closure test + audit log review |
+
+## Lifecycle and Governance Specifics
+
+- **Provisioning in User Stories**: Define preconditions, policy gate, and emitted evidence artifact.
+- **Allocation in User Stories**: Define contention handling, SLA timers, and rollback behavior.
+- **Decommissioning in User Stories**: Define terminal checks, retention obligations, and approval authority.
+- **Exception workflow in User Stories**: Detect → classify → contain → resolve → recover → postmortem with owner + SLA.
+
+## Implementation Checklist
+
+- [ ] Artifact reviewed by engineering, operations, and governance stakeholders.
+- [ ] Traceability links added to related requirements/design/runbooks.
+- [ ] Failure-path and compensation behavior documented in testable form.
+- [ ] Metrics and alerts mapped to artifact outcomes.
