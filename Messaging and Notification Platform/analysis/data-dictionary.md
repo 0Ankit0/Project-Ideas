@@ -1,41 +1,64 @@
 # Data Dictionary
 
-This data dictionary is the canonical reference for **Messaging and Notification Platform**. It defines shared terminology, entity semantics, and governance controls required to keep messaging and notification workflows consistent across teams and services.
+## Objective
+Provide implementation-ready guidance for **Data Dictionary** in the Messaging and Notification Platform.
 
-## Scope and Goals
-- Establish a stable vocabulary for architecture, API, analytics, and operations teams.
-- Define minimum required fields for core entities and expected relationship boundaries.
-- Document data quality and retention controls needed for production readiness.
+## Scope
+- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
+- Transactional, operational, and campaign traffic profiles.
+- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
 
-## Core Entities
-| Entity | Description | Required Attributes |
-|---|---|---|
-| TenantOrOrganization | Top-level ownership boundary for data segregation | `org_id, name, status, region, created_at` |
-| UserOrActor | Human/system principal that performs actions | `actor_id, org_id, role, status, last_active_at` |
-| PrimaryRecord | Main lifecycle object handled by the platform | `record_id, org_id, state, owner_id, created_at, updated_at` |
-| ChildTransaction | Operational transaction or sub-step linked to primary record | `txn_id, record_id, txn_type, amount_or_value, occurred_at` |
-| PolicyOrRule | Versioned policy configuration that influences decisions | `policy_id, scope, version, effective_from, effective_to` |
-| AuditEvent | Append-only evidence for state changes and controls | `audit_id, record_id, actor_id, action, reason_code, occurred_at` |
+## Analysis Notes
+- Domain boundaries: ingestion, orchestration, dispatch, feedback, compliance.
+- Primary risks: duplicate sends, delayed callbacks, consent drift, provider brownouts.
+- Mitigations: idempotency, callback reconciliation, consent version checks, circuit breakers.
 
-## Canonical Relationship Diagram
-```mermaid
-erDiagram
-    TENANTORORGANIZATION ||--o{ USERORACTOR : owns
-    TENANTORORGANIZATION ||--o{ PRIMARYRECORD : contains
-    PRIMARYRECORD ||--o{ CHILDTRANSACTION : has
-    POLICYORRULE ||--o{ PRIMARYRECORD : governs
-    PRIMARYRECORD ||--o{ AUDITEVENT : audited_by
-    USERORACTOR ||--o{ AUDITEVENT : performs
-```
+## Delivery, Reliability, and Compliance Baseline
 
-## Data Quality Controls
-1. All write paths enforce required-field validation and referential integrity for mandatory foreign keys.
-2. External imports must include provenance metadata (`source_system`, `source_ref`, `ingested_at`).
-3. Status/state fields use controlled vocabularies and reject unknown values.
-4. Duplicate detection runs on natural keys where business identity collisions are likely.
-5. Sensitive fields carry classification tags to drive masking, encryption, and export behavior.
+### 1) Delivery semantics
+- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
+- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
+- **Latency tiers:**
+  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
+  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
+  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
+- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
 
-## Retention and Audit
-- Operational records remain online for active workflow windows and support forensic queries.
-- Historical records move to archive tiers by policy without breaking traceability.
-- Audit events are immutable and linked through correlation ids for incident analysis.
+### 2) Queue and topic behavior
+- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
+- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
+- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
+- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+
+### 3) Retry and dead-letter handling
+- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
+- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
+- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
+- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
+- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+
+### 4) Provider routing and failover
+- **Routing mode:** weighted primary/secondary by channel and geography.
+- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
+- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
+- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
+
+### 5) Template management
+- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
+- **Versioning:** immutable published versions; sends always pin explicit version.
+- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
+- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
+
+### 6) Compliance and audit logging
+- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
+- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
+- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
+- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
+
+## Verification Checklist
+- [ ] All interfaces include idempotency + correlation identifiers.
+- [ ] Retryable vs non-retryable errors are explicitly classified.
+- [ ] DLQ replay process is documented with approvals and guardrails.
+- [ ] Provider failover policy defines trigger, action, and recovery criteria.
+- [ ] Template versioning and approval workflow are enforceable in tooling.
+- [ ] Compliance evidence can be queried by message_id and correlation_id.
