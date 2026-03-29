@@ -1,224 +1,98 @@
 # C4 Component Diagram
 
-## Overview
-This document provides the C4 Level 3 component diagrams for the major functional subsystems of the CMS backend.
+## Scope
+Component decomposition for authoring and publishing containers.
 
----
-
-## Component Diagram — IAM & Auth Subsystem
-
+## Mermaid Diagram
 ```mermaid
-graph TB
-    Client[Authenticated Client / Public Browser]
-
-    subgraph "IAM & Auth Module"
-        AuthRouter[Auth Router<br>POST /auth/login, /register, /refresh]
-        UserRouter[User Router<br>GET/PATCH /users/{id}]
-        JWTService[JWT Service<br>Issue, validate, refresh tokens]
-        OAuthService[OAuth2 Service<br>Google / GitHub flow]
-        TwoFAService[2FA Service<br>TOTP setup and verify]
-        PermService[Permission Guard<br>Role enforcement per endpoint]
-        InvitationService[Invitation Service<br>Send, validate, accept invites]
+flowchart LR
+    subgraph AuthoringContainer
+      API[REST Controller]
+      APP[Application Service]
+      DOM[Domain Model]
+      REPO[Repository]
     end
-
-    DB[(PostgreSQL)]
-    Redis[(Redis — Token Store)]
-    OAuthProvider[OAuth2 Provider]
-    EmailSvc[Email Provider]
-
-    Client --> AuthRouter
-    Client --> UserRouter
-    AuthRouter --> JWTService
-    AuthRouter --> OAuthService
-    AuthRouter --> TwoFAService
-    OAuthService --> OAuthProvider
-    AuthRouter --> InvitationService
-    InvitationService --> EmailSvc
-    JWTService --> Redis
-    AuthRouter --> DB
-    UserRouter --> DB
-    PermService --> DB
+    subgraph PublishingContainer
+      ORCH[Publish Orchestrator]
+      REND[Renderer]
+      INV[Invalidation Worker]
+    end
+    API-->APP-->DOM-->REPO
+    APP-->ORCH
+    ORCH-->REND-->INV
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## Component Diagram — Content & Publishing Subsystem
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-```mermaid
-graph TB
-    Author[Author / Editor Client]
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
-    subgraph "Content & Publishing Module"
-        PostRouter[Post Router]
-        PageRouter[Page Router]
-        PublishRouter[Publishing Router]
-
-        DraftSvc[Draft & Auto-Save Service]
-        RevisionSvc[Revision Service]
-        WorkflowEngine[Workflow State Machine<br>draft→pending→published→archived]
-        ScheduleSvc[Schedule Service<br>Job enqueue and cancel]
-        FeedGen[RSS/Atom Feed Generator]
-        SitemapGen[Sitemap Generator]
-        PublishNotify[Publish Event Notifier]
-        SearchIndexer[Search Indexer Client]
-    end
-
-    DB[(PostgreSQL)]
-    Queue[(Redis Queue)]
-    SearchIdx[(Search Index)]
-    CDN[CDN Invalidator]
-
-    Author --> PostRouter
-    Author --> PageRouter
-    Author --> PublishRouter
-
-    PostRouter --> DraftSvc
-    PostRouter --> RevisionSvc
-    PublishRouter --> WorkflowEngine
-    WorkflowEngine --> FeedGen
-    WorkflowEngine --> SitemapGen
-    WorkflowEngine --> PublishNotify
-    WorkflowEngine --> ScheduleSvc
-    WorkflowEngine --> SearchIndexer
-
-    DraftSvc --> DB
-    RevisionSvc --> DB
-    WorkflowEngine --> DB
-    ScheduleSvc --> Queue
-    FeedGen --> DB
-    FeedGen --> CDN
-    SitemapGen --> DB
-    SitemapGen --> CDN
-    PublishNotify --> DB
-    PublishNotify --> Queue
-    SearchIndexer --> SearchIdx
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
-
-## Component Diagram — Layout & Widget Subsystem
-
-```mermaid
-graph TB
-    AdminClient[Admin Client]
-    Visitor[Site Visitor]
-
-    subgraph "Layout & Widget Module"
-        ThemeRouter[Theme Router]
-        WidgetRouter[Widget Router]
-        MenuRouter[Menu Router]
-
-        ThemeSvc[Theme Lifecycle Service<br>Install, activate, preview, migrate zones]
-        WidgetRegistry[Widget Registry<br>Built-in + plugin-registered types]
-        ZoneSvc[Zone Placement Service<br>Place, reorder, remove, override]
-        MenuSvc[Navigation Menu Service]
-        LayoutRenderer[Layout Renderer<br>Resolve zones + widget data at request time]
-        CacheInvalidator[Cache Invalidation Service]
-    end
-
-    DB[(PostgreSQL)]
-    Storage[(Object Storage — Theme Packages)]
-    CDN[CDN]
-
-    AdminClient --> ThemeRouter
-    AdminClient --> WidgetRouter
-    AdminClient --> MenuRouter
-
-    ThemeRouter --> ThemeSvc
-    WidgetRouter --> WidgetRegistry
-    WidgetRouter --> ZoneSvc
-    MenuRouter --> MenuSvc
-
-    ThemeSvc --> DB
-    ThemeSvc --> Storage
-    ZoneSvc --> DB
-    ZoneSvc --> CacheInvalidator
-    WidgetRegistry --> DB
-    MenuSvc --> DB
-    CacheInvalidator --> CDN
-
-    Visitor --> LayoutRenderer
-    LayoutRenderer --> ZoneSvc
-    LayoutRenderer --> WidgetRegistry
-    LayoutRenderer --> DB
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
 
----
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
 
-## Component Diagram — Comment & Moderation Subsystem
-
-```mermaid
-graph TB
-    Reader[Reader / Guest]
-    Moderator[Editor / Admin]
-
-    subgraph "Comment Module"
-        CommentRouter[Comment Router<br>POST /posts/{id}/comments]
-        ModRouter[Moderation Router<br>GET /moderation/comments]
-
-        CommentSvc[Comment Service<br>Submit, thread, approve, reject]
-        SpamClient[Spam Filter Client]
-        ModerationSvc[Moderation Service<br>Queue management, bulk actions]
-        CommentNotify[Comment Notification Service]
-    end
-
-    DB[(PostgreSQL)]
-    Queue[(Redis Queue)]
-    SpamAPI[Spam Filter API]
-    EmailSvc[Email Provider]
-
-    Reader --> CommentRouter
-    Moderator --> ModRouter
-
-    CommentRouter --> CommentSvc
-    CommentSvc --> SpamClient
-    SpamClient --> SpamAPI
-    CommentSvc --> ModerationSvc
-    CommentSvc --> CommentNotify
-    ModerationSvc --> DB
-    CommentSvc --> DB
-    CommentNotify --> Queue
-    Queue --> EmailSvc
-    ModRouter --> ModerationSvc
-```
-
----
-
-## Component Diagram — Analytics Subsystem
-
-```mermaid
-graph TB
-    PublicVisitor[Public Visitor]
-    AdminUser[Admin User]
-    AuthorUser[Author User]
-    Worker[Background Worker]
-
-    subgraph "Analytics Module"
-        EventRouter[Event Router<br>POST /analytics/events]
-        DashboardRouter[Dashboard Router<br>GET /analytics/dashboard]
-
-        IngestionSvc[Event Ingestion Service<br>Write page-view events]
-        RollupSvc[Daily Rollup Service<br>Aggregate raw events]
-        QuerySvc[Dashboard Query Service<br>Read rollup tables with filters]
-        ExportSvc[Export Service<br>Generate CSV exports]
-    end
-
-    DB[(PostgreSQL)]
-    Storage[(Object Storage — CSV Exports)]
-
-    PublicVisitor --> EventRouter
-    EventRouter --> IngestionSvc
-    IngestionSvc --> DB
-
-    AdminUser --> DashboardRouter
-    AuthorUser --> DashboardRouter
-    DashboardRouter --> QuerySvc
-    QuerySvc --> DB
-
-    Worker --> RollupSvc
-    RollupSvc --> DB
-
-    AdminUser --> ExportSvc
-    ExportSvc --> DB
-    ExportSvc --> Storage
-```
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

@@ -1,236 +1,94 @@
 # Swimlane Diagrams
 
-## Overview
-Swimlane (BPMN-style) diagrams show cross-role workflows and responsibilities within the CMS platform.
+## Scope
+Role-lane workflows for author, editor, publishing service, and operations.
 
----
-
-## 1. End-to-End Post Publishing Workflow
-
+## Mermaid Diagram
 ```mermaid
 sequenceDiagram
-    box Author
-        participant A as Author
-    end
-    box Editor
-        participant E as Editor
-    end
-    box System
-        participant S as CMS System
-    end
-    box Readers & Subscribers
-        participant R as Reader / Subscriber
-    end
-
-    A->>S: Create new post (Draft)
-    S-->>A: Editor opens, auto-save enabled
-    A->>S: Write content, upload media, assign taxonomy
-    A->>S: Submit for Review
-    S->>S: Transition post → Pending Review
-    S-->>E: Notify: new submission pending
-
-    E->>S: Open submission queue
-    S-->>E: Display pending posts
-    E->>S: Preview post
-    S-->>E: Render in active theme
-
-    alt Editor approves
-        E->>S: Click Publish
-        S->>S: Transition post → Published
-        S-->>A: Notify: post published
-        S->>S: Update RSS/Atom feed
-        S->>S: Rebuild sitemap.xml
-        S-->>R: Dispatch newsletter digest
-    else Editor returns to draft
-        E->>S: Return to Draft with feedback
-        S->>S: Transition post → Draft
-        S-->>A: Notify: feedback provided
-        A->>S: Revise and re-submit
-    else Editor schedules
-        E->>S: Set scheduled datetime
-        S->>S: Transition post → Scheduled
-        S-->>A: Notify: post scheduled
-        S->>S: Wait for scheduled time
-        S->>S: Auto-publish at scheduled time
-        S-->>R: Dispatch newsletter digest
-    end
+    participant Author
+    participant Editor
+    participant WorkflowSvc as Workflow Service
+    participant PublishSvc as Publishing Service
+    participant Ops
+    Author->>WorkflowSvc: submitDraft(contentId)
+    WorkflowSvc->>Editor: createReviewTask
+    Editor->>WorkflowSvc: approve(contentId)
+    WorkflowSvc->>PublishSvc: scheduleOrPublish
+    PublishSvc-->>Ops: alert on partial publish
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## 2. Comment Submission and Moderation
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-```mermaid
-sequenceDiagram
-    box Reader
-        participant R as Reader
-    end
-    box System
-        participant S as CMS System
-        participant SP as Spam Filter
-    end
-    box Moderator
-        participant M as Editor / Admin
-    end
-    box Author
-        participant A as Post Author
-    end
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
-    R->>S: Submit comment on post
-    S->>SP: Check comment for spam
-    SP-->>S: Return spam score
-
-    alt High spam score
-        S->>S: Discard comment silently
-    else Low score + trusted reader
-        S->>S: Auto-approve comment
-        S-->>A: Notify: new comment on your post
-        S-->>R: Notify: reply received (if applicable)
-    else Medium score or new reader
-        S->>S: Queue for moderation
-        S-->>M: Notify: comment awaiting moderation
-
-        M->>S: Open moderation queue
-        S-->>M: Display pending comments
-
-        alt Approve
-            M->>S: Approve comment
-            S->>S: Comment published
-            S-->>A: Notify: new approved comment
-        else Reject
-            M->>S: Reject comment
-            S->>S: Comment deleted
-        else Mark as Spam
-            M->>S: Mark as spam
-            S->>S: Add to spam list
-        end
-    end
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
-
-## 3. Theme Activation with Widget Migration
-
-```mermaid
-sequenceDiagram
-    box Admin
-        participant ADM as Admin
-    end
-    box System
-        participant S as CMS System
-        participant CDN as CDN
-    end
-
-    ADM->>S: Install new theme
-    S-->>ADM: Theme installed (inactive)
-    ADM->>S: Request live preview
-    S-->>ADM: Preview rendered in isolated session
-
-    ADM->>S: Confirm activation
-    S->>S: Compare new theme zones vs. existing widget placements
-    S-->>ADM: Show unmapped widget zones (if any)
-
-    ADM->>S: Map old zones to new zones
-    S->>S: Migrate widget instances to new zones
-    S->>S: Activate theme
-    S->>CDN: Invalidate site-wide cache
-    CDN-->>S: Cache cleared
-    S-->>ADM: Activation confirmed
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
 
----
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
 
-## 4. Plugin Installation and Hook Registration
-
-```mermaid
-sequenceDiagram
-    box Admin
-        participant ADM as Admin
-    end
-    box System
-        participant S as CMS System
-    end
-    box Plugin
-        participant P as Plugin Package
-    end
-
-    ADM->>S: Upload or select plugin from marketplace
-    S->>P: Download and extract plugin
-    S->>P: Validate API version and hook compatibility
-    P-->>S: Compatibility report
-
-    alt Compatible
-        S-->>ADM: Show Activate button
-        ADM->>S: Click Activate
-        S->>P: Call plugin.install() hook
-        P->>S: Register widget types
-        P->>S: Register admin menu items
-        P->>S: Register API route extensions
-        S-->>ADM: Plugin active, settings page available
-    else Incompatible
-        S-->>ADM: Show warning with details
-        ADM->>S: Proceed anyway (or cancel)
-    end
-```
-
----
-
-## 5. Subscriber Newsletter Dispatch
-
-```mermaid
-sequenceDiagram
-    box System
-        participant S as CMS System
-        participant Q as Notification Queue
-        participant EM as Email Provider
-    end
-    box Subscriber
-        participant SUB as Subscriber
-    end
-
-    S->>S: Post published (or scheduled time reached)
-    S->>Q: Enqueue newsletter dispatch job
-
-    Q->>S: Process job: fetch subscriber list
-    S-->>Q: Return confirmed subscriber emails
-
-    loop For each subscriber batch
-        Q->>EM: Send digest email (post title, excerpt, link)
-        EM-->>Q: Delivery status (delivered / bounced)
-        Q->>S: Store delivery event (or unsubscribe on hard bounce)
-    end
-
-    S-->>SUB: Newsletter email received
-    SUB->>S: Click unsubscribe link (optional)
-    S->>S: Remove subscription, confirm page shown
-```
-
----
-
-## 6. Media Upload and Processing
-
-```mermaid
-sequenceDiagram
-    box Author / Editor
-        participant U as Author / Editor
-    end
-    box System
-        participant S as CMS System
-        participant MS as Media Storage
-    end
-
-    U->>S: Upload image file
-    S->>S: Validate file type and size
-    S->>MS: Store original file
-    MS-->>S: Return storage URL
-
-    S->>S: Generate thumbnail (150×150)
-    S->>S: Generate medium size (640×480)
-    S->>S: Generate large size (1280×960)
-    S->>MS: Store all image size variants
-    S->>S: Create media library record with all variant URLs
-    S-->>U: Upload complete, media available in library
-
-    U->>S: Insert image into post editor
-    S-->>U: Embed responsive image HTML with srcset
-```
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

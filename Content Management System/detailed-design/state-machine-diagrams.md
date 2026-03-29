@@ -1,158 +1,93 @@
 # State Machine Diagrams
 
-## Overview
-State machine diagrams model the lifecycle and valid state transitions for key entities in the CMS.
+## Scope
+Formal lifecycle state machines for content, workflow, and publication jobs.
 
----
-
-## 1. Post Lifecycle
-
+## Mermaid Diagram
 ```mermaid
 stateDiagram-v2
-    [*] --> Draft : Author creates new post
-
-    Draft --> Draft : Author saves draft / auto-save
-    Draft --> PendingReview : Author submits for review
-
-    PendingReview --> Draft : Editor returns with feedback
-    PendingReview --> Published : Editor publishes immediately
-    PendingReview --> Scheduled : Editor sets scheduled datetime
-
-    Scheduled --> Published : System auto-publishes at scheduled time
-    Scheduled --> Draft : Admin or Editor cancels schedule
-
-    Published --> Archived : Editor or Admin archives post
-    Published --> Draft : Admin reverts to draft (unpublish)
-
-    Archived --> Published : Admin restores post
-    Archived --> Trashed : Admin moves to trash
-
-    Draft --> Trashed : Author or Admin trashes draft
-
-    Trashed --> Draft : Admin restores within retention window
-    Trashed --> [*] : System permanently deletes after retention period
+    [*] --> DRAFT
+    DRAFT --> PENDING_REVIEW: submit
+    PENDING_REVIEW --> DRAFT: request_changes
+    PENDING_REVIEW --> APPROVED: approve
+    APPROVED --> SCHEDULED: schedule
+    APPROVED --> PUBLISHED: publish_now
+    SCHEDULED --> PUBLISHED: schedule_trigger
+    PUBLISHED --> ARCHIVED: archive
+    PUBLISHED --> ROLLED_BACK: rollback
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## 2. Comment Lifecycle
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-```mermaid
-stateDiagram-v2
-    [*] --> Submitted : Reader submits comment
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
-    Submitted --> SpamChecking : System submits to spam filter
-    SpamChecking --> Spam : High spam score
-    SpamChecking --> AutoApproved : Low score + trusted reader
-    SpamChecking --> Pending : Medium score or new reader
-
-    Pending --> Approved : Moderator approves
-    Pending --> Rejected : Moderator rejects
-    Pending --> Spam : Moderator marks as spam
-
-    AutoApproved --> Approved : State normalised
-
-    Approved --> Rejected : Moderator later removes approved comment
-    Approved --> Spam : Moderator escalates to spam
-
-    Spam --> [*] : Periodically purged
-    Rejected --> [*] : Deleted immediately
-    Approved --> [*] : Post is deleted (cascade)
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
-
-## 3. Widget Placement Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Unplaced : Widget type registered in library
-
-    Unplaced --> Placed : Admin drags widget into a zone
-    Placed --> Configured : Admin opens and saves configuration form
-    Configured --> Placed : Admin clears configuration (resets to defaults)
-    Configured --> Reordered : Admin changes position within zone
-    Reordered --> Configured : Stable position
-
-    Configured --> MovedZone : Admin moves widget to different zone
-    MovedZone --> Configured : Stable in new zone
-
-    Placed --> Removed : Admin removes widget from zone
-    Configured --> Removed : Admin removes widget from zone
-    Removed --> Unplaced : Widget type still available in library
-
-    note right of Configured
-        Layout cache invalidated
-        on every configuration save
-    end note
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
 
----
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
 
-## 4. Theme Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Installed : Admin installs from marketplace or upload
-
-    Installed --> Previewing : Admin triggers live preview
-    Previewing --> Installed : Admin cancels preview
-    Previewing --> Activating : Admin confirms activation
-
-    Installed --> Activating : Admin activates directly (skipping preview)
-
-    Activating --> Active : Widget zones migrated; cache invalidated
-    Active --> Deactivated : Admin activates a different theme
-
-    Deactivated --> Activating : Admin re-activates this theme
-    Deactivated --> [*] : Admin uninstalls theme
-
-    Active --> [*] : Cannot uninstall the active theme directly
-```
-
----
-
-## 5. User / Site Membership Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Invited : Admin sends invitation
-
-    Invited --> Invitation_Expired : Invitation token expires (24 h)
-    Invitation_Expired --> [*] : Invitation purged
-
-    Invited --> Active : User accepts invitation and sets password
-
-    Active --> Suspended : Admin suspends user
-    Suspended --> Active : Admin reinstates user
-    Suspended --> Deactivated : Admin deactivates permanently
-
-    Active --> Deactivated : User requests account deletion (GDPR erasure)
-    Deactivated --> [*] : Data erased after retention period
-```
-
----
-
-## 6. Plugin Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Downloaded : Admin initiates install from marketplace or upload
-
-    Downloaded --> CompatibilityCheck : System validates against CMS version and hook API
-
-    CompatibilityCheck --> Installed : Compatibility passed
-    CompatibilityCheck --> IncompatibleWarning : Compatibility failed
-    IncompatibleWarning --> Installed : Admin overrides and proceeds
-    IncompatibleWarning --> [*] : Admin cancels install
-
-    Installed --> Active : Admin activates plugin
-    Active --> Inactive : Admin deactivates plugin
-
-    Inactive --> Active : Admin re-activates plugin
-    Inactive --> [*] : Admin uninstalls (files removed)
-
-    Active --> Updating : Admin triggers update
-    Updating --> Active : Update successful
-    Updating --> Active : Update failed, rollback applied
-```
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

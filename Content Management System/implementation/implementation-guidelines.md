@@ -1,219 +1,96 @@
 # Implementation Guidelines
 
-## Overview
-This document provides implementation guidelines for the CMS backend, covering technology choices, coding standards, module boundaries, and development patterns.
+## Scope
+Coding, testing, release, and operability standards for engineering teams.
 
----
-
-## Technology Stack
-
-| Layer | Technology | Rationale |
-|-------|-----------|-----------|
-| API Framework | FastAPI (Python 3.11+) | Async-native, automatic OpenAPI docs, type-safe via Pydantic |
-| ORM | SQLAlchemy 2.x (async) | Mature, supports PostgreSQL-specific features |
-| Database | PostgreSQL 15+ | JSONB for widget configs, full-text search fallback, strong ACID guarantees |
-| Cache / Queue | Redis 7 (via ARQ or Celery) | Session store, rate limiting, background job queue |
-| Search | Meilisearch | Typo-tolerant, fast, easy to self-host |
-| Media Processing | Pillow (Python) via worker | Resize and optimise images asynchronously |
-| Auth | python-jose (JWT) + pyotp (TOTP) | Standard libraries with well-understood security properties |
-| Email | SMTP abstraction (SES/SendGrid adapter) | Provider-agnostic via adapter pattern |
-| Frontend (Public) | Next.js 14+ (App Router, SSR) | SEO-optimised server-side rendering, ISR for post pages |
-| Frontend (Admin/Author) | React + Vite + TanStack Query | SPA for complex interactive editors |
-| Containerisation | Docker + Kubernetes (Helm charts) | Standard cloud-native deployment |
-
----
-
-## Project Structure
-
-```
-cms-backend/
-├── app/
-│   ├── main.py                  # FastAPI app factory, lifespan events
-│   ├── config.py                # Settings (pydantic-settings)
-│   ├── database.py              # Async SQLAlchemy engine and session
-│   ├── dependencies.py          # Shared FastAPI dependencies (auth, pagination)
-│   │
-│   ├── iam/                     # Auth, users, roles, 2FA, OAuth2
-│   │   ├── router.py
-│   │   ├── service.py
-│   │   ├── models.py
-│   │   ├── schemas.py
-│   │   └── permissions.py
-│   │
-│   ├── content/                 # Posts, pages, revisions
-│   │   ├── router.py
-│   │   ├── service.py
-│   │   ├── models.py
-│   │   └── schemas.py
-│   │
-│   ├── publishing/              # Workflow state machine, scheduling
-│   │   ├── router.py
-│   │   ├── workflow.py          # State machine transitions
-│   │   ├── scheduler.py         # ARQ job registration
-│   │   ├── feed.py              # RSS/Atom feed generation
-│   │   └── sitemap.py           # sitemap.xml generation
-│   │
-│   ├── taxonomy/                # Categories, tags, custom taxonomies
-│   │   ├── router.py
-│   │   ├── service.py
-│   │   ├── models.py
-│   │   └── schemas.py
-│   │
-│   ├── media/                   # Upload, library, resize
-│   │   ├── router.py
-│   │   ├── service.py
-│   │   ├── processor.py         # Image resize using Pillow
-│   │   ├── storage.py           # S3-compatible storage abstraction
-│   │   └── models.py
-│   │
-│   ├── layout/                  # Themes, widgets, zones, menus
-│   │   ├── router.py
-│   │   ├── theme_service.py
-│   │   ├── widget_registry.py   # Built-in + plugin-registered widgets
-│   │   ├── zone_service.py
-│   │   ├── renderer.py          # Zone resolution at request time
-│   │   ├── menu_service.py
-│   │   └── models.py
-│   │
-│   ├── comments/                # Comment submission, threading, moderation
-│   │   ├── router.py
-│   │   ├── service.py
-│   │   ├── moderation.py
-│   │   ├── spam_client.py       # Spam filter API adapter
-│   │   └── models.py
-│   │
-│   ├── seo/                     # Meta fields, redirects
-│   │   ├── router.py
-│   │   ├── service.py
-│   │   └── models.py
-│   │
-│   ├── analytics/               # Event ingestion, rollups, dashboard
-│   │   ├── router.py
-│   │   ├── ingestion.py
-│   │   ├── rollup.py
-│   │   ├── query.py
-│   │   └── models.py
-│   │
-│   ├── notifications/           # In-app store, email dispatch
-│   │   ├── service.py
-│   │   ├── email_dispatcher.py
-│   │   └── models.py
-│   │
-│   ├── plugins/                 # Plugin registry and hook engine
-│   │   ├── router.py
-│   │   ├── registry.py
-│   │   ├── hooks.py             # Hook system: on_post_publish, on_widget_render, etc.
-│   │   └── models.py
-│   │
-│   ├── sites/                   # Multi-site and tenant management
-│   │   ├── router.py
-│   │   ├── service.py
-│   │   └── models.py
-│   │
-│   └── worker/                  # Background job definitions
-│       ├── jobs.py              # ARQ job functions
-│       └── scheduler_config.py
-│
-├── alembic/                     # Database migrations
-│   └── versions/
-├── tests/
-│   ├── conftest.py
-│   ├── test_publishing_workflow.py
-│   ├── test_widget_placement.py
-│   ├── test_comment_moderation.py
-│   └── ...
-├── Dockerfile
-├── docker-compose.yml
-├── pyproject.toml
-└── README.md
-```
-
----
-
-## Module Design Principles
-
-### 1. Workflow State Machine
-All post and comment state transitions must go through the `WorkflowEngine`. Direct model `status` mutations outside the engine are prohibited. Each transition validates the current state, the actor's role, and records an event log entry.
-
-```python
-# Example: Transition a post to published
-await workflow_engine.transition(
-    post=post,
-    to_state=PostStatus.PUBLISHED,
-    actor=current_user,
-    context={"published_at": datetime.utcnow()},
-)
-```
-
-### 2. Widget Registry Pattern
-Widgets are registered via a decorator in the `WidgetRegistry`. Built-in widgets are registered on application startup. Plugins register their widgets during their `on_activate` hook.
-
-```python
-@widget_registry.register("recent_posts")
-class RecentPostsWidget(BaseWidget):
-    config_schema = RecentPostsConfig  # Pydantic model
-    
-    async def render(self, config: RecentPostsConfig, context: RenderContext) -> str:
-        posts = await post_repo.list_recent(site_id=context.site_id, limit=config.count)
-        return templates.render("widgets/recent_posts.html", posts=posts)
-```
-
-### 3. Zone Placement and Rendering
-The `LayoutRenderer` resolves widget placements at request time by querying the zone placement table. Results are cached in Redis for a configurable TTL. The cache is invalidated on every layout save or theme activation.
-
-### 4. Plugin Hook System
-Hooks allow plugins to extend CMS behaviour without modifying core code. Key hooks:
-
-| Hook Name | Trigger | Use Case |
-|-----------|---------|----------|
-| `on_post_publish` | Post transitions to published | Crosspost to social media |
-| `on_comment_approve` | Comment approved | Send mention notification |
-| `on_widget_render` | Widget renders | Inject custom analytics code |
-| `on_admin_menu_build` | Admin sidebar built | Add plugin settings link |
-| `on_page_request` | Public page requested | Add custom HTTP headers |
-
-### 5. Multi-Site Isolation
-All repository methods accept `site_id` as the first argument and apply it as a mandatory filter. The `get_current_site` FastAPI dependency resolves site context from the request host or an `X-Site-ID` header for API clients.
-
-### 6. Revision Strategy
-Revisions are captured automatically via a SQLAlchemy event listener on Post and Page `after_update` events. The full content snapshot is stored; no delta compression is applied at this stage to keep the implementation simple and restore operations fast.
-
----
-
-## Security Checklist
-
-- [ ] All state-mutating endpoints require authenticated JWT with appropriate role
-- [ ] All rich text content is sanitised server-side using `bleach` or equivalent before storage
-- [ ] File uploads are validated for MIME type and max size before processing
-- [ ] Rate limiting applied to comment submission (10/min per IP) and login (5/min per IP)
-- [ ] CSRF protection enabled for non-API browser sessions (SameSite=Strict cookies)
-- [ ] `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY` headers on all responses
-- [ ] SQL queries exclusively via SQLAlchemy ORM (no raw string interpolation)
-- [ ] Spam filter called on every comment before storage
-- [ ] Plugin packages validated against a checksum and scanned before activation
-
----
-
-## Performance Guidelines
-
-| Area | Guideline |
-|------|-----------|
-| Database | Use indexed columns for `site_id`, `status`, `slug`, `published_at` on all content tables |
-| Redis caching | Cache rendered zone HTML with key `zone:{site_id}:{zone_name}:{theme_id}` TTL 5 min |
-| Image resizing | Perform async in worker; do not resize in the API request path |
-| Feed generation | Cache RSS/Atom at CDN; regenerate only on publish/unpublish events |
-| Search indexing | Async in worker; API returns 200 immediately after DB write |
-| Analytics ingestion | Fire-and-forget POST to `/analytics/events`; no synchronous response payload needed |
-| Pagination | Default 20, max 100 items per page for all list endpoints |
-
----
+## Engineering Standards
+- Hexagonal architecture for domain isolation.
+- Commands mutate state; queries read projections.
+- Every mutating endpoint must emit audit event and metrics.
 
 ## Testing Strategy
+- Unit tests for policy and aggregate transition rules.
+- Contract tests for API + async event compatibility.
+- End-to-end tests for draft->review->publish->rollback workflow.
+- Chaos tests for queue lag and dependency failure tolerance.
 
-| Level | Tool | Coverage Target |
-|-------|------|----------------|
-| Unit | pytest + pytest-asyncio | Business logic in services and state machine |
-| Integration | pytest + test database | Router → service → DB round-trips |
-| API contract | httpx TestClient | All published API endpoints |
-| Widget rendering | HTML snapshot tests | Each built-in widget type |
-| End-to-end | Playwright | Critical reader and author journeys |
+## Definition of Done
+- Requirement traceability row updated.
+- Runbook updates for new alert or operational behavior.
+- Feature flag and rollback plan documented.
+
+
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
+
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
+
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
+
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
+```
+
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
+```
+
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
+
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

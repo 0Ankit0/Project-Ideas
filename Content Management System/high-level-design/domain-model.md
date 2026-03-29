@@ -1,231 +1,95 @@
 # Domain Model
 
-## Overview
-The domain model shows the key business entities in the CMS, their attributes, and the relationships between them.
+## Scope
+Bounded contexts, aggregates, and key invariants.
 
----
+## Aggregates and Invariants
+- **ContentItem aggregate:** status transitions guarded by workflow state.
+- **Workflow aggregate:** only one OPEN approval task per content item.
+- **Publishing aggregate:** publish and rollback jobs are mutually exclusive for same content id.
 
-## Core Domain Model
 
+## Mermaid Diagram
 ```mermaid
-classDiagram
-    class Site {
-        +id: int
-        +name: string
-        +slug: string
-        +domain: string
-        +timezone: string
-        +active_theme_id: int
-        +is_active: bool
-    }
-
-    class User {
-        +id: int
-        +email: string
-        +display_name: string
-        +bio: text
-        +avatar_url: string
-        +role: Role
-        +is_active: bool
-        +twofa_enabled: bool
-    }
-
-    class Post {
-        +id: int
-        +title: string
-        +slug: string
-        +content: text
-        +excerpt: text
-        +status: PostStatus
-        +featured_image_id: int
-        +scheduled_at: datetime
-        +published_at: datetime
-        +author_id: int
-        +site_id: int
-    }
-
-    class Page {
-        +id: int
-        +title: string
-        +slug: string
-        +content: text
-        +status: PageStatus
-        +template: string
-        +in_navigation: bool
-        +site_id: int
-    }
-
-    class Revision {
-        +id: int
-        +content_type: string
-        +content_id: int
-        +title: string
-        +content: text
-        +actor_id: int
-        +created_at: datetime
-    }
-
-    class Category {
-        +id: int
-        +name: string
-        +slug: string
-        +parent_id: int
-        +description: text
-        +site_id: int
-    }
-
-    class Tag {
-        +id: int
-        +name: string
-        +slug: string
-        +site_id: int
-    }
-
-    class MediaItem {
-        +id: int
-        +filename: string
-        +mime_type: string
-        +file_size: int
-        +original_url: string
-        +thumbnail_url: string
-        +medium_url: string
-        +large_url: string
-        +alt_text: string
-        +uploader_id: int
-        +site_id: int
-    }
-
-    class Comment {
-        +id: int
-        +post_id: int
-        +parent_id: int
-        +author_user_id: int
-        +author_name: string
-        +author_email: string
-        +body: text
-        +status: CommentStatus
-        +spam_score: float
-    }
-
-    class Widget {
-        +id: int
-        +type: string
-        +name: string
-        +description: string
-        +config_schema: json
-        +registered_by: string
-    }
-
-    class WidgetPlacement {
-        +id: int
-        +site_id: int
-        +theme_id: int
-        +zone_name: string
-        +widget_id: int
-        +position: int
-        +config: json
-        +page_override_id: int
-    }
-
-    class Theme {
-        +id: int
-        +name: string
-        +version: string
-        +zones: json
-        +package_url: string
-        +is_active: bool
-        +site_id: int
-    }
-
-    class NavigationMenu {
-        +id: int
-        +name: string
-        +zone: string
-        +site_id: int
-    }
-
-    class NavigationItem {
-        +id: int
-        +menu_id: int
-        +label: string
-        +url: string
-        +parent_id: int
-        +position: int
-    }
-
-    class SEOMeta {
-        +id: int
-        +content_type: string
-        +content_id: int
-        +meta_title: string
-        +meta_description: text
-        +og_image_id: int
-        +canonical_url: string
-    }
-
-    class Subscription {
-        +id: int
-        +email: string
-        +site_id: int
-        +is_confirmed: bool
-        +frequency: string
-        +created_at: datetime
-    }
-
-    class Plugin {
-        +id: int
-        +name: string
-        +version: string
-        +is_active: bool
-        +site_id: int
-        +config: json
-    }
-
-    Site "1" --> "many" User : has members
-    Site "1" --> "many" Post : contains
-    Site "1" --> "many" Page : contains
-    Site "1" --> "many" Category : owns
-    Site "1" --> "many" Tag : owns
-    Site "1" --> "many" Theme : installs
-    Site "1" --> "many" NavigationMenu : defines
-    Site "1" --> "many" Subscription : gathers
-    Site "1" --> "many" Plugin : installs
-
-    User "1" --> "many" Post : authors
-    User "1" --> "many" Comment : writes
-
-    Post "1" --> "many" Revision : has
-    Post "many" --> "many" Category : classified_by
-    Post "many" --> "many" Tag : tagged_with
-    Post "1" --> "many" Comment : receives
-    Post "1" --> "1" SEOMeta : has
-
-    Page "1" --> "many" Revision : has
-    Page "1" --> "1" SEOMeta : has
-
-    Theme "1" --> "many" WidgetPlacement : defines
-    Widget "1" --> "many" WidgetPlacement : placed_as
-
-    NavigationMenu "1" --> "many" NavigationItem : contains
+erDiagram
+    CONTENT_ITEM ||--o{ CONTENT_REVISION : has
+    CONTENT_ITEM ||--o{ WORKFLOW_TASK : creates
+    CONTENT_ITEM ||--o{ PUBLISH_JOB : triggers
+    CONTENT_ITEM }o--o{ TAXONOMY_TERM : classified_by
+    CONTENT_REVISION ||--o{ REVIEW_COMMENT : annotated_by
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## Domain Enumerations
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-### PostStatus
-```
-Draft → PendingReview → Scheduled → Published → Archived → Trashed
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
+
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
-### CommentStatus
-```
-Pending → Approved
-Pending → Rejected
-Pending → Spam
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
 
-### Role
-```
-Reader < Author < Editor < Administrator < SuperAdmin
-```
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
+
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

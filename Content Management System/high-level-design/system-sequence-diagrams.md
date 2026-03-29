@@ -1,162 +1,102 @@
 # System Sequence Diagrams
 
-## Overview
-System sequence diagrams model the interactions between external actors and the CMS as a black box, focusing on the messages exchanged at the system boundary.
+## Scope
+System-level interaction sequences for core and failure paths.
 
----
+## Review and Publish System Sequence
+- Decision command must include expected task version.
+- Workflow emits `content.status.changed` before publication starts.
+- Publishing produces idempotency key `publish:{contentId}:{revisionId}`.
+- Failure branch routes to rollback policy evaluator and incident notifier.
 
-## 1. Author Creates and Submits a Post
 
+## Mermaid Diagram
 ```mermaid
 sequenceDiagram
-    actor Author
-    participant CMS as CMS System
-
-    Author->>CMS: POST /api/v1/posts (title, content, status=draft)
-    CMS-->>Author: 201 Created {post_id, slug, status: draft}
-
-    Author->>CMS: PATCH /api/v1/posts/{post_id} (content update)
-    CMS-->>Author: 200 OK {revision_id, updated_at}
-
-    Author->>CMS: POST /api/v1/media (image file)
-    CMS-->>Author: 201 Created {media_id, thumbnail_url, medium_url, large_url}
-
-    Author->>CMS: PATCH /api/v1/posts/{post_id} (featured_image_id)
-    CMS-->>Author: 200 OK
-
-    Author->>CMS: PUT /api/v1/posts/{post_id}/submit
-    CMS-->>Author: 200 OK {status: pending_review, notified_editor: true}
+    participant UI as Editor UI
+    participant API as API Gateway
+    participant WF as Workflow Service
+    participant PUB as Publishing Service
+    participant CDN as CDN
+    participant AUD as Audit Service
+    UI->>API: Approve draft
+    API->>WF: resolveTask(APPROVE)
+    WF->>PUB: publish(contentId)
+    PUB->>CDN: invalidate(paths)
+    PUB->>AUD: record publish evidence
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## 2. Editor Reviews and Publishes
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-```mermaid
-sequenceDiagram
-    actor Editor
-    participant CMS as CMS System
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
-    Editor->>CMS: GET /api/v1/posts?status=pending_review
-    CMS-->>Editor: 200 OK [{post_id, title, author, submitted_at}, ...]
-
-    Editor->>CMS: GET /api/v1/posts/{post_id}
-    CMS-->>Editor: 200 OK {full post content, metadata}
-
-    Editor->>CMS: GET /api/v1/posts/{post_id}/preview
-    CMS-->>Editor: 200 OK (rendered HTML preview)
-
-    alt Publish now
-        Editor->>CMS: PUT /api/v1/posts/{post_id}/publish
-        CMS-->>Editor: 200 OK {status: published, published_at}
-    else Schedule
-        Editor->>CMS: PUT /api/v1/posts/{post_id}/schedule (scheduled_at)
-        CMS-->>Editor: 200 OK {status: scheduled, scheduled_at}
-    else Return to draft
-        Editor->>CMS: PUT /api/v1/posts/{post_id}/return (feedback)
-        CMS-->>Editor: 200 OK {status: draft}
-    end
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
-
-## 3. Admin Configures Widget Layout
-
-```mermaid
-sequenceDiagram
-    actor Admin
-    participant CMS as CMS System
-
-    Admin->>CMS: GET /api/v1/themes/active/zones
-    CMS-->>Admin: 200 OK [{zone_name, current_widgets}, ...]
-
-    Admin->>CMS: GET /api/v1/widgets
-    CMS-->>Admin: 200 OK [{widget_type, name, config_schema}, ...]
-
-    Admin->>CMS: POST /api/v1/layouts/zones/{zone_name}/widgets
-    Note right of Admin: body: {widget_type, config, position}
-    CMS-->>Admin: 201 Created {placement_id}
-
-    Admin->>CMS: PATCH /api/v1/layouts/placements/{placement_id}
-    Note right of Admin: body: {config updates}
-    CMS-->>Admin: 200 OK
-
-    Admin->>CMS: PUT /api/v1/layouts/zones/{zone_name}/order
-    Note right of Admin: body: {placement_ids in order}
-    CMS-->>Admin: 200 OK
-
-    Admin->>CMS: DELETE /api/v1/layouts/placements/{placement_id}
-    CMS-->>Admin: 204 No Content
-
-    Admin->>CMS: POST /api/v1/layouts/save
-    CMS-->>Admin: 200 OK {cache_invalidated: true}
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
 
----
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
 
-## 4. Reader Subscribes to Newsletter
-
-```mermaid
-sequenceDiagram
-    actor Reader
-    participant CMS as CMS System
-    participant Email as Email Provider
-
-    Reader->>CMS: POST /api/v1/subscriptions (email)
-    CMS-->>Reader: 202 Accepted {message: "check your inbox"}
-
-    CMS->>Email: Send confirmation email with token
-    Email-->>Reader: Confirmation email delivered
-
-    Reader->>CMS: GET /api/v1/subscriptions/confirm?token={token}
-    CMS-->>Reader: 200 OK {subscribed: true}
-
-    CMS->>Email: Send welcome email
-    Email-->>Reader: Welcome email delivered
-```
-
----
-
-## 5. Reader Searches and Reads a Post
-
-```mermaid
-sequenceDiagram
-    actor Reader
-    participant CMS as CMS System
-    participant Search as Search Index
-
-    Reader->>CMS: GET /api/v1/search?q=keyword&category=tech
-    CMS->>Search: query(keyword, filters)
-    Search-->>CMS: [{post_id, title, excerpt, score}, ...]
-    CMS-->>Reader: 200 OK {results, total, page}
-
-    Reader->>CMS: GET /api/v1/posts/{slug}
-    CMS-->>Reader: 200 OK {post content, author, categories, tags, comments_enabled}
-
-    Reader->>CMS: POST /api/v1/analytics/pageview
-    Note right of Reader: body: {post_id, referrer, device}
-    CMS-->>Reader: 204 No Content
-```
-
----
-
-## 6. Super Admin Creates a New Site
-
-```mermaid
-sequenceDiagram
-    actor SuperAdmin
-    participant CMS as CMS System
-    participant Email as Email Provider
-
-    SuperAdmin->>CMS: POST /api/v1/sites
-    Note right of SuperAdmin: body: {name, domain, slug, owner_email, theme_id}
-    CMS-->>SuperAdmin: 201 Created {site_id, status: provisioning}
-
-    CMS->>CMS: Provision tenant database schema
-    CMS->>CMS: Apply default theme and plugins
-    CMS->>Email: Send owner invitation email
-    Email-->>SuperAdmin: Invitation sent confirmation
-
-    SuperAdmin->>CMS: GET /api/v1/sites/{site_id}
-    CMS-->>SuperAdmin: 200 OK {site_id, status: active, domain}
-```
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

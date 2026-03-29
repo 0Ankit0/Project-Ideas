@@ -1,207 +1,106 @@
 # C4 Diagrams
 
-## Overview
-C4 diagrams describe the CMS architecture at four levels of zoom: System Context, Container, Component, and Code.
+## Scope
+Context and container views of CMS platform and dependencies.
 
----
-
-## Level 1: System Context Diagram
-
+## Mermaid Diagram
 ```mermaid
-graph TB
-    Reader((Reader))
-    Author((Author))
-    Editor((Editor))
-    Admin((Admin))
-    SuperAdmin((Super Admin))
-
-    subgraph "CMS Platform"
-        System[Content Management System<br>Widget-based page builder, multi-author publishing workflow,<br>multi-site management, plugin architecture]
+flowchart TB
+    subgraph Context
+      User[Author/Editor/Reader]
+      CMS[CMS Platform]
+      Ext[External Services]
     end
+    User --> CMS
+    CMS --> Ext
 
-    EmailSvc[Email Provider<br>SES / SendGrid / Mailgun]
-    SpamSvc[Spam Filter Service<br>Akismet-compatible API]
-    MediaStorage[Object Storage<br>S3-compatible]
-    SearchSvc[Search Service<br>Meilisearch]
-    CDN[CDN<br>CloudFront / Fastly]
-    OAuth[OAuth2 Provider<br>Google / GitHub]
-
-    Reader -->|"read, comment, subscribe, search"| System
-    Author -->|"create posts, upload media, manage drafts"| System
-    Editor -->|"review, publish, manage taxonomy"| System
-    Admin -->|"configure themes, widgets, users, plugins"| System
-    SuperAdmin -->|"manage sites, global users, push updates"| System
-
-    System -->|"transactional and digest emails"| EmailSvc
-    System -->|"score comments for spam"| SpamSvc
-    System -->|"store and retrieve media"| MediaStorage
-    System -->|"index and query content"| SearchSvc
-    System -->|"serve cached assets and pages"| CDN
-    System -->|"delegate social login"| OAuth
+    subgraph Containers
+      API[API Gateway]
+      Authoring[Authoring Service]
+      Workflow[Workflow Service]
+      Publish[Publishing Service]
+      Search[Search Projector]
+      DB[(PostgreSQL)]
+      Queue[(Message Bus)]
+    end
+    API --> Authoring
+    API --> Workflow
+    Workflow --> Queue
+    Publish --> Queue
+    Authoring --> DB
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## Level 2: Container Diagram
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-```mermaid
-graph TB
-    Reader((Reader))
-    Author((Author))
-    Editor((Editor))
-    Admin((Admin))
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
-    subgraph "CMS Platform"
-        PublicFront[Public Frontend<br>SSR web application<br>Next.js / Astro]
-        AdminSPA[Admin & Editor SPA<br>React SPA]
-        AuthorSPA[Author Dashboard<br>React SPA]
-
-        API[CMS API Server<br>FastAPI — versioned REST endpoints<br>and domain modules]
-        Worker[Background Worker<br>Scheduled jobs: publish, email dispatch,<br>media processing, index sync, cache invalidation]
-        WS[WebSocket Server<br>Real-time notifications for editors and admins]
-
-        DB[(PostgreSQL<br>Primary content, users, layout, analytics)]
-        Redis[(Redis<br>Sessions, rate limiting, job queue, short-term cache)]
-        Storage[(Object Storage<br>Media assets, theme & plugin packages)]
-        SearchIdx[(Search Index<br>Meilisearch)]
-    end
-
-    EmailSvc[Email Provider]
-    SpamSvc[Spam Filter]
-    CDN[CDN]
-    OAuth[OAuth2 Provider]
-
-    Reader --> PublicFront
-    Author --> AuthorSPA
-    Editor --> AdminSPA
-    Admin --> AdminSPA
-
-    PublicFront --> API
-    AuthorSPA --> API
-    AdminSPA --> API
-    AdminSPA --> WS
-
-    API --> DB
-    API --> Redis
-    API --> Storage
-    API --> SearchIdx
-    API --> Worker
-    API --> SpamSvc
-    API --> OAuth
-
-    Worker --> DB
-    Worker --> Storage
-    Worker --> EmailSvc
-    Worker --> SearchIdx
-    Worker --> CDN
-
-    PublicFront --> CDN
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
 ```
 
----
-
-## Level 3: Component Diagram — Content & Publishing Core
-
-```mermaid
-graph TB
-    AuthorClient[Author / Editor Client]
-
-    subgraph "Content & Publishing Core"
-        ContentAPI[Content Routers<br>POST /posts, /pages, /revisions]
-        TaxonomyAPI[Taxonomy Routers<br>/categories, /tags]
-        MediaAPI[Media Routers<br>/media]
-        PublishingAPI[Publishing Routers<br>/posts/{id}/submit|publish|schedule|return]
-
-        DraftService[Draft & Auto-Save Service]
-        RevisionService[Revision Snapshot Service]
-        PublishService[Publish / Schedule Service]
-        FeedService[RSS/Atom Feed Generator]
-        SitemapService[Sitemap Builder]
-        NotifyService[Publishing Event Notifier]
-    end
-
-    DB[(PostgreSQL)]
-    Redis[(Redis Queue)]
-    SearchIdx[(Search Index)]
-    Worker[Background Worker]
-
-    AuthorClient --> ContentAPI
-    AuthorClient --> TaxonomyAPI
-    AuthorClient --> MediaAPI
-    AuthorClient --> PublishingAPI
-
-    ContentAPI --> DraftService
-    ContentAPI --> RevisionService
-    PublishingAPI --> PublishService
-    PublishService --> FeedService
-    PublishService --> SitemapService
-    PublishService --> NotifyService
-
-    DraftService --> DB
-    RevisionService --> DB
-    PublishService --> DB
-    PublishService --> Worker
-    FeedService --> DB
-    SitemapService --> DB
-    NotifyService --> DB
-    NotifyService --> Redis
-    ContentAPI --> SearchIdx
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
 ```
 
----
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
 
-## Level 3: Component Diagram — Layout & Widget Core
-
-```mermaid
-graph TB
-    AdminClient[Admin Client]
-
-    subgraph "Layout & Widget Core"
-        ThemeAPI[Theme Routers<br>/themes]
-        WidgetAPI[Widget Routers<br>/widgets, /layouts]
-        MenuAPI[Menu Routers<br>/menus]
-
-        ThemeService[Theme Lifecycle Service]
-        WidgetRegistry[Widget Registry]
-        ZoneService[Zone Placement Service]
-        MenuService[Navigation Menu Service]
-        LayoutRenderer[Layout Renderer<br>Resolves zones and widget data at request time]
-        CacheInvalidator[Cache Invalidation Service]
-    end
-
-    DB[(PostgreSQL)]
-    CDN[CDN]
-    Storage[(Object Storage)]
-
-    AdminClient --> ThemeAPI
-    AdminClient --> WidgetAPI
-    AdminClient --> MenuAPI
-
-    ThemeAPI --> ThemeService
-    WidgetAPI --> WidgetRegistry
-    WidgetAPI --> ZoneService
-    MenuAPI --> MenuService
-
-    ThemeService --> DB
-    ThemeService --> Storage
-    ZoneService --> DB
-    ZoneService --> CacheInvalidator
-    MenuService --> DB
-    WidgetRegistry --> DB
-    LayoutRenderer --> ZoneService
-    LayoutRenderer --> WidgetRegistry
-    CacheInvalidator --> CDN
-```
-
----
-
-## Current-Future Boundary
-
-| Area | Current Design |
-|------|---------------|
-| Architecture | Modular monolith (FastAPI) |
-| Search | Meilisearch for full-text; filtered DB queries as fallback |
-| Real-time notifications | WebSocket for admin/editor panel; email for authors and readers |
-| Plugin hooks | In-process hook invocation; external webhook plugins are a future option |
-| Multi-site | Schema-per-tenant PostgreSQL; shared application layer |
-| Recommendation | Tag/category affinity for related-posts widget; ML-based ranking is a future option |
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)

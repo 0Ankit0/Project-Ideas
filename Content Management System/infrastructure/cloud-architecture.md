@@ -1,154 +1,107 @@
-# Cloud Architecture Diagram
+# Cloud Architecture
 
-## Overview
-This document describes the cloud architecture for the CMS platform deployed on AWS. The design is cloud-provider-agnostic and maps directly to equivalent GCP and Azure services.
+## Scope
+Cloud service mapping, HA topology, autoscaling, and disaster recovery patterns.
 
----
+## Capacity and Resilience
+- Horizontal pod autoscaling on queue lag + CPU.
+- Publish workers isolated from authoring pool via dedicated node group.
+- Backup policy: PITR 35 days for primary DB; object storage versioning enabled.
+- DR runbook validated quarterly with failover drills.
 
-## AWS Cloud Architecture
 
+## Mermaid Diagram
 ```mermaid
-graph TB
-    subgraph "Global"
-        Route53[Route 53<br>DNS]
-        CloudFront[CloudFront<br>CDN + WAF]
-        ACM[ACM<br>TLS Certificates]
-        S3Media[S3 Bucket<br>Media Assets]
-        S3Exports[S3 Bucket<br>Report Exports & Backups]
+flowchart TB
+    subgraph RegionA[Primary Region]
+      ALB[Load Balancer]
+      ECS[EKS/ECS Services]
+      RDS[(PostgreSQL Multi-AZ)]
+      MQ[(Managed Kafka/SQS)]
+      REDIS[(Redis Cluster)]
     end
-
-    subgraph "AWS Region — Primary"
-        subgraph "Availability Zone A"
-            ALB[Application Load Balancer]
-
-            subgraph "EKS Node Group A"
-                APIA[CMS API Pod]
-                WorkerA[Worker Pod]
-                FrontendA[Frontend Pod]
-            end
-
-            RDSPrimary[(RDS PostgreSQL<br>Multi-AZ Primary)]
-            ElastiCachePrimary[(ElastiCache Redis<br>Primary node)]
-        end
-
-        subgraph "Availability Zone B"
-            subgraph "EKS Node Group B"
-                APIB[CMS API Pod]
-                WorkerB[Worker Pod]
-                FrontendB[Frontend Pod]
-            end
-
-            RDSStandby[(RDS PostgreSQL<br>Multi-AZ Standby)]
-            ElastiCacheReplica[(ElastiCache Redis<br>Replica node)]
-        end
-
-        subgraph "Shared Services"
-            EKS[Amazon EKS<br>Kubernetes control plane]
-            ECR[ECR<br>Container Registry]
-            SES[SES<br>Email Service]
-            Meilisearch[Meilisearch<br>EC2 or EKS StatefulSet]
-            CloudWatch[CloudWatch<br>Logs, Metrics, Alarms]
-            XRay[X-Ray<br>Distributed Tracing]
-            SecretsManager[Secrets Manager<br>DB credentials, API keys]
-        end
+    subgraph RegionB[DR Region]
+      STBY[Warm Standby Services]
+      RDSR[(Read Replica)]
     end
-
-    subgraph "AWS Region — DR / Read Replica"
-        RDSReplica[(RDS Read Replica<br>Cross-region)]
-        S3Replica[S3 Replication<br>Media backup]
-    end
-
-    Route53 --> CloudFront
-    CloudFront --> ALB
-    CloudFront --> S3Media
-    ACM --> CloudFront
-    ACM --> ALB
-
-    ALB --> APIA
-    ALB --> APIB
-    ALB --> FrontendA
-    ALB --> FrontendB
-
-    APIA --> RDSPrimary
-    APIA --> ElastiCachePrimary
-    APIA --> Meilisearch
-    APIA --> S3Media
-    APIA --> SES
-    APIA --> SecretsManager
-
-    WorkerA --> RDSPrimary
-    WorkerA --> ElastiCachePrimary
-    WorkerA --> S3Media
-    WorkerA --> SES
-
-    RDSPrimary --> RDSStandby
-    RDSPrimary --> RDSReplica
-    ElastiCachePrimary --> ElastiCacheReplica
-    S3Media --> S3Replica
-
-    EKS --> APIA
-    EKS --> APIB
-    EKS --> WorkerA
-    EKS --> WorkerB
-    ECR --> EKS
-    CloudWatch --> APIA
-    XRay --> APIA
-    S3Exports --> CloudWatch
+    ALB --> ECS
+    ECS --> RDS
+    ECS --> MQ
+    ECS --> REDIS
+    RDS --> RDSR
 ```
 
----
+## Detailed Flow
+1. Validate request context, tenant scope, and feature toggles.
+2. Execute business and policy checks before mutating state.
+3. Persist transactional state and emit outbox/integration events.
+4. Update projections, caches, and search indexes asynchronously.
+5. Record audit evidence and SLO telemetry for operational governance.
 
-## Cloud Service Mapping
+## Component Responsibilities
+| Component | Responsibilities | Key Decisions |
+|---|---|---|
+| API Gateway | Authentication, authorization, throttling, request validation | Enforce idempotency and version headers |
+| Content Service | Aggregate commands, revision management, lifecycle transitions | Maintain invariant-safe transitions |
+| Workflow Service | Task routing, SLA timers, escalation | Deterministic assignment and timeout behavior |
+| Publishing Service | Render, publish, cache invalidation, rollback | Idempotent publish and compensating actions |
+| Data Platform | Event projections, analytics, audit archive | Exactly-once processing and retention compliance |
 
-| Function | AWS | GCP | Azure |
-|----------|-----|-----|-------|
-| DNS | Route 53 | Cloud DNS | Azure DNS |
-| CDN + WAF | CloudFront + AWS WAF | Cloud CDN + Cloud Armor | Azure Front Door |
-| Load Balancer | ALB | Cloud Load Balancing | Azure App Gateway |
-| Kubernetes | EKS | GKE | AKS |
-| Container Registry | ECR | Artifact Registry | ACR |
-| PostgreSQL | RDS PostgreSQL | Cloud SQL | Azure Database for PostgreSQL |
-| Redis | ElastiCache | Memorystore | Azure Cache for Redis |
-| Object Storage | S3 | Cloud Storage | Azure Blob Storage |
-| Email | SES | — (use SendGrid) | Azure Communication Services |
-| TLS Certificates | ACM | Google-managed SSL | App Service Managed Cert |
-| Secrets | Secrets Manager | Secret Manager | Azure Key Vault |
-| Logging | CloudWatch Logs | Cloud Logging | Azure Monitor Logs |
-| Tracing | X-Ray | Cloud Trace | Azure Application Insights |
-| CI/CD | CodePipeline / GitHub Actions | Cloud Build | Azure DevOps |
+## Schema-Level Examples
+```sql
+CREATE TABLE content_item (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  slug VARCHAR(180) NOT NULL,
+  locale VARCHAR(10) NOT NULL DEFAULT 'en-US',
+  status VARCHAR(40) NOT NULL,
+  current_revision_id UUID NOT NULL,
+  published_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (tenant_id, locale, slug)
+);
 
----
+CREATE TABLE content_revision (
+  id UUID PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES content_item(id),
+  version INT NOT NULL,
+  body_json JSONB NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (content_id, version)
+);
+```
 
-## Backup and Disaster Recovery
+```json
+{
+  "eventType": "content.status.changed",
+  "eventVersion": 1,
+  "tenantId": "0e0d08f3-2a5d-4d85-8f1d-5fce2abf913e",
+  "contentId": "3c917a78-0cbf-4f07-97d7-8f94a4f2df80",
+  "fromStatus": "PENDING_REVIEW",
+  "toStatus": "PUBLISHED",
+  "actorId": "dfe334d4-8a7d-4d52-b3ad-a1fb36aa0508",
+  "occurredAt": "2026-03-28T09:15:00Z",
+  "traceId": "7f1aa03bc7d7440a"
+}
+```
 
-| Asset | Backup Method | RPO | RTO |
-|-------|---------------|-----|-----|
-| PostgreSQL | RDS automated snapshots (daily) + continuous WAL archiving | 1 h | 1 h |
-| Redis | ElastiCache daily snapshot to S3 | 24 h | 30 min |
-| Media (S3) | S3 versioning + cross-region replication | 1 h | 15 min |
-| Search Index | Rebuilt from PostgreSQL on recovery | N/A | 2 h |
-| Container Images | Immutable tags in ECR; multi-region replication | N/A | 5 min |
+## Non-Functional Requirements
+- **Availability:** Authoring plane 99.95% monthly; publishing pipeline 99.99%.
+- **Performance:** p95 command latency < 350 ms; p95 read latency < 180 ms.
+- **Scalability:** Handle 8x baseline publish spikes and 20x comment spikes.
+- **Security:** OIDC + MFA for privileged users; signed asset URLs; immutable audit logs.
+- **Reliability:** Outbox/inbox deduplication with idempotency keys for external side effects.
+- **Operability:** SLO alerts for queue lag, task SLA breaches, cache invalidation failures.
 
----
-
-## Auto-Scaling Configuration
-
-| Component | Metric | Min | Max |
-|-----------|--------|-----|-----|
-| CMS API Pods | CPU > 60% | 2 | 10 |
-| Worker Pods | Redis queue depth > 100 | 2 | 8 |
-| Frontend Pods | CPU > 70% | 2 | 6 |
-| RDS | — | 1 primary | 1 primary + 1 replica |
-| ElastiCache | — | 1 primary | 1 primary + 2 replicas |
-
----
-
-## Cost Optimisation
-
-| Strategy | Implementation |
-|----------|---------------|
-| CDN caching | Cache public posts, feeds, and sitemap at CDN for 5 min; media for 365 days |
-| Spot / Preemptible nodes | Use spot instances for worker pods; on-demand for API pods |
-| Read replicas | Route all public GET queries to RDS read replica |
-| S3 lifecycle | Move exports older than 90 days to S3 Glacier |
-| Reserved instances | Reserve 1-year term for RDS and ElastiCache primary nodes |
+## Cross-Document Traceability
+- [Requirements](../requirements/requirements.md)
+- [User Stories](../requirements/user-stories.md)
+- [Use Case Descriptions](../analysis/use-case-descriptions.md)
+- [API Design](../detailed-design/api-design.md)
+- [ERD and Database Schema](../detailed-design/erd-database-schema.md)
+- [Sequence Diagrams](../detailed-design/sequence-diagrams.md)
+- [Deployment Diagram](../infrastructure/deployment-diagram.md)
+- [Backend Status Matrix](../implementation/backend-status-matrix.md)
+- [Edge Cases Index](../edge-cases/README.md)
