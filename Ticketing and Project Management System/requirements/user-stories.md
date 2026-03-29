@@ -40,3 +40,45 @@
 - **US-ADM-001**: As an admin, I want to manage role templates and access policies so the right users see the right data.
 - **US-ADM-002**: As an admin, I want configurable categories, priorities, SLA policies, and workflow rules so the system fits different teams.
 - **US-ADM-003**: As an admin, I want immutable audit logs and export capability so operational and compliance reviews are possible.
+
+## Cross-Cutting Workflow and Operational Governance
+
+### User Stories: Document-Specific Scope
+- Primary focus for this artifact: **persona intent, acceptance tests, and story-level edge conditions**.
+- Implementation handoff expectation: this document must be sufficient for an engineer/architect/operator to implement without hidden assumptions.
+- Traceability anchor: `REQUIREMENTS_USER_STORIES` should be referenced in backlog items, design reviews, and release checklists when this artifact changes.
+
+### Workflow and State Machine Semantics (REQUIREMENTS_USER_STORIES)
+- For this document, workflow guidance must **translate requirement IDs into executable transition guards and acceptance tests**.
+- Transition definitions must include trigger, actor, guard, failure code, side effects, and audit payload contract.
+- Any asynchronous transition path must define idempotency key strategy and replay safety behavior.
+
+### SLA and Escalation Rules (REQUIREMENTS_USER_STORIES)
+- For this document, SLA guidance must **define policy tables and exception approval requirements for SLA timers**.
+- Escalation must explicitly identify owner, dwell-time threshold, notification channel, and acknowledgement requirement.
+- Breach and near-breach states must be queryable in reporting without recomputing from free-form notes.
+
+### Permission Boundaries (REQUIREMENTS_USER_STORIES)
+- For this document, permission guidance must **define least-privilege role capabilities and client-vs-internal field exposure**.
+- Privileged actions require reason codes, actor identity, and immutable audit entries.
+- Client-visible payloads must be explicitly redacted from internal-only and regulated fields.
+
+### Reporting and Metrics (REQUIREMENTS_USER_STORIES)
+- For this document, reporting guidance must **define formula lineage and freshness expectations for each KPI**.
+- Metric definitions must include numerator/denominator, time window, dimensional keys, and null/missing-data behavior.
+- Each metric should map to raw events/tables so results are reproducible during audits.
+
+### Operational Edge-Case Handling (REQUIREMENTS_USER_STORIES)
+- For this document, operational guidance must **require runbooks with detection, containment, recovery, and communication**.
+- Partial failure handling must identify what is rolled back, compensated, or deferred.
+- Recovery completion criteria must be measurable (not subjective) and tied to dashboard/alert signals.
+
+### Implementation Readiness Checklist (REQUIREMENTS_USER_STORIES)
+| Checklist Item | This Document Must Provide | Validation Evidence |
+|---|---|---|
+| Workflow Contract Completeness | All relevant states, transitions, and invalid paths for `requirements/user-stories.md` | Scenario walkthrough + transition test mapping |
+| SLA/ Escalation Determinism | Timer, pause, escalation, and override semantics | Policy table review + simulated timer run |
+| Authorization Correctness | Role scope, tenant scope, and field visibility boundaries | Auth matrix review + API/UI parity checks |
+| Reporting Reproducibility | KPI formulas, dimensions, and source lineage | Recompute KPI from event data sample |
+| Operations Recoverability | Degraded-mode and compensation runbook steps | Tabletop/game-day evidence and postmortem template |
+

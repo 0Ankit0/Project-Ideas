@@ -89,3 +89,45 @@ Ticketing and Project Management System/
 - ✅ Infrastructure complete
 - ✅ Edge cases complete
 - ✅ Implementation complete
+
+## Cross-Cutting Workflow and Operational Governance
+
+### Readme: Document-Specific Scope
+- Primary focus for this artifact: **program-level governance, integration boundaries, and delivery accountability**.
+- Implementation handoff expectation: this document must be sufficient for an engineer/architect/operator to implement without hidden assumptions.
+- Traceability anchor: `ROOT_README` should be referenced in backlog items, design reviews, and release checklists when this artifact changes.
+
+### Workflow and State Machine Semantics (ROOT_README)
+- For this document, workflow guidance must **maintain a canonical lifecycle vocabulary across all artifacts**.
+- Transition definitions must include trigger, actor, guard, failure code, side effects, and audit payload contract.
+- Any asynchronous transition path must define idempotency key strategy and replay safety behavior.
+
+### SLA and Escalation Rules (ROOT_README)
+- For this document, SLA guidance must **standardize escalation thresholds, channels, and auditability expectations**.
+- Escalation must explicitly identify owner, dwell-time threshold, notification channel, and acknowledgement requirement.
+- Breach and near-breach states must be queryable in reporting without recomputing from free-form notes.
+
+### Permission Boundaries (ROOT_README)
+- For this document, permission guidance must **align tenant/project/function boundaries for the whole program**.
+- Privileged actions require reason codes, actor identity, and immutable audit entries.
+- Client-visible payloads must be explicitly redacted from internal-only and regulated fields.
+
+### Reporting and Metrics (ROOT_README)
+- For this document, reporting guidance must **govern KPI definition versions and cross-team interpretation**.
+- Metric definitions must include numerator/denominator, time window, dimensional keys, and null/missing-data behavior.
+- Each metric should map to raw events/tables so results are reproducible during audits.
+
+### Operational Edge-Case Handling (ROOT_README)
+- For this document, operational guidance must **set uniform expectations for incident review and governance feedback loops**.
+- Partial failure handling must identify what is rolled back, compensated, or deferred.
+- Recovery completion criteria must be measurable (not subjective) and tied to dashboard/alert signals.
+
+### Implementation Readiness Checklist (ROOT_README)
+| Checklist Item | This Document Must Provide | Validation Evidence |
+|---|---|---|
+| Workflow Contract Completeness | All relevant states, transitions, and invalid paths for `README.md` | Scenario walkthrough + transition test mapping |
+| SLA/ Escalation Determinism | Timer, pause, escalation, and override semantics | Policy table review + simulated timer run |
+| Authorization Correctness | Role scope, tenant scope, and field visibility boundaries | Auth matrix review + API/UI parity checks |
+| Reporting Reproducibility | KPI formulas, dimensions, and source lineage | Recompute KPI from event data sample |
+| Operations Recoverability | Degraded-mode and compensation runbook steps | Tabletop/game-day evidence and postmortem template |
+
