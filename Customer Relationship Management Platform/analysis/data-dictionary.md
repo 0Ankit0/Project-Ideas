@@ -39,3 +39,37 @@ erDiagram
 - Operational records remain online for active workflow windows and support forensic queries.
 - Historical records move to archive tiers by policy without breaking traceability.
 - Audit events are immutable and linked through correlation ids for incident analysis.
+
+## Domain Glossary
+- **Canonical Attribute**: File-specific term used to anchor decisions in **Data Dictionary**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Defined -> Typed -> Validated -> Published -> Deprecated`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Defined] --> B[Typed]
+    B[Typed] --> C[Validated]
+    C[Validated] --> D[Published]
+    D[Published] --> E[Deprecated]
+    E[Deprecated]
+```
+
+## Integration Boundaries
+- Dictionary feeds API schemas, DB migrations, and BI semantic models.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- Schema publish retries on registry downtime; conflicting field types require manual adjudication.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- No field ships without owner, datatype, nullability, and PII classification.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.

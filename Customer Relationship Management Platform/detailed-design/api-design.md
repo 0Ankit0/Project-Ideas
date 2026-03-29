@@ -84,3 +84,37 @@ sequenceDiagram
 - Resource updates use optimistic concurrency via version/ETag fields.
 - Sensitive reads and writes are RBAC-gated and mirrored into immutable audit logs.
 - Async operations (merge, reassignment, backfill) return job resources and are pollable.
+
+## Domain Glossary
+- **Endpoint Contract**: File-specific term used to anchor decisions in **Api Design**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Draft Spec -> Mock -> Contract Test -> Implement -> Version`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Draft Spec] --> B[Mock]
+    B[Mock] --> C[Contract Test]
+    C[Contract Test] --> D[Implement]
+    D[Implement] --> E[Version]
+    E[Version]
+```
+
+## Integration Boundaries
+- Boundaries include API gateway, auth token service, and downstream domain services.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- POST/PATCH retries require same idempotency key; stale ETags fail with 412.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- OpenAPI contains example payloads and error codes for 2xx/4xx/5xx for each endpoint.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.

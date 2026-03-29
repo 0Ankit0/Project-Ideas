@@ -23,3 +23,37 @@ Define the use case descriptions artifacts for the **Customer Relationship Manag
 - Capture alternate/error flows for: lead capture and qualification, deduplication and merge review, opportunity stage progression.
 - Distinguish synchronous decision points vs asynchronous compensation.
 - Track external dependencies through channels: web, email, calendar, mobile.
+
+## Domain Glossary
+- **Main Success Scenario**: File-specific term used to anchor decisions in **Use Case Descriptions**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Actor Intent -> Preconditions -> Main Flow -> Alternate Flow -> Postconditions`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Actor Intent] --> B[Preconditions]
+    B[Preconditions] --> C[Main Flow]
+    C[Main Flow] --> D[Alternate Flow]
+    D[Alternate Flow] --> E[Postconditions]
+    E[Postconditions]
+```
+
+## Integration Boundaries
+- Descriptions align with UX flow docs and API endpoint coverage.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- Alternate flows define user-facing recovery instructions for failed steps.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- Each use case has preconditions, triggers, and at least 2 failure alternatives.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.

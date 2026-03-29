@@ -23,3 +23,37 @@ Define the erd database schema artifacts for the **Customer Relationship Managem
 - Table/entity constraints and invariants are explicit.
 - Failure semantics for retries/timeouts are defined per integration.
 - Versioning strategy documented for APIs, events, and data migrations.
+
+## Domain Glossary
+- **Table Constraint**: File-specific term used to anchor decisions in **Erd Database Schema**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Design Table -> Apply Migration -> Backfill -> Verify -> Lock`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Design Table] --> B[Apply Migration]
+    B[Apply Migration] --> C[Backfill]
+    C[Backfill] --> D[Verify]
+    D[Verify] --> E[Lock]
+    E[Lock]
+```
+
+## Integration Boundaries
+- Schema integrates with migration tooling, ORM mappings, and CDC capture.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- Migration retries only for lock timeouts; checksum mismatches require rollback.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- All critical tables include PK/FK and uniqueness constraints plus index strategy.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.

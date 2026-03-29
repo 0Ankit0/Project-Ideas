@@ -28,3 +28,38 @@ Define the requirements artifacts for the **Customer Relationship Management Pla
 - Availability target: 99.9% monthly for tier-1 APIs.
 - Data integrity: no silent data loss; deterministic replay supported.
 - Security: encryption in transit/at rest and detailed access logs.
+
+## Domain Glossary
+- **Requirement Baseline**: File-specific term used to anchor decisions in **Requirements**.
+- **Lead**: Prospect record entering qualification and ownership workflows.
+- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
+- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
+
+## Entity Lifecycles
+- Lifecycle for this document: `Intake -> Prioritize -> Approve -> Implement -> UAT Signoff -> Retire`.
+- Each transition must capture actor, timestamp, source state, target state, and justification note.
+
+```mermaid
+flowchart LR
+    A[Intake] --> B[Prioritize]
+    B[Prioritize] --> C[Approve]
+    C[Approve] --> D[Implement]
+    D[Implement] --> E[UAT Signoff]
+    E[UAT Signoff] --> F[Retire]
+    F[Retire]
+```
+
+## Integration Boundaries
+- Product board, CRM core services, and reporting teams consume this baseline as contract-of-record.
+- Data ownership and write authority must be explicit at each handoff boundary.
+- Interface changes require schema/version review and downstream impact acknowledgement.
+
+## Error and Retry Behavior
+- Change-request retries are allowed before approval; after approval, revisions require version bump and trace link.
+- Retries must preserve idempotency token and correlation ID context.
+- Exhausted retries route to an operational queue with triage metadata.
+
+## Measurable Acceptance Criteria
+- 100% requirements map to at least one user story, one test case, and one owning team.
+- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
+- Quarterly review confirms definitions and diagrams still match production behavior.
