@@ -1,59 +1,61 @@
 # Business Rules
 
-## Authorization Rules
-- BR-01: Default deny when no policy matches.
-- BR-02: Deny overrides permit for the same action/resource tuple.
-- BR-03: Privileged actions require recent MFA (`auth_time <= 15m`).
-- BR-04: Break-glass grants require dual approval and auto-expire within configured TTL.
+This document defines enforceable policy rules for **Identity and Access Management Platform** so authentication, authorization, federation, and lifecycle management behave consistently under normal and exceptional conditions.
 
-## Identity and Lifecycle Rules
-- BR-05: A suspended or locked identity cannot receive new tokens.
-- BR-06: Deprovisioned identities must have zero active sessions.
-- BR-07: Workload identity secrets/certs must rotate before `rotation_due`.
+## Context
+- Domain focus: identity authentication, policy-based authorization, and identity lifecycle management.
+- Rule categories: authorization, identity lifecycle, federation, session management, and compliance.
+- Enforcement points: API gateway, policy decision point (PDP), token service, lifecycle workers, and admin consoles.
+
+## Enforceable Rules
+1. Every request to a protected resource must be accompanied by a valid, non-expired access token with the correct audience.
+2. Authorization decisions default to deny when no policy explicitly permits the requested action on the resource.
+3. An explicit deny from any policy overrides any matching permit for the same action/resource tuple.
+4. Privileged or high-risk actions require a step-up MFA challenge completed within 15 minutes.
+5. A suspended, locked, or deprovisioned identity must not receive new access tokens or permit any resource access.
+6. Refresh token reuse detection: reusing a previously rotated token must revoke the entire token family and terminate the session.
+7. Break-glass access grants require dual approval, are scoped to a specific resource/time window, and auto-expire.
+8. Federated login is denied if issuer URI, audience, or required claim mappings do not match the registered connection.
+9. Policy bundle activation requires approval metadata and an immutable diff checksum recorded in the audit log.
+10. All critical administrative actions (policy publication, identity suspension, break-glass grant) must reference a ticket and emit an immutable audit event.
+
+## Rule Evaluation Pipeline
+
+```mermaid
+flowchart TD
+    A[Incoming Request] --> B[Validate Token Signature + Expiry]
+    B --> C{Token Valid?}
+    C -- No --> C1[Reject 401 + Audit]
+    C -- Yes --> D[Extract Claims + Context]
+    D --> E{Step-Up Required?}
+    E -- Yes --> E1[Challenge MFA]
+    E1 --> F{MFA Passed?}
+    F -- No --> F1[Deny + Alert]
+    F -- Yes --> G[Evaluate Policy Bundle]
+    E -- No --> G
+    G --> H{Decision}
+    H -- Permit --> I[Enforce Obligations + Allow]
+    H -- Deny --> J[Return 403 + Decision Log]
+    H -- Indeterminate --> K[Fail Closed for Write Operations]
+```
+
+## Exception and Override Handling
+- Overrides are restricted to approved exception classes (`break_glass`, `emergency_access`) and require dual-party approval.
+- Override windows automatically expire and emit an expiry audit event; access is not silently retained.
+- Repeated override patterns trigger policy redesign review and automation improvement tasks.
+- Indeterminate decisions fail closed for write or privileged operations; fail open only for explicitly safe read paths with a documented risk acceptance.
 
 ## Federation and Provisioning Rules
-- BR-08: Federated login denied if issuer or audience mismatch.
-- BR-09: Missing required mapping claims blocks JIT provisioning.
-- BR-10: SCIM source priority matrix decides attribute conflict winners.
+- Missing required claim mappings block JIT provisioning with a structured error and an alert to the IdP owner.
+- SCIM source-of-truth matrix defines which system wins attribute conflicts; drift reconciliation runs every 15 minutes.
+- Certificate rollover and metadata refresh for federation connections follow overlap windows to avoid service disruption.
 
-## Audit and Compliance Rules
-- BR-11: Critical admin changes require ticket reference and immutable event.
-- BR-12: Any policy publication must include approval metadata and diff checksum.
-## Cross-Cutting Implementation Baselines
+## Compliance and Audit Rules
+- Every access token contains minimum claims: `sub`, `iss`, `aud`, `iat`, `exp`, `tid` (tenant), `scope`.
+- Decision logs include: policy version hash, matched rules, obligations, request context, and correlation ID.
+- Audit retention: 13 months hot search, 7 years archive; log integrity is verified by cryptographic hash chain.
 
-### Token and Session Standards
-- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
-- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
-- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
-- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
-
-### Policy Evaluation Standards
-- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
-- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
-- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
-- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
-
-### Identity Lifecycle Standards
-- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
-- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
-- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
-- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
-
-### Federation and SCIM Assumptions
-- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
-- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
-- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
-- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
-
-### Threat Model and Auditability
-- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
-- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
-- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
-- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
-
-## Implementation Deep-Dive Addendum
-
-### Rule Conflict Test Matrix
-- Deny-overrides with mixed policy sets.
-- Time-windowed policies across DST/timezone boundaries.
-- Group hierarchy cycles and maximum expansion depth protection.
+## Measurable Acceptance Criteria
+- Authorization decision latency P99 <= 50 ms at 10 000 RPS.
+- Token revocation propagation to all enforcement points within 5 seconds P95.
+- Zero false-permit decisions under adversarial test scenarios.
