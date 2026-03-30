@@ -1,64 +1,59 @@
 # Event Catalog
 
-## Objective
-Provide implementation-ready guidance for **Event Catalog** in the Messaging and Notification Platform.
+This catalog defines production event contracts for the **Messaging and Notification Platform**. It covers events produced during message ingestion, dispatch, delivery feedback, and compliance lifecycle.
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
+## Contract Conventions
+- Event name format: `<domain>.<aggregate>.<action>.v1`.
+- Mandatory headers: `event_id`, `event_time`, `correlation_id`, `causation_id`, `tenant_id`, `schema_version`.
+- Delivery semantics: at-least-once; all consumers must implement idempotency using `event_id`.
+- Ordering guarantee: ordered per partition key (`tenant_id:recipient_id:channel`).
+- Breaking change policy: major version bump with old topic maintained during migration window.
 
-## Analysis Notes
-- Domain boundaries: ingestion, orchestration, dispatch, feedback, compliance.
-- Primary risks: duplicate sends, delayed callbacks, consent drift, provider brownouts.
-- Mitigations: idempotency, callback reconciliation, consent version checks, circuit breakers.
+## Domain Events
 
-## Delivery, Reliability, and Compliance Baseline
+| Event | Producer | Partition Key | Key Payload Fields | Trigger | Consumers |
+|---|---|---|---|---|---|
+| `message.accepted.v1` | ingestion-service | `tenant_id:recipient_id:channel` | `message_id`, `idempotency_key`, `channel`, `priority` | Request validated and queued | Orchestrator, Analytics |
+| `message.delivered.v1` | provider-adapter | `tenant_id:message_id` | `message_id`, `provider_message_id`, `delivered_at` | Provider delivery confirmed | Status tracker, Analytics, Audit |
+| `message.failed.v1` | provider-adapter | `tenant_id:message_id` | `message_id`, `error_class`, `provider_code`, `attempt_no` | Non-retryable provider failure | DLQ handler, Alerting, Audit |
+| `message.expired.v1` | orchestrator | `tenant_id:message_id` | `message_id`, `channel`, `queued_at`, `expired_at` | TTL exceeded before dispatch | DLQ handler, Analytics |
+| `recipient.suppressed.v1` | compliance-service | `tenant_id:recipient_id` | `recipient_id`, `channel`, `reason`, `suppressed_at` | Opt-out or policy suppression | Preference sync, Audit |
+| `consent.revoked.v1` | preference-service | `tenant_id:recipient_id` | `recipient_id`, `channel`, `revoked_at`, `version` | Recipient opts out | Consent cache, In-flight cancel, Audit |
+| `provider.circuit.opened.v1` | provider-monitor | `channel:provider_id` | `provider_id`, `channel`, `error_rate`, `opened_at` | Circuit breaker trips | Failover router, Alerting |
+| `dlq.message.received.v1` | dlq-processor | `tenant_id:message_id` | `message_id`, `error_class`, `attempt_count`, `last_error` | Message sent to DLQ | Alerting, Operator console |
+| `template.published.v1` | template-service | `tenant_id:template_id` | `template_id`, `version`, `approved_by`, `published_at` | Template approved and published | Render cache, Audit |
 
-### 1) Delivery semantics
-- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
-- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
-- **Latency tiers:**
-  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
-  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
-  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
-- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
+## Publish and Consumption Sequence
 
-### 2) Queue and topic behavior
-- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
-- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
-- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
-- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant Ingestion
+    participant Outbox as DB + Outbox
+    participant Relay
+    participant Bus as Event Bus
+    participant Orchestrator
 
-### 3) Retry and dead-letter handling
-- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
-- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
-- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
-- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
-- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+    Caller->>Ingestion: POST /messages
+    Ingestion->>Outbox: persist message + outbox row
+    Ingestion-->>Caller: 202 Accepted (message_id)
+    Relay->>Outbox: poll committed rows
+    Relay->>Bus: publish message.accepted.v1
+    Bus-->>Orchestrator: deliver event
+    Orchestrator->>Orchestrator: check consent + suppression
+    Orchestrator->>Bus: publish to provider dispatch topic
+    alt provider delivers
+        Bus-->>Orchestrator: message.delivered.v1
+    else provider fails
+        Bus-->>Orchestrator: message.failed.v1
+        Orchestrator->>Bus: retry or DLQ routing
+    end
+```
 
-### 4) Provider routing and failover
-- **Routing mode:** weighted primary/secondary by channel and geography.
-- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
-- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
-- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
-
-### 5) Template management
-- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
-- **Versioning:** immutable published versions; sends always pin explicit version.
-- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
-- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
-
-### 6) Compliance and audit logging
-- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
-- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
-- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
-- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
-
-## Verification Checklist
-- [ ] All interfaces include idempotency + correlation identifiers.
-- [ ] Retryable vs non-retryable errors are explicitly classified.
-- [ ] DLQ replay process is documented with approvals and guardrails.
-- [ ] Provider failover policy defines trigger, action, and recovery criteria.
-- [ ] Template versioning and approval workflow are enforceable in tooling.
-- [ ] Compliance evidence can be queried by message_id and correlation_id.
+## Operational SLOs
+- P95 message.accepted to message.delivered latency: <= 5 seconds for P0 transactional messages.
+- P95 message.accepted to message.delivered latency: <= 30 seconds for P1 operational messages.
+- DLQ alert acknowledgement within 10 minutes for tenant-impacting failures.
+- Consent revocation must propagate to all dispatch workers within 60 seconds P95.
+- Monthly schema compatibility review with all registered consumers.
+- Provider circuit-breaker state changes must trigger PagerDuty alert within 30 seconds.
