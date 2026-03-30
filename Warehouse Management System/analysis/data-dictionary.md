@@ -2,7 +2,7 @@
 
 This document defines implementation-ready data semantics for WMS write paths, read models, and analytics pipelines.
 
-## Canonical Entities
+## Core Entities
 
 | Entity | Purpose | Required Attributes | Business Constraints |
 |---|---|---|---|
@@ -17,7 +17,7 @@ This document defines implementation-ready data semantics for WMS write paths, r
 | `exception_case` | Operational issue and remediation | `case_id`, `type`, `state`, `owner_id`, `severity` | Closed cases immutable except comment append |
 | `audit_event` | Compliance trail | `audit_id`, `entity_type`, `entity_id`, `action`, `reason_code`, `occurred_at` | Immutable retention policy |
 
-## Relationship Diagram
+## Canonical Relationship Diagram
 ```mermaid
 erDiagram
     WAREHOUSE ||--o{ INVENTORY_BALANCE : stores
@@ -32,7 +32,7 @@ erDiagram
     AUDIT_EVENT }o--|| EXCEPTION_CASE : records
 ```
 
-## Data Quality and Validation Rules
+## Data Quality Controls
 - Required field validation must run before authorization side effects.
 - Natural-key duplicate detection required for scanner-originated transactions.
 - `reason_code` mandatory for all manual or exception-driven updates.

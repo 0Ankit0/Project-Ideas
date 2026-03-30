@@ -9,7 +9,7 @@ This catalog defines production event contracts for the **Warehouse Management S
 - Ordering guarantee: ordered per partition key (`warehouse_id + aggregate_id`).
 - Breaking change policy: major version bump; old topic maintained during migration window.
 
-## Core Operational Events
+## Domain Events
 
 | Event | Producer | Partition Key | Key Fields | Triggers | Rule IDs |
 |---|---|---|---|---|---|
@@ -23,7 +23,7 @@ This catalog defines production event contracts for the **Warehouse Management S
 | `shipping.confirmed.v1` | shipping-service | `warehouse_id+shipment_id` | `shipment_id`, `carrier`, `tracking_no`, `handoff_time` | Carrier handoff success | BR-9 |
 | `exception.case.resolved.v1` | operations-service | `warehouse_id+case_id` | `case_id`, `action`, `resolved_by`, `evidence_ref` | Case resolved | BR-3, BR-4, BR-10 |
 
-## Publish and Consumption Pattern
+## Publish and Consumption Sequence
 ```mermaid
 sequenceDiagram
     participant CommandSvc
@@ -49,7 +49,7 @@ sequenceDiagram
 3. Handle out-of-order events by aggregate version checks.
 4. Emit consumer lag and processing-failure metrics.
 
-## SLOs and Governance
+## Operational SLOs
 - P95 commit-to-publish latency <= 5 seconds.
 - DLQ acknowledgement <= 15 minutes for tier-1 domains.
 - Monthly schema compatibility review with integration teams.
