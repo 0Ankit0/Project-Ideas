@@ -1,17 +1,49 @@
-# Edge Cases - Storage and File Providers
+# Edge Cases – Storage and File Providers
 
-| Scenario | Risk | Mitigation |
-|----------|------|------------|
-| Provider exposes eventual consistency for object listing | Missing files in immediate read-after-write scenarios | Use metadata-backed listing and document consistency semantics |
-| Signed URL behavior differs between providers | Download/upload flows break | Normalize facade-level signed access contract and validate adapter compliance |
-| Multipart upload interrupted mid-transfer | Orphaned objects or incomplete metadata | Use resumable flow state and cleanup jobs |
-| File metadata written but provider object missing | Broken references | Reconcile object existence before committing active file state |
-| Storage provider migration for large buckets | Long migration windows | Support staged copy, dual-write, checksum verification, and delayed retirement |
+## Scenarios
 
-## Deep Edge Cases: Storage and File Providers
+| # | Scenario | Severity | Risk | Mitigation |
+|---|----------|----------|------|-----------|
+| 1 | Provider exposes eventual consistency for object listing | High | Missing files in immediate read-after-write | Use metadata-backed listing from PostgreSQL; document consistency semantics per adapter |
+| 2 | Upload interrupted mid-stream | Medium | Orphaned partial objects in provider storage | Track upload intent in PostgreSQL; background job aborts stale multipart uploads older than 24 hours |
+| 3 | Signed URL accessed after expiry | Low | 403 from provider; confusing error to client | Surface `STORAGE_URL_EXPIRED` with expiry timestamp; suggest re-generation |
+| 4 | File object metadata in PostgreSQL out of sync with provider after crash | High | Ghost records or missing files | Reconciliation job runs hourly: compares PostgreSQL metadata against provider object list and flags discrepancies |
+| 5 | Provider switchover copy fails mid-transfer for large files | Critical | Files not accessible in new provider | Checkpoint per-file copy status; resume from last successful checkpoint; do not activate new binding until parity score ≥ 99.99% |
+| 6 | Tenant exceeds storage quota during upload | Medium | Partial upload committed | Quota check against current `usage_meters` before accepting upload; reject with `STORAGE_QUOTA_EXCEEDED` |
+| 7 | Two concurrent uploads to the same object key | Medium | Last write wins; first upload silently overwritten | Require explicit `overwrite: true` flag; default rejects duplicate keys with `STORAGE_KEY_EXISTS` |
 
-- Object metadata incompatibility across providers is normalized through facade metadata schema.
-- Multipart upload commit race returns `STATE_UPLOAD_COMMIT_CONFLICT`.
-- Signed URL policy drift returns `AUTHZ_URL_SCOPE_INVALID`.
+## Deep Edge Cases
 
-Migration approach: dual-write metadata, background copy objects, parity sample, then cutover.
+### Stale Multipart Upload Cleanup
+```
+Every hour, background job queries:
+  SELECT * FROM file_objects
+  WHERE state = 'upload-in-progress'
+    AND created_at < NOW() - INTERVAL '24 hours';
+For each: call IStorageAdapter.abortMultipartUpload(providerUploadId)
+          UPDATE file_objects SET state = 'abandoned'
+```
+
+### Provider Switchover Parity Check
+After copy phase completes:
+1. List all `file_objects` in PostgreSQL for the environment.
+2. Verify each exists in new provider (check object key + size + checksum).
+3. Compute `parity_score = verified_count / total_count * 100`.
+4. Gate: switchover proceeds only if `parity_score >= 99.99`.
+5. If gate fails: surface `SWITCHOVER_PARITY_CHECK_FAILED` with object-level diff report.
+
+### Signed URL Security
+- Signed URLs carry HMAC signature bound to `fileId`, `bucketId`, `tenantId`, `expiresAt`.
+- URL parameters are validated by the platform before redirecting to the provider-level presigned URL.
+- Provider presigned URL has the same or shorter TTL than the platform-level URL.
+- Revoked file objects immediately invalidate all outstanding signed URLs (signed_access_grants table `revoked_at` field).
+
+## State Impact Summary
+
+| Scenario | File Object State |
+|----------|-----------------|
+| Interrupted upload | `upload-in-progress` → `abandoned` (after 24h) |
+| Successful upload | `upload-in-progress` → `active` |
+| Switchover copy | `active` in old → `active` in new (after parity check) |
+| Quota exceeded | Upload rejected; no state change |
+| File deleted | `active` → `deleted` (soft delete; purged after retention period) |

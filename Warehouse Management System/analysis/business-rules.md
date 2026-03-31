@@ -7,6 +7,18 @@ This document defines enforceable policy rules for **Warehouse Management System
 - Rule categories: lifecycle transitions, authorization, compliance, consistency, and resilience.
 - Enforcement points: APIs, workflow/state engines, background processors, and administrative consoles.
 
+## Enforceable Rules
+1. Every state-changing command must pass authentication, authorization, and schema validation before processing.
+2. Lifecycle transitions must follow the configured state graph; invalid transitions are rejected with explicit reason codes.
+3. High-impact operations (financial, security, or regulated data actions) require additional approval evidence.
+4. Manual overrides must include approver identity, rationale, and expiration timestamp.
+5. Retries and compensations must be idempotent and must not create duplicate business effects.
+6. Receiving must validate ASN/PO, quantity tolerance, and lot/serial constraints before stock becomes allocatable.
+7. Picking must consume reservation allocations and prevent negative ATP for reservable stock.
+8. Packing must reconcile picked lines, package contents, and shipping labels before shipment release.
+9. Shipping confirmation is the system-of-record handoff event for decrement finalization, tracking, and customer visibility.
+10. Exception paths (damage, short pick, offline replay, carrier outage) must preserve auditability and deterministic recovery actions.
+
 ## Major Business Rules
 
 | Rule ID | Rule |

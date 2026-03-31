@@ -1,64 +1,57 @@
 # Business Rules
 
-## Objective
-Provide implementation-ready guidance for **Business Rules** in the Messaging and Notification Platform.
+This document defines enforceable policy rules for **Messaging and Notification Platform** so message ingestion, delivery orchestration, provider dispatch, and compliance controls behave consistently.
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
+## Context
+- Domain focus: multi-channel, multi-tenant notification delivery.
+- Rule categories: consent, suppression, idempotency, retry, rate limiting, and template governance.
+- Enforcement points: API gateway, ingestion service, delivery orchestrator, provider adapters, and compliance workers.
 
-## Analysis Notes
-- Domain boundaries: ingestion, orchestration, dispatch, feedback, compliance.
-- Primary risks: duplicate sends, delayed callbacks, consent drift, provider brownouts.
-- Mitigations: idempotency, callback reconciliation, consent version checks, circuit breakers.
+## Enforceable Rules
+1. Every notification request must carry a valid `idempotency_key`; duplicate keys within the deduplication window return the existing status without a new send.
+2. Consent must be active and non-expired for the target channel before any message is admitted to the queue.
+3. Suppressed recipients (global or channel-specific) are silently excluded; suppression checks run before queue admission and cannot be bypassed by callers.
+4. Template version must be explicitly pinned in each send request; sending against a deprecated or retired template version is rejected.
+5. Message status transitions follow the defined state machine: `ACCEPTED` -> `QUEUED` -> `DISPATCHING` -> `PROVIDER_ACCEPTED` -> `DELIVERED` or `FAILED` or `EXPIRED`.
+6. Retry attempts use capped exponential backoff with jitter; non-retryable errors (invalid recipient, permanent reject) route to DLQ immediately without retrying.
+7. Promotional messages are subject to tenant-level and recipient-level rate limits; requests exceeding limits return `429 Too Many Requests`.
+8. Provider failover must preserve the original idempotency key and not create a new message record.
+9. Template changes that affect regulated content require dual approval before publication.
+10. PII in message bodies must be tokenized in operational logs; only the recipient token and correlation ID are stored in hot logs.
 
-## Delivery, Reliability, and Compliance Baseline
+## Rule Evaluation Pipeline
 
-### 1) Delivery semantics
-- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
-- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
-- **Latency tiers:**
-  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
-  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
-  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
-- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
+```mermaid
+flowchart TD
+    A[Incoming Send Request] --> B[Validate Schema + Idempotency]
+    B --> C{Duplicate Key?}
+    C -- Yes --> C1[Return Existing Status 200]
+    C -- No --> D{Suppressed Recipient?}
+    D -- Yes --> D1[Silent Exclude + Log]
+    D -- No --> E{Consent Active?}
+    E -- No --> E1[Reject 403 + Audit]
+    E -- Yes --> F{Template Valid?}
+    F -- No --> F1[Reject 400]
+    F -- Yes --> G[Enqueue to Priority Topic]
+    G --> H[Dispatch Worker]
+    H --> I{Provider Response}
+    I -- Success --> J[Mark DELIVERED + Emit Event]
+    I -- Retryable Failure --> K[Backoff + Retry]
+    I -- Terminal Failure --> L[Route to DLQ]
+```
 
-### 2) Queue and topic behavior
-- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
-- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
-- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
-- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+## Exception and Override Handling
+- Rate limit overrides require tenant-level configuration change with approval; no per-request bypass is permitted.
+- Template approval bypass is not available; emergency content changes require a new version with expedited approval.
+- DLQ replay requires operator approval; replay preserves original idempotency keys and does not generate new message IDs.
+- Suppression overrides are not supported at the API level; suppression changes must go through the preference management flow.
 
-### 3) Retry and dead-letter handling
-- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
-- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
-- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
-- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
-- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+## Compliance Controls
+- Opt-out processing must complete within 24 hours of receipt; messages in-flight at the time of opt-out are cancelled where possible.
+- GDPR erasure requests must purge all non-aggregated recipient data from hot and warm stores within 72 hours.
+- Campaign sends must include unsubscribe links compliant with CAN-SPAM, GDPR, and applicable regional regulations.
 
-### 4) Provider routing and failover
-- **Routing mode:** weighted primary/secondary by channel and geography.
-- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
-- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
-- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
-
-### 5) Template management
-- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
-- **Versioning:** immutable published versions; sends always pin explicit version.
-- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
-- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
-
-### 6) Compliance and audit logging
-- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
-- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
-- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
-- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
-
-## Verification Checklist
-- [ ] All interfaces include idempotency + correlation identifiers.
-- [ ] Retryable vs non-retryable errors are explicitly classified.
-- [ ] DLQ replay process is documented with approvals and guardrails.
-- [ ] Provider failover policy defines trigger, action, and recovery criteria.
-- [ ] Template versioning and approval workflow are enforceable in tooling.
-- [ ] Compliance evidence can be queried by message_id and correlation_id.
+## Measurable Acceptance Criteria
+- Idempotency deduplication window: minimum 24 hours per tenant.
+- P95 transactional message enqueue latency <= 1 second.
+- Consent check latency adds no more than 10 ms P99 to request path.

@@ -1,18 +1,45 @@
 # Identity and Access Management Platform Design Documentation
 
-## Purpose
-This documentation set is implementation-ready guidance for delivering a multi-tenant IAM platform with secure authentication, authorization, federation, lifecycle management, and auditability.
+## Documentation Structure
 
-## Documentation Map
-| Layer | Folder | Implementation intent |
+| Phase | Folder | Description |
 |---|---|---|
-| Requirements | `requirements/` | Hard constraints, acceptance criteria, actor outcomes |
-| Analysis | `analysis/` | Business semantics, events, context, workflow decomposition |
-| High-level Design | `high-level-design/` | Architecture topology, trust boundaries, data movement |
-| Detailed Design | `detailed-design/` | API/schema/component/state and execution details |
-| Infrastructure | `infrastructure/` | Runtime topology, network controls, resiliency model |
-| Implementation | `implementation/` | Delivery sequencing, readiness matrix, code mapping |
-| Edge Cases | `edge-cases/` | Failure modes, recovery patterns, safety rails |
+| 1 | [requirements](./requirements/) | Scope, FR/NFR, acceptance criteria, and user stories |
+| 2 | [analysis](./analysis/) | Actors, use cases, context boundaries, activities, events, and rule traceability |
+| 3 | [high-level-design](./high-level-design/) | Architecture topology, trust boundaries, domain model, data flow |
+| 4 | [detailed-design](./detailed-design/) | API contracts, schemas, components, state machines, policy engine |
+| 5 | [infrastructure](./infrastructure/) | Deployment topology, networking, security, cloud primitives |
+| 6 | [implementation](./implementation/) | Delivery sequencing, readiness matrix, code mapping |
+| 7 | [edge-cases](./edge-cases/) | Failure modes, recovery patterns, token revocation, break-glass |
+
+## Key Features
+- **Authentication**: passwordless, federated login, adaptive MFA, session management, device attestation.
+- **Authorization**: policy decision point (PDP), policy administration point (PAP), enforcement at every service boundary.
+- **Identity lifecycle**: onboarding, verification, entitlement grant/revoke, suspension, deprovisioning with reconciliation.
+- **Federation and SCIM**: enterprise IdP SSO (OIDC/SAML), inbound SCIM provisioning, drift reconciliation.
+- **Token management**: JWT access tokens, opaque refresh tokens with rotation, reuse detection, family revocation.
+- **Audit and compliance**: immutable audit trail, decision explainability, 7-year retention, operational SLO dashboards.
+
+## Getting Started
+1. Start with [requirements/requirements.md](./requirements/requirements.md) for hard constraints and acceptance criteria.
+2. Read [analysis/business-rules.md](./analysis/business-rules.md) for authorization and lifecycle rules.
+3. Review [high-level-design/architecture-diagram.md](./high-level-design/architecture-diagram.md) for trust topology.
+4. Implement tokens and session lifecycle from [detailed-design/api-design.md](./detailed-design/api-design.md).
+5. Review [detailed-design/policy-engine-and-federation.md](./detailed-design/policy-engine-and-federation.md) for PDP implementation.
+6. Apply infrastructure controls from [infrastructure/cloud-architecture.md](./infrastructure/cloud-architecture.md).
+7. Execute against [implementation/backend-status-matrix.md](./implementation/backend-status-matrix.md) to track readiness.
+
+## Documentation Status
+
+| Phase | Status | Notes |
+|---|---|---|
+| Requirements | Complete | FR/NFR, acceptance criteria, and user stories documented |
+| Analysis | Complete | Use cases, data dictionary, business rules, event catalog |
+| High-Level Design | Complete | Architecture, domain model, C4 diagrams, sequence/DFD views |
+| Detailed Design | Complete | APIs, ERD, state machines, components, policy engine |
+| Infrastructure | Complete | Deployment topology, networking, cloud architecture |
+| Implementation | Complete | Guidelines, readiness matrix, C4 code diagram |
+| Edge Cases | Complete | Token revocation, federation drift, break-glass, entitlement conflicts |
 
 ## Reference Implementation Scope
 - Authentication: passwordless + federated login, adaptive MFA, session management.

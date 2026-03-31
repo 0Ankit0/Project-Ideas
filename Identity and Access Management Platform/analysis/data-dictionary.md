@@ -1,54 +1,59 @@
 # Data Dictionary
 
-| Entity | Key Fields | Notes |
+This data dictionary is the canonical reference for **Identity and Access Management Platform**. It defines shared terminology, entity semantics, and governance controls required to keep identity and authorization workflows consistent across services and teams.
+
+## Scope and Goals
+- Establish a stable vocabulary for authentication, authorization, federation, and lifecycle management.
+- Define minimum required fields for core IAM entities and expected relationship boundaries.
+- Document data quality and retention controls needed for production readiness.
+
+## Core Entities
+
+| Entity | Description | Required Attributes |
 |---|---|---|
-| Identity | `identity_id`, `tenant_id`, `status`, `subject_ref` | Human/workload principal record |
-| Session | `session_id`, `identity_id`, `status`, `auth_time`, `device_id` | Session source of truth |
-| TokenFamily | `family_id`, `session_id`, `latest_refresh_hash`, `revoked_at` | Rotation and reuse detection |
-| PolicyBundle | `policy_version`, `bundle_hash`, `activated_at`, `activated_by` | Immutable policy artifact metadata |
-| DecisionLog | `decision_id`, `policy_version`, `result`, `obligations` | Explainability and forensic evidence |
-| FederationConnection | `connection_id`, `protocol`, `issuer`, `jwks_uri`, `status` | Trust config |
-| ScimJob | `job_id`, `external_system`, `object_ref`, `attempt`, `result` | Provisioning pipeline telemetry |
+| `Identity` | Human or workload principal record | `identity_id`, `tenant_id`, `type`, `status`, `subject_ref`, `created_at` |
+| `Session` | Active session source of truth | `session_id`, `identity_id`, `status`, `auth_time`, `device_id`, `expires_at` |
+| `TokenFamily` | Refresh token rotation tracking | `family_id`, `session_id`, `latest_refresh_hash`, `revoked_at`, `created_at` |
+| `PolicyBundle` | Immutable versioned policy artifact | `policy_version`, `bundle_hash`, `activated_at`, `activated_by`, `scope` |
+| `DecisionLog` | Explainability and forensic evidence | `decision_id`, `policy_version`, `identity_id`, `resource`, `action`, `result`, `obligations` |
+| `FederationConnection` | Enterprise IdP trust configuration | `connection_id`, `tenant_id`, `protocol`, `issuer`, `jwks_uri`, `status` |
+| `ScimJob` | SCIM provisioning pipeline telemetry | `job_id`, `external_system`, `object_ref`, `attempt`, `result`, `occurred_at` |
+| `AuditEvent` | Immutable compliance and operations trail | `audit_id`, `identity_id`, `actor`, `action`, `target`, `decision`, `ip_address`, `occurred_at` |
+
+## Canonical Relationship Diagram
+
+```mermaid
+erDiagram
+    IDENTITY ||--o{ SESSION : has
+    SESSION ||--o{ TOKENFAMILY : generates
+    IDENTITY ||--o{ AUDITEVENT : produces
+    IDENTITY ||--o{ DECISIONLOG : subject_of
+    POLICYBUNDLE ||--o{ DECISIONLOG : evaluated_by
+    FEDERATIONCONNECTION ||--o{ IDENTITY : provisions
+    SCIMJOB ||--o{ IDENTITY : syncs
+```
+
+## Data Quality Controls
+1. `tenant_id` is mandatory on all entities; requests without tenant context are rejected at the gateway.
+2. PII-bearing fields (email, phone, display name) are encrypted at rest and tagged with classification tier.
+3. Immutable entities (`AuditEvent`, `DecisionLog`, `TokenFamily`) use append-only storage patterns.
+4. Status fields (`identity.status`, `session.status`) use controlled vocabularies and reject unknown values.
+5. External imports from SCIM must include `external_id`, `source_system`, and `ingested_at` provenance.
+6. Duplicate identity detection runs on natural keys (`subject_ref + tenant_id`) to prevent provisioning collisions.
+
+## Retention and Access Patterns
+- Active sessions and token families: hot OLTP with strict TTL enforcement.
+- Decision logs: 13 months hot search + 7 years compliance archive.
+- Audit events: immutable retention with legal-hold support and correlation ID indexing.
 
 ## Field Constraints
 - `tenant_id` is mandatory on all entities.
 - PII-bearing fields must be encrypted-at-rest and access-controlled.
 - Immutable fields are append-only through event sourcing patterns.
-## Cross-Cutting Implementation Baselines
+- `reason_code` is mandatory for lifecycle transitions and high-impact administrative actions.
 
-### Token and Session Standards
-- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
-- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
-- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
-- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
-
-### Policy Evaluation Standards
-- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
-- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
-- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
-- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
-
-### Identity Lifecycle Standards
-- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
-- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
-- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
-- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
-
-### Federation and SCIM Assumptions
-- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
-- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
-- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
-- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
-
-### Threat Model and Auditability
-- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
-- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
-- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
-- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
-
-## Implementation Deep-Dive Addendum
-
-### Data Stewardship
-- Ownership is defined per entity for schema changes and data quality alarms.
-- PII classification tier is stored for each field with masking/redaction policy.
-- Lineage tags link user-facing decisions back to source entities and policy versions.
+## Domain Glossary
+- **Identity**: A human user or system workload that can authenticate and receive authorization decisions.
+- **PolicyBundle**: A versioned, immutable artifact containing all authorization policies active for a scope.
+- **TokenFamily**: A lineage tracking record that links refresh token rotations for reuse detection.
+- **Decision**: An authorization verdict (`permit`, `deny`, `not_applicable`, `indeterminate`) produced by the PDP.
