@@ -1,291 +1,828 @@
 # Class Diagrams
 
 ## Overview
-Detailed class structures with attributes and methods for the core Finance Management System domain.
+
+Detailed UML class diagrams for the Finance Management System domain aggregates. Each diagram covers a specific bounded context within the finance domain, showing all entity attributes (with types and access modifiers) and method signatures (with return types and parameters). Diagrams are organised by aggregate root.
 
 ---
 
-## General Ledger Classes
+## 1. Journal / Ledger Aggregate
+
+The general ledger aggregate is the system of record for all financial activity. It models the fiscal structure, chart of accounts, and double-entry journal entries that underpin all financial reporting and period-end processes.
 
 ```mermaid
 classDiagram
-    class JournalEntryService {
-        +db: AsyncSession
-        +journal_repo: JournalRepository
-        +period_repo: PeriodRepository
-        +audit_service: AuditService
-        +create_entry(user_id, data: JournalEntryCreate) JournalEntry
-        +post_entry(entry_id, user_id) JournalEntry
-        +reverse_entry(entry_id, user_id) JournalEntry
-        +get_entry(entry_id) JournalEntry
-        +list_entries(filters, page, limit) Page~JournalEntry~
-        -_validate_balanced(lines: list) void
-        -_validate_period_open(entry_date, entity_id) void
+    direction TB
+
+    class Organization {
+        +UUID id
+        +String name
+        +String legalName
+        +String taxId
+        +String baseCurrency
+        +String country
+        +OrganizationStatus status
+        +DateTime createdAt
+        +DateTime updatedAt
+        +createFiscalYear(name: String, start: Date, end: Date) FiscalYear
+        +getActiveFiscalYear() FiscalYear
+        +getChartOfAccounts() ChartOfAccounts
+        +validateBaseCurrency(code: String) Boolean
     }
 
-    class JournalRepository {
-        +db: AsyncSession
-        +find_by_id(id: int) JournalEntry
-        +find_by_period(period_id: int) list~JournalEntry~
-        +save(entry: JournalEntry) JournalEntry
-        +find_unposted(entity_id: int) list~JournalEntry~
-        +get_account_balance(account_id, as_of_date) Decimal
+    class FiscalYear {
+        +UUID id
+        +UUID organizationId
+        +String name
+        +Date startDate
+        +Date endDate
+        +FiscalYearStatus status
+        +UUID closedBy
+        +DateTime closedAt
+        +DateTime createdAt
+        +DateTime updatedAt
+        +openPeriod(periodNumber: Integer) AccountingPeriod
+        +close(userId: UUID) void
+        +isOpen() Boolean
+        +getPeriods() AccountingPeriod[]
+        +getCurrentPeriod() AccountingPeriod
+        +getNetIncome() Decimal
     }
 
-    class PeriodService {
-        +db: AsyncSession
-        +period_repo: PeriodRepository
-        +open_period(period_id, user_id) AccountingPeriod
-        +soft_close(period_id, user_id) AccountingPeriod
-        +hard_close(period_id, user_id) AccountingPeriod
-        +is_period_open(period_id) bool
-        +get_current_period(entity_id) AccountingPeriod
-        -_run_close_validations(period_id) CloseValidationResult
+    class AccountingPeriod {
+        +UUID id
+        +UUID fiscalYearId
+        +UUID organizationId
+        +Integer periodNumber
+        +String name
+        +Date startDate
+        +Date endDate
+        +PeriodStatus status
+        +UUID softClosedBy
+        +DateTime softClosedAt
+        +UUID hardClosedBy
+        +DateTime hardClosedAt
+        +DateTime createdAt
+        +DateTime updatedAt
+        +open() void
+        +softClose(userId: UUID) void
+        +hardClose(userId: UUID) void
+        +reopen(userId: UUID, reason: String) void
+        +isPostable() Boolean
+        +isSoftClosed() Boolean
+        +isHardClosed() Boolean
+        +getJournalEntries() JournalEntry[]
     }
 
-    class ReconciliationService {
-        +db: AsyncSession
-        +import_bank_statement(file, bank_account_id) ImportResult
-        +auto_match_transactions(bank_account_id) MatchResult
-        +manual_match(gl_transaction_id, bank_txn_id) void
-        +get_unmatched_items(bank_account_id) list~UnmatchedItem~
-        +generate_reconciliation_report(bank_account_id, period_id) ReconciliationReport
+    class ChartOfAccounts {
+        +UUID id
+        +UUID organizationId
+        +String name
+        +String description
+        +Boolean isDefault
+        +DateTime createdAt
+        +DateTime updatedAt
+        +addAccount(account: Account) Account
+        +findByCode(code: String) Account
+        +getAccountTree() AccountNode[]
+        +getAccountsByType(type: AccountType) Account[]
+        +validateStructure() ValidationResult
+        +importAccounts(accounts: Account[]) ImportResult
     }
 
-    JournalEntryService --> JournalRepository
-    JournalEntryService --> PeriodService
+    class Account {
+        +UUID id
+        +UUID chartOfAccountsId
+        +UUID organizationId
+        +UUID parentAccountId
+        +String code
+        +String name
+        +String description
+        +AccountType type
+        +AccountSubType subType
+        +NormalBalance normalBalance
+        +String currency
+        +Boolean isSummary
+        +Boolean allowDirectPosting
+        +Boolean isActive
+        +Boolean isSystemAccount
+        +Integer level
+        +DateTime createdAt
+        +DateTime updatedAt
+        +getBalance(asOf: Date) Decimal
+        +getBalanceForPeriod(period: AccountingPeriod) Decimal
+        +getChildren() Account[]
+        +hasChildren() Boolean
+        +validate() ValidationResult
+        +deactivate() void
+    }
+
+    class JournalEntry {
+        +UUID id
+        +UUID organizationId
+        +UUID fiscalYearId
+        +UUID accountingPeriodId
+        +String entryNumber
+        +JournalEntryType type
+        +JournalEntryStatus status
+        +Date transactionDate
+        +String reference
+        +String description
+        +String sourceName
+        +UUID sourceId
+        +String currency
+        +Decimal exchangeRate
+        +UUID createdBy
+        +UUID approvedBy
+        +DateTime approvedAt
+        +UUID postedBy
+        +DateTime postedAt
+        +UUID reversedBy
+        +DateTime reversedAt
+        +UUID reversalOf
+        +String rejectionReason
+        +DateTime createdAt
+        +DateTime updatedAt
+        +addLine(line: JournalLine) void
+        +removeLine(lineId: UUID) void
+        +validate() ValidationResult
+        +isBalanced() Boolean
+        +getTotalDebits() Decimal
+        +getTotalCredits() Decimal
+        +submit() void
+        +approve(userId: UUID) void
+        +reject(userId: UUID, reason: String) void
+        +post(userId: UUID) void
+        +reverse(userId: UUID, date: Date, reason: String) JournalEntry
+        +getLines() JournalLine[]
+        +clone() JournalEntry
+        +generateEntryNumber() String
+    }
+
+    class JournalLine {
+        +UUID id
+        +UUID journalEntryId
+        +UUID accountId
+        +UUID costCenterId
+        +UUID projectId
+        +Integer lineNumber
+        +String description
+        +DebitCredit debitCredit
+        +Decimal amount
+        +String currency
+        +Decimal exchangeRate
+        +Decimal amountInBaseCurrency
+        +String taxCode
+        +Decimal taxAmount
+        +String reference
+        +DateTime createdAt
+        +DateTime updatedAt
+        +getAccount() Account
+        +getCostCenter() CostCenter
+        +getProject() Project
+        +isDebit() Boolean
+        +isCredit() Boolean
+        +validate() ValidationResult
+        +toBaseCurrency() Decimal
+    }
+
+    class LedgerBalance {
+        +UUID id
+        +UUID organizationId
+        +UUID accountId
+        +UUID accountingPeriodId
+        +UUID fiscalYearId
+        +Decimal openingBalance
+        +Decimal totalDebits
+        +Decimal totalCredits
+        +Decimal closingBalance
+        +String currency
+        +DateTime lastUpdatedAt
+        +DateTime createdAt
+        +addDebit(amount: Decimal) void
+        +addCredit(amount: Decimal) void
+        +recalculate() void
+        +getNetMovement() Decimal
+        +getAccount() Account
+        +getPeriod() AccountingPeriod
+        +lock() void
+    }
+
+    Organization "1" --> "many" FiscalYear : owns
+    FiscalYear "1" --> "many" AccountingPeriod : partitioned into
+    Organization "1" --> "1" ChartOfAccounts : maintains
+    ChartOfAccounts "1" --> "many" Account : defines
+    Account "0..1" --> "many" Account : parent of
+    AccountingPeriod "1" --> "many" JournalEntry : contains
+    JournalEntry "1" --> "2..*" JournalLine : comprises
+    JournalLine "many" --> "1" Account : debits or credits
+    AccountingPeriod "1" --> "many" LedgerBalance : accumulates
+    Account "1" --> "many" LedgerBalance : tracked by
 ```
 
 ---
 
-## Accounts Payable Classes
+## 2. AP / AR Aggregate
+
+The AP/AR aggregate manages vendor payables, customer receivables, invoice processing, and payment application. It generates journal entries that are posted to the general ledger.
 
 ```mermaid
 classDiagram
-    class InvoiceService {
-        +db: AsyncSession
-        +invoice_repo: InvoiceRepository
-        +vendor_repo: VendorRepository
-        +matching_service: MatchingService
-        +audit_service: AuditService
-        +create_invoice(user_id, data: InvoiceCreate) VendorInvoice
-        +submit_for_approval(invoice_id, user_id) VendorInvoice
-        +approve_invoice(invoice_id, user_id) VendorInvoice
-        +reject_invoice(invoice_id, user_id, reason) VendorInvoice
-        +void_invoice(invoice_id, user_id, reason) VendorInvoice
-        +get_aging_report(as_of_date) APAgingReport
-        -_check_duplicate(vendor_id, invoice_no, amount) bool
+    direction TB
+
+    class Vendor {
+        +UUID id
+        +UUID organizationId
+        +String vendorCode
+        +String name
+        +String legalName
+        +String taxId
+        +String email
+        +String phone
+        +String addressLine1
+        +String city
+        +String country
+        +String postalCode
+        +UUID defaultPaymentTermId
+        +UUID defaultAccountId
+        +String defaultCurrency
+        +VendorStatus status
+        +Boolean is1099Eligible
+        +DateTime createdAt
+        +DateTime updatedAt
+        +createInvoice(invoice: Invoice) Invoice
+        +getOutstandingBalance() Decimal
+        +getInvoices(filter: InvoiceFilter) Invoice[]
+        +getPayments(filter: PaymentFilter) Payment[]
+        +activate() void
+        +deactivate() void
     }
 
-    class MatchingService {
-        +db: AsyncSession
-        +perform_three_way_match(invoice_id, po_id, receipt_id) MatchResult
-        +perform_two_way_match(invoice_id, po_id) MatchResult
-        -_calculate_variance(invoice_line, po_line) Decimal
-        -_is_within_tolerance(variance_pct, tolerance_pct) bool
+    class Customer {
+        +UUID id
+        +UUID organizationId
+        +String customerCode
+        +String name
+        +String legalName
+        +String taxId
+        +String email
+        +String phone
+        +String addressLine1
+        +String city
+        +String country
+        +UUID defaultPaymentTermId
+        +UUID defaultAccountId
+        +String defaultCurrency
+        +Decimal creditLimit
+        +CustomerStatus status
+        +DateTime createdAt
+        +DateTime updatedAt
+        +createInvoice(invoice: Invoice) Invoice
+        +getOutstandingBalance() Decimal
+        +isWithinCreditLimit(amount: Decimal) Boolean
+        +getAgingReport() AgingReport
     }
 
-    class PaymentRunService {
-        +db: AsyncSession
-        +payment_run_repo: PaymentRunRepository
-        +bank_service: BankFileService
-        +gl_service: GLPostingService
-        +create_run(user_id, invoice_ids: list) PaymentRun
-        +approve_run(run_id, user_id) PaymentRun
-        +generate_bank_file(run_id) BankFile
-        +submit_to_bank(run_id) SubmitResult
-        +process_bank_confirmation(batch_ref, status) void
-        +mark_invoices_paid(run_id) void
-        -_apply_early_pay_discount(invoice_id) Decimal
+    class PaymentTerm {
+        +UUID id
+        +UUID organizationId
+        +String code
+        +String name
+        +Integer netDays
+        +Decimal earlyPayDiscountPercent
+        +Integer earlyPayDiscountDays
+        +DateTime createdAt
+        +calculateDueDate(invoiceDate: Date) Date
+        +calculateDiscountAmount(invoiceTotal: Decimal) Decimal
+        +isDiscountApplicable(paymentDate: Date, invoiceDate: Date) Boolean
     }
 
-    InvoiceService --> MatchingService
-    PaymentRunService --> InvoiceService
+    class Invoice {
+        +UUID id
+        +UUID organizationId
+        +InvoiceDirection direction
+        +String invoiceNumber
+        +InvoiceStatus status
+        +UUID vendorId
+        +UUID customerId
+        +UUID paymentTermId
+        +UUID accountingPeriodId
+        +Date invoiceDate
+        +Date dueDate
+        +String currency
+        +Decimal exchangeRate
+        +Decimal subtotal
+        +Decimal taxAmount
+        +Decimal discountAmount
+        +Decimal totalAmount
+        +Decimal amountPaid
+        +Decimal amountDue
+        +String vendorInvoiceNumber
+        +String reference
+        +String notes
+        +UUID approvedBy
+        +DateTime approvedAt
+        +UUID journalEntryId
+        +UUID createdBy
+        +DateTime createdAt
+        +DateTime updatedAt
+        +addLine(line: InvoiceLine) void
+        +removeLine(lineId: UUID) void
+        +calculateTotals() void
+        +submit() void
+        +approve(userId: UUID) void
+        +reject(userId: UUID, reason: String) void
+        +applyPayment(payment: Payment, amount: Decimal) void
+        +cancel(userId: UUID, reason: String) void
+        +dispute(reason: String) void
+        +isOverdue() Boolean
+        +getDaysOverdue() Integer
+        +getLines() InvoiceLine[]
+        +getPayments() Payment[]
+        +generateJournalEntry() JournalEntry
+    }
+
+    class InvoiceLine {
+        +UUID id
+        +UUID invoiceId
+        +Integer lineNumber
+        +String description
+        +String itemCode
+        +Decimal quantity
+        +String unitOfMeasure
+        +Decimal unitPrice
+        +Decimal discountPercent
+        +Decimal discountAmount
+        +Decimal subtotal
+        +String taxCode
+        +Decimal taxPercent
+        +Decimal taxAmount
+        +Decimal lineTotal
+        +UUID accountId
+        +UUID costCenterId
+        +UUID projectId
+        +DateTime createdAt
+        +DateTime updatedAt
+        +calculateAmounts() void
+        +applyDiscount(percent: Decimal) void
+        +validate() ValidationResult
+    }
+
+    class Payment {
+        +UUID id
+        +UUID organizationId
+        +PaymentDirection direction
+        +PaymentStatus status
+        +String paymentNumber
+        +UUID vendorId
+        +UUID customerId
+        +UUID bankAccountId
+        +PaymentMethod method
+        +Date paymentDate
+        +String currency
+        +Decimal amount
+        +Decimal exchangeRate
+        +Decimal amountInBaseCurrency
+        +String reference
+        +String checkNumber
+        +String transactionId
+        +String notes
+        +UUID journalEntryId
+        +UUID createdBy
+        +DateTime createdAt
+        +DateTime updatedAt
+        +applyToInvoice(invoice: Invoice, amount: Decimal) PaymentApplication
+        +void(reason: String) void
+        +getApplications() PaymentApplication[]
+        +getUnappliedAmount() Decimal
+        +validate() ValidationResult
+        +generateJournalEntry() JournalEntry
+    }
+
+    class PaymentApplication {
+        +UUID id
+        +UUID paymentId
+        +UUID invoiceId
+        +Decimal amountApplied
+        +Date appliedDate
+        +Decimal discountTaken
+        +DateTime createdAt
+        +validate() ValidationResult
+        +reverse() void
+    }
+
+    Vendor "1" --> "many" Invoice : issues
+    Customer "1" --> "many" Invoice : billed to
+    Invoice "1" --> "many" InvoiceLine : contains
+    Invoice "many" --> "1" PaymentTerm : governed by
+    Invoice "1" --> "many" PaymentApplication : settled by
+    Payment "1" --> "many" PaymentApplication : allocated via
+    Vendor "1" --> "many" Payment : paid via
+    Customer "1" --> "many" Payment : receives
 ```
 
 ---
 
-## Budgeting Classes
+## 3. Budget Aggregate
+
+The budget aggregate manages financial planning, cost centre allocations, and budget-vs-actual variance tracking across fiscal periods.
 
 ```mermaid
 classDiagram
-    class BudgetService {
-        +db: AsyncSession
-        +budget_repo: BudgetRepository
-        +workflow_service: ApprovalWorkflowService
-        +notify_service: NotificationService
-        +create_budget(user_id, data: BudgetCreate) Budget
-        +submit_for_approval(budget_id, user_id) Budget
-        +approve_by_fm(budget_id, user_id) Budget
-        +approve_by_cfo(budget_id, user_id) Budget
-        +reject_budget(budget_id, user_id, reason) Budget
-        +create_revision(budget_id, user_id) Budget
-        +get_budget_utilization(cost_center_id, period_id) UtilizationReport
-        -_load_prior_year_actuals(entity_id, fiscal_year_id) list~BudgetLine~
+    direction TB
+
+    class CostCenter {
+        +UUID id
+        +UUID organizationId
+        +String code
+        +String name
+        +String description
+        +UUID parentCostCenterId
+        +UUID managerId
+        +CostCenterType type
+        +Boolean isActive
+        +DateTime createdAt
+        +DateTime updatedAt
+        +getChildren() CostCenter[]
+        +getBudget(fiscalYearId: UUID) Budget
+        +getActualSpend(periodId: UUID) Decimal
+        +getVariance(periodId: UUID) Decimal
+        +getHierarchyPath() String
     }
 
-    class VarianceTrackingService {
-        +db: AsyncSession
-        +budget_repo: BudgetRepository
-        +calculate_variance(account_id, cost_center_id, period_id) BudgetVariance
-        +check_budget_thresholds(account_id, cost_center_id, period_id) list~Alert~
-        +generate_variance_report(entity_id, period_id) VarianceReport
-        +get_forecast(entity_id, period_id) Forecast
+    class Project {
+        +UUID id
+        +UUID organizationId
+        +UUID costCenterId
+        +String projectCode
+        +String name
+        +String description
+        +ProjectStatus status
+        +UUID managerId
+        +Date startDate
+        +Date endDate
+        +Decimal approvedBudget
+        +Decimal spentToDate
+        +DateTime createdAt
+        +DateTime updatedAt
+        +getBudgetUtilization() Decimal
+        +isOverBudget() Boolean
+        +close() void
+        +activate() void
     }
 
-    class AlertEngine {
-        +variance_service: VarianceTrackingService
-        +notify_service: NotificationService
-        +THRESHOLD_80: float = 0.80
-        +THRESHOLD_95: float = 0.95
-        +THRESHOLD_BREACH: float = 1.00
-        +evaluate_and_alert(account_id, cost_center_id, period_id) void
-        -_determine_alert_level(utilization_pct) AlertLevel
-        -_notify_stakeholders(level, cost_center_id, utilization) void
+    class Budget {
+        +UUID id
+        +UUID organizationId
+        +UUID fiscalYearId
+        +UUID costCenterId
+        +UUID projectId
+        +String budgetCode
+        +String name
+        +BudgetType type
+        +BudgetStatus status
+        +String currency
+        +Decimal totalAmount
+        +Decimal totalActual
+        +Decimal totalVariance
+        +Integer version
+        +UUID submittedBy
+        +DateTime submittedAt
+        +UUID approvedBy
+        +DateTime approvedAt
+        +String approvalNotes
+        +UUID createdBy
+        +DateTime createdAt
+        +DateTime updatedAt
+        +addLine(line: BudgetLine) void
+        +removeLine(lineId: UUID) void
+        +recalculateTotal() void
+        +submit(userId: UUID) void
+        +approve(userId: UUID, notes: String) void
+        +reject(userId: UUID, reason: String) void
+        +requestRevision(userId: UUID, reason: String) void
+        +activate() void
+        +close() void
+        +getLines() BudgetLine[]
+        +getRevisions() BudgetRevision[]
+        +getActualVsBudget() BudgetVarianceReport
+        +checkOverrun(accountId: UUID, amount: Decimal) OverrunResult
+        +createRevision(reason: String) BudgetRevision
     }
 
-    BudgetService --> VarianceTrackingService
-    VarianceTrackingService --> AlertEngine
+    class BudgetLine {
+        +UUID id
+        +UUID budgetId
+        +UUID accountId
+        +UUID costCenterId
+        +UUID projectId
+        +Integer periodNumber
+        +String description
+        +String category
+        +Decimal budgetedAmount
+        +Decimal actualAmount
+        +Decimal committedAmount
+        +Decimal variance
+        +Decimal variancePercent
+        +String currency
+        +DateTime createdAt
+        +DateTime updatedAt
+        +updateActual(amount: Decimal) void
+        +updateCommitted(amount: Decimal) void
+        +calculateVariance() void
+        +isOverBudget() Boolean
+        +getAvailableBalance() Decimal
+        +getEncumberedBalance() Decimal
+    }
+
+    class BudgetRevision {
+        +UUID id
+        +UUID budgetId
+        +Integer revisionNumber
+        +String reason
+        +RevisionType type
+        +Decimal previousTotalAmount
+        +Decimal revisedTotalAmount
+        +Decimal deltaAmount
+        +BudgetRevisionStatus status
+        +UUID requestedBy
+        +DateTime requestedAt
+        +UUID approvedBy
+        +DateTime approvedAt
+        +String approvalNotes
+        +DateTime createdAt
+        +getChangedLines() BudgetLineChange[]
+        +approve(userId: UUID, notes: String) void
+        +reject(userId: UUID, reason: String) void
+        +apply() void
+        +validate() ValidationResult
+    }
+
+    class BudgetTransfer {
+        +UUID id
+        +UUID organizationId
+        +UUID sourceBudgetLineId
+        +UUID targetBudgetLineId
+        +Decimal amount
+        +String reason
+        +BudgetTransferStatus status
+        +UUID requestedBy
+        +DateTime requestedAt
+        +UUID approvedBy
+        +DateTime approvedAt
+        +DateTime createdAt
+        +approve(userId: UUID) void
+        +execute() void
+        +validate() ValidationResult
+    }
+
+    CostCenter "0..1" --> "many" CostCenter : hierarchical parent
+    CostCenter "1" --> "many" Budget : plans for
+    Project "0..1" --> "many" Budget : scopes
+    Budget "1" --> "many" BudgetLine : detailed by
+    Budget "1" --> "many" BudgetRevision : modified by
+    BudgetRevision "1" --> "many" BudgetTransfer : executes
 ```
 
 ---
 
-## Payroll Classes
+## 4. Fixed Asset Aggregate
+
+The fixed asset aggregate handles the full lifecycle of capital assets from acquisition through disposal, including scheduled depreciation and gain/loss calculations.
 
 ```mermaid
 classDiagram
-    class PayrollService {
-        +db: AsyncSession
-        +employee_repo: PayrollEmployeeRepository
-        +run_repo: PayrollRunRepository
-        +deduction_engine: DeductionEngine
-        +bank_service: BankFileService
-        +gl_service: GLPostingService
-        +create_run(user_id, period_start, period_end, pay_group) PayrollRun
-        +calculate_run(run_id) PayrollRun
-        +submit_for_approval(run_id, user_id) PayrollRun
-        +approve_run(run_id, user_id) PayrollRun
-        +disburse(run_id) DisbursementResult
-        +generate_pay_stubs(run_id) list~PayStub~
-        -_validate_pre_run(run_id) ValidationResult
+    direction TB
+
+    class AssetCategory {
+        +UUID id
+        +UUID organizationId
+        +String code
+        +String name
+        +String description
+        +DepreciationMethod defaultMethod
+        +Integer defaultUsefulLifeMonths
+        +Decimal defaultResidualPercent
+        +UUID assetAccountId
+        +UUID depreciationExpenseAccountId
+        +UUID accumulatedDepreciationAccountId
+        +UUID gainOnDisposalAccountId
+        +UUID lossOnDisposalAccountId
+        +Boolean isActive
+        +DateTime createdAt
+        +DateTime updatedAt
+        +createAsset(data: AssetData) FixedAsset
+        +getDepreciationRule() DepreciationRule
     }
 
-    class DeductionEngine {
-        +tax_config: TaxConfiguration
-        +calculate_income_tax(gross_pay, employee_id) Decimal
-        +calculate_social_security(gross_pay, employee_id) Decimal
-        +calculate_provident_fund(gross_pay, employee_id) Decimal
-        +calculate_voluntary_deductions(employee_id) list~Deduction~
-        +compute_net_pay(gross_pay, deductions: list) Decimal
+    class FixedAsset {
+        +UUID id
+        +UUID organizationId
+        +UUID assetCategoryId
+        +UUID costCenterId
+        +String assetCode
+        +String name
+        +String description
+        +String serialNumber
+        +String location
+        +AssetStatus status
+        +Date acquisitionDate
+        +Decimal acquisitionCost
+        +Decimal currentBookValue
+        +Decimal accumulatedDepreciation
+        +Decimal residualValue
+        +DepreciationMethod depreciationMethod
+        +Integer usefulLifeMonths
+        +Integer remainingLifeMonths
+        +Date depreciationStartDate
+        +Date lastDepreciationDate
+        +UUID acquisitionJournalEntryId
+        +UUID createdBy
+        +DateTime createdAt
+        +DateTime updatedAt
+        +activate() void
+        +dispose(date: Date, proceeds: Decimal, method: DisposalMethod) DisposalRecord
+        +getNextDepreciationAmount() Decimal
+        +getDepreciationSchedule() DepreciationSchedule[]
+        +isFullyDepreciated() Boolean
+        +calculateMonthlyDepreciation() Decimal
+        +revalue(newCost: Decimal, date: Date, reason: String) void
+        +transfer(newCostCenterId: UUID, date: Date) void
+        +getCategory() AssetCategory
+        +getDepreciations() Depreciation[]
     }
 
-    PayrollService --> DeductionEngine
+    class Depreciation {
+        +UUID id
+        +UUID fixedAssetId
+        +UUID accountingPeriodId
+        +UUID depreciationRunId
+        +UUID journalEntryId
+        +Date depreciationDate
+        +Integer periodNumber
+        +Decimal openingBookValue
+        +Decimal depreciationAmount
+        +Decimal accumulatedDepreciation
+        +Decimal closingBookValue
+        +DepreciationStatus status
+        +String method
+        +DateTime createdAt
+        +DateTime updatedAt
+        +reverse() void
+        +validate() ValidationResult
+        +generateJournalEntry() JournalEntry
+    }
+
+    class DepreciationRun {
+        +UUID id
+        +UUID organizationId
+        +UUID accountingPeriodId
+        +DepreciationRunStatus status
+        +Integer assetsProcessed
+        +Integer assetsSkipped
+        +Integer assetsFailed
+        +Decimal totalDepreciationAmount
+        +UUID initiatedBy
+        +DateTime scheduledAt
+        +DateTime startedAt
+        +DateTime completedAt
+        +String errorSummary
+        +DateTime createdAt
+        +start() void
+        +process(asset: FixedAsset) DepreciationResult
+        +complete() void
+        +rollback() void
+        +getResults() DepreciationResult[]
+        +generateSummaryReport() DepreciationSummary
+    }
+
+    class DepreciationSchedule {
+        +UUID id
+        +UUID fixedAssetId
+        +Integer periodNumber
+        +Date scheduledDate
+        +Decimal openingBookValue
+        +Decimal scheduledAmount
+        +Decimal projectedClosingBookValue
+        +Boolean isProcessed
+        +DateTime createdAt
+        +getAsset() FixedAsset
+        +update(newAmount: Decimal) void
+    }
+
+    class DisposalRecord {
+        +UUID id
+        +UUID fixedAssetId
+        +Date disposalDate
+        +DisposalMethod method
+        +Decimal bookValueAtDisposal
+        +Decimal accumulatedDepreciationAtDisposal
+        +Decimal proceedsAmount
+        +Decimal gainLossAmount
+        +Boolean isGain
+        +String reason
+        +String notes
+        +UUID journalEntryId
+        +UUID approvedBy
+        +DateTime approvedAt
+        +UUID createdBy
+        +DateTime createdAt
+        +calculateGainLoss() Decimal
+        +generateJournalEntry() JournalEntry
+        +validate() ValidationResult
+    }
+
+    AssetCategory "1" --> "many" FixedAsset : classifies
+    FixedAsset "1" --> "many" Depreciation : accumulates
+    FixedAsset "1" --> "many" DepreciationSchedule : planned by
+    FixedAsset "0..1" --> "1" DisposalRecord : retired via
+    DepreciationRun "1" --> "many" Depreciation : generates
 ```
 
 ---
 
-## Notification and Audit Classes
+## 5. Supporting Enumerations
 
 ```mermaid
 classDiagram
-    class NotificationService {
-        +db: AsyncSession
-        +email_provider: EmailProvider
-        +push_provider: PushProvider
-        +ws_manager: WebSocketManager
-        +send_approval_request(user_id, entity_type, entity_id) void
-        +send_approval_decision(user_id, approved: bool, reason) void
-        +send_payment_confirmation(user_id, amount, reference) void
-        +send_budget_alert(user_id, alert: BudgetAlert) void
-        +send_period_close_reminder(user_ids: list, period_id) void
-        -_persist_notification(user_id, type, payload) Notification
+    class AccountType {
+        <<enumeration>>
+        ASSET
+        LIABILITY
+        EQUITY
+        REVENUE
+        EXPENSE
+        CONTRA_ASSET
+        CONTRA_REVENUE
     }
 
-    class AuditService {
-        +db: AsyncSession
-        +audit_repo: AuditRepository
-        +log(user_id, action, entity_type, entity_id, before, after) AuditLog
-        +get_logs(filters: AuditFilter) list~AuditLog~
-        +export_logs(filters: AuditFilter) bytes
+    class JournalEntryStatus {
+        <<enumeration>>
+        DRAFT
+        PENDING_APPROVAL
+        APPROVED
+        POSTED
+        REVERSED
+        REJECTED
     }
 
-    class WebSocketManager {
-        +connections: dict~int, WebSocket~
-        +connect(user_id, ws: WebSocket) void
-        +disconnect(user_id) void
-        +broadcast_to_user(user_id, event: dict) void
-        +broadcast_to_role(role: str, event: dict) void
+    class PeriodStatus {
+        <<enumeration>>
+        FUTURE
+        OPEN
+        SOFT_CLOSED
+        HARD_CLOSED
+        REOPENED
     }
 
-    NotificationService --> WebSocketManager
-    NotificationService --> AuditService
+    class InvoiceStatus {
+        <<enumeration>>
+        DRAFT
+        SUBMITTED
+        APPROVED
+        PARTIALLY_PAID
+        PAID
+        CANCELLED
+        DISPUTED
+    }
+
+    class BudgetStatus {
+        <<enumeration>>
+        DRAFT
+        SUBMITTED
+        UNDER_REVIEW
+        APPROVED
+        ACTIVE
+        REVISION_REQUESTED
+        CLOSED
+    }
+
+    class AssetStatus {
+        <<enumeration>>
+        PROPOSED
+        ACTIVE
+        PARTIALLY_DEPRECIATED
+        FULLY_DEPRECIATED
+        DISPOSED
+    }
+
+    class DepreciationMethod {
+        <<enumeration>>
+        STRAIGHT_LINE
+        DECLINING_BALANCE
+        DOUBLE_DECLINING_BALANCE
+        SUM_OF_YEARS_DIGITS
+        UNITS_OF_PRODUCTION
+    }
+
+    class PaymentMethod {
+        <<enumeration>>
+        ACH
+        WIRE
+        CHECK
+        CREDIT_CARD
+        CASH
+        DIRECT_DEBIT
+        DIGITAL_WALLET
+    }
 ```
-
-## Implementation-Ready Finance Control Expansion
-
-### 1) Accounting Rule Assumptions (Detailed)
-- Ledger model is strictly double-entry with balanced journal headers and line-level dimensional tagging (entity, cost-center, project, product, counterparty).
-- Posting policies are versioned and time-effective; historical transactions are evaluated against the rule version active at transaction time.
-- Currency handling requires transaction currency, functional currency, and optional reporting currency; FX revaluation and realized/unrealized gains are separated.
-- Materiality thresholds are explicit and configurable; below-threshold variances may auto-resolve only when policy explicitly allows.
-
-### 2) Transaction Invariants and Data Contracts
-- Every command/event must include `transaction_id`, `idempotency_key`, `source_system`, `event_time_utc`, `actor_id/service_principal`, and `policy_version`.
-- Mutations affecting posted books are append-only. Corrections use reversal + adjustment entries with causal linkage to original posting IDs.
-- Period invariant checks: no unapproved journals in closing period, all sub-ledger control accounts reconciled, and close checklist fully attested.
-- Referential invariants: every ledger line links to a provenance artifact (invoice/payment/payroll/expense/asset/tax document).
-
-### 3) Reconciliation and Close Strategy
-- Continuous reconciliation cadence:
-  - **T+0/T+1** operational reconciliation (gateway, bank, processor, payroll outputs).
-  - **Daily** sub-ledger to GL tie-out.
-  - **Monthly/Quarterly** close certification with controller sign-off.
-- Exception taxonomy is mandatory: timing mismatch, mapping/config error, duplicate, missing source event, external counterparty variance, FX rounding.
-- Close blockers are machine-detectable and surfaced on a close dashboard with ownership, ETA, and escalation policy.
-
-### 4) Failure Handling and Operational Recovery
-- Posting pipeline uses outbox/inbox patterns with deterministic retries and dead-letter quarantine for non-retriable payloads.
-- Duplicate delivery and partial failure scenarios must be proven safe through idempotency and compensating accounting entries.
-- Incident runbooks require: containment decision, scope quantification, replay/rebuild method, reconciliation rerun, and financial controller approval.
-- Recovery drills must be executed periodically with evidence retained for audit.
-
-### 5) Regulatory / Compliance / Audit Expectations
-- Controls must support segregation of duties, least privilege, and end-to-end tamper-evident audit trails.
-- Retention strategy must satisfy jurisdictional requirements for financial records, tax documents, and payroll artifacts.
-- Sensitive data handling includes classification, masking/tokenization for non-production, and secure export controls.
-- Every policy override (manual journal, reopened period, emergency access) requires reason code, approver, and expiration window.
-
-### 6) Data Lineage & Traceability (Requirements → Implementation)
-- Maintain an explicit traceability matrix for this artifact (`detailed-design/class-diagrams.md`):
-  - `Requirement ID` → `Business Rule / Event` → `Design Element` (API/schema/diagram component) → `Code Module` → `Test Evidence` → `Control Owner`.
-- Lineage metadata minimums: source event ID, transformation ID/version, posting rule version, reconciliation batch ID, and report consumption path.
-- Any change touching accounting semantics must include impact analysis across upstream requirements and downstream close/compliance reports.
-- Documentation updates are blocking for release when they alter financial behavior, posting logic, or reconciliation outcomes.
-
-### 7) Phase-Specific Implementation Readiness
-- Specify schema-level constraints: unique idempotency keys, check constraints for debit/credit signs, immutable posting rows, FK coverage.
-- Define API contracts for posting/approval/reconciliation including error codes, retry semantics, and deterministic conflict handling.
-- Include state-transition guards for approval and period-close flows to prevent illegal transitions.
-
-### 8) Implementation Checklist for `class diagrams`
-- [ ] Control objectives and success/failure criteria are explicit and testable.
-- [ ] Data contracts include mandatory identifiers, timestamps, and provenance fields.
-- [ ] Reconciliation logic defines cadence, tolerances, ownership, and escalation.
-- [ ] Operational runbooks cover retries, replay, backfill, and close re-certification.
-- [ ] Compliance evidence artifacts are named, retained, and linked to control owners.
-
-
-### Mermaid Control Overlay (Implementation-Ready)
-```mermaid
-flowchart LR
-    Req[Requirements Controls] --> Rules[Posting/Tax/Approval Rules]
-    Rules --> Events[Domain Events with Idempotency Keys]
-    Events --> Ledger[Immutable Ledger Entries]
-    Ledger --> Recon[Automated Reconciliation Jobs]
-    Recon --> Close[Period Close & Certification]
-    Close --> Reports[Regulatory + Management Reports]
-    Reports --> Audit[Evidence Store / Audit Trail]
-    Audit -->|Feedback| Req
-```
-
-

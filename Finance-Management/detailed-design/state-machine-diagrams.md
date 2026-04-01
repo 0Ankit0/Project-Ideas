@@ -1,280 +1,343 @@
 # State Machine Diagrams
 
 ## Overview
-Entity state transition diagrams for the key financial documents and workflows in the Finance Management System.
+
+State transition diagrams for key financial domain objects in the Finance Management System. Each diagram shows valid states, transitions with trigger conditions and guards, entry/exit actions, and terminal states. Diagrams use `stateDiagram-v2` notation.
 
 ---
 
-## Vendor Invoice State Machine
+## 1. JournalEntry State Machine
+
+A journal entry moves from composition through approval and posting. Once posted it is immutable; reversal creates a new offsetting entry rather than modifying the original.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT : Accountant creates invoice
+    [*] --> DRAFT : create()
 
-    DRAFT --> SUBMITTED : Accountant submits for approval
-    DRAFT --> VOID : Accountant voids before submission
+    DRAFT --> PENDING_APPROVAL : submit()
+[hasLines && isBalanced && periodIsOpen]
+    DRAFT --> DRAFT : saveDraft()
+    DRAFT --> [*] : discard()
+[no approvals started]
 
-    SUBMITTED --> MATCH_EXCEPTION : 3-way match variance exceeds tolerance
-    SUBMITTED --> PENDING_FM_APPROVAL : Match passes, amount above threshold
-    SUBMITTED --> APPROVED : Match passes, amount below threshold (auto-approved)
+    PENDING_APPROVAL --> APPROVED : approve(userId)
+[approver != creator && hasAuthority]
+    PENDING_APPROVAL --> REJECTED : reject(userId, reason)
+    PENDING_APPROVAL --> DRAFT : recall()
+[creator only && within 15 min]
 
-    MATCH_EXCEPTION --> PENDING_FM_APPROVAL : FM overrides exception
-    MATCH_EXCEPTION --> VOID : FM rejects exception
+    APPROVED --> POSTED : post(userId)
+[period.isPostable()]
+    APPROVED --> DRAFT : revise(userId)
+[within 1 hour of approval]
 
-    PENDING_FM_APPROVAL --> APPROVED : Finance Manager approves
-    PENDING_FM_APPROVAL --> DRAFT : Finance Manager returns with comments
+    POSTED --> REVERSED : reverse(userId, date, reason)
+[period.isOpen() || periodIsReopened]
 
-    APPROVED --> SCHEDULED : Added to payment run
-    SCHEDULED --> PARTIALLY_PAID : Partial payment applied
-    SCHEDULED --> PAID : Full payment received and cleared
+    REJECTED --> DRAFT : reviseAndResubmit()
 
-    PARTIALLY_PAID --> PAID : Remaining balance paid
+    REVERSED --> [*]
 
-    APPROVED --> VOID : Finance Manager voids approved invoice
-    PAID --> [*]
-    VOID --> [*]
+    note right of DRAFT
+        entry: generateDraftNumber()
+        exit: validateBalance()
+    end note
+
+    note right of PENDING_APPROVAL
+        entry: notifyApprovers()
+        entry: setSubmittedAt()
+    end note
+
+    note right of POSTED
+        entry: updateLedgerBalances()
+        entry: publishJournalPostedEvent()
+        entry: setPostedAt()
+    end note
+
+    note right of REVERSED
+        entry: createReversalEntry()
+        entry: updateLedgerBalances()
+        entry: publishJournalReversedEvent()
+    end note
+```
+
+**State Reference**
+
+| State | Description |
+|---|---|
+| DRAFT | Entry is being composed; lines can be added or removed freely |
+| PENDING_APPROVAL | Submitted for workflow approval; entry is read-only |
+| APPROVED | Approved by an authorised reviewer; awaiting the posting window |
+| POSTED | Permanently posted to the general ledger; fully immutable |
+| REVERSED | A reversal entry has been created; this entry is effectively voided |
+| REJECTED | Rejected by approver; returned to DRAFT with a mandatory reason |
+
+---
+
+## 2. AccountingPeriod State Machine
+
+An accounting period progresses through a controlled close sequence. Re-opening a hard-closed period requires board-level approval and creates an immutable audit trail entry.
+
+```mermaid
+stateDiagram-v2
+    [*] --> FUTURE : createPeriod()
+
+    FUTURE --> OPEN : open()
+[currentDate >= period.startDate]
+
+    OPEN --> SOFT_CLOSED : softClose(userId)
+[checklistComplete && approvalGranted]
+    OPEN --> OPEN : postJournalEntry()
+
+    SOFT_CLOSED --> HARD_CLOSED : hardClose(userId)
+[auditSignOff && allAdjustmentsPosted]
+    SOFT_CLOSED --> REOPENED : reopen(userId, reason)
+[requires CFO approval]
+
+    HARD_CLOSED --> REOPENED : reopen(userId, reason)
+[requires board approval + audit entry]
+
+    REOPENED --> SOFT_CLOSED : softClose(userId)
+[adjustments posted && re-approved]
+    REOPENED --> HARD_CLOSED : hardClose(userId)
+
+    note right of OPEN
+        entry: setOpenedAt()
+        entry: propagateOpeningBalances()
+        exit: runPreCloseChecklist()
+    end note
+
+    note right of SOFT_CLOSED
+        entry: lockNonAdjustingEntries()
+        entry: notifyControllers()
+        entry: publishPeriodSoftClosedEvent()
+    end note
+
+    note right of HARD_CLOSED
+        entry: lockAllEntries()
+        entry: archiveLedgerBalances()
+        entry: publishPeriodHardClosedEvent()
+    end note
+
+    note right of REOPENED
+        entry: createAuditLogEntry(reason, approvedBy)
+        entry: notifyAuditTeam()
+        entry: publishPeriodReopenedEvent()
+    end note
 ```
 
 ---
 
-## Customer Invoice State Machine
+## 3. Invoice State Machine
+
+Invoices flow from creation through approval to payment settlement. Disputes can interrupt the payment flow and require explicit resolution before the invoice proceeds.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT : Accountant creates invoice
+    [*] --> DRAFT : createInvoice()
 
-    DRAFT --> ISSUED : Accountant sends to customer
-    DRAFT --> VOID : Cancelled before sending
+    DRAFT --> SUBMITTED : submit()
+[hasLines && totalAmount > 0]
+    DRAFT --> [*] : delete()
+[no payments applied]
 
-    ISSUED --> PARTIALLY_PAID : Partial payment recorded
-    ISSUED --> PAID : Full payment received
-    ISSUED --> OVERDUE : Due date passes without payment
+    SUBMITTED --> APPROVED : approve(userId)
+[approver is authorised]
+    SUBMITTED --> DRAFT : reject(userId, reason)
+    SUBMITTED --> CANCELLED : cancel(userId, reason)
 
-    PARTIALLY_PAID --> PAID : Remaining balance collected
-    PARTIALLY_PAID --> OVERDUE : Due date passes
+    APPROVED --> PARTIALLY_PAID : applyPayment(amount)
+[0 < amount < totalAmount]
+    APPROVED --> PAID : applyPayment(amount)
+[amount == amountDue]
+    APPROVED --> DISPUTED : dispute(reason)
+    APPROVED --> CANCELLED : cancel(userId, reason)
+[no payments applied]
 
-    OVERDUE --> PAID : Late payment received
-    OVERDUE --> WRITTEN_OFF : CFO approves bad debt write-off
+    PARTIALLY_PAID --> PAID : applyPayment(amount)
+[amountDue == 0]
+    PARTIALLY_PAID --> DISPUTED : dispute(reason)
+
+    DISPUTED --> APPROVED : resolveDispute(resolution)
+[resolution = VALID]
+    DISPUTED --> CANCELLED : resolveDispute(resolution)
+[resolution = INVALID]
 
     PAID --> [*]
-    WRITTEN_OFF --> [*]
-    VOID --> [*]
+    CANCELLED --> [*]
+
+    note right of APPROVED
+        entry: createJournalEntry()
+        entry: updateVendorOrCustomerBalance()
+        entry: publishInvoiceApprovedEvent()
+    end note
+
+    note right of PAID
+        entry: publishInvoicePaidEvent()
+        entry: closeJournalEntry()
+        entry: updatePaymentTerm()
+    end note
+
+    note right of DISPUTED
+        entry: notifyCounterparty()
+        entry: freezePaymentSchedule()
+        entry: createDisputeCase()
+    end note
 ```
 
 ---
 
-## Budget State Machine
+## 4. Budget State Machine
+
+A budget is drafted, reviewed, approved, and activated for spend control. Mid-year revisions create a new version while the current version remains active until the revision is approved.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT : Budget Manager creates budget
+    [*] --> DRAFT : createBudget()
 
-    DRAFT --> PENDING_FM_REVIEW : Submitted for Finance Manager review
-    DRAFT --> [*] : Deleted as draft
+    DRAFT --> SUBMITTED : submit(userId)
+[hasLines && totalAmount > 0]
+    DRAFT --> DRAFT : saveDraft()
+    DRAFT --> [*] : discard()
 
-    PENDING_FM_REVIEW --> DRAFT : Returned with comments
-    PENDING_FM_REVIEW --> PENDING_CFO_APPROVAL : Finance Manager approves
+    SUBMITTED --> UNDER_REVIEW : startReview(reviewerId)
+    SUBMITTED --> DRAFT : returnToDraft(userId, reason)
 
-    PENDING_CFO_APPROVAL --> PENDING_FM_REVIEW : CFO returns to Finance Manager
-    PENDING_CFO_APPROVAL --> APPROVED : CFO approves
+    UNDER_REVIEW --> APPROVED : approve(userId)
+[quorum of approvers reached]
+    UNDER_REVIEW --> REVISION_REQUESTED : requestRevision(userId, changes[])
+    UNDER_REVIEW --> SUBMITTED : returnForRevision()
 
-    APPROVED --> ACTIVE : Fiscal period starts
-    ACTIVE --> REVISED : Budget revision submitted
-    REVISED --> PENDING_FM_REVIEW : Revision routed for re-approval
-    ACTIVE --> CLOSED : Fiscal period ends
+    APPROVED --> ACTIVE : activate()
+[fiscalYear.isOpen()]
+    APPROVED --> REVISION_REQUESTED : requestRevision(userId)
+
+    ACTIVE --> REVISION_REQUESTED : requestRevision(userId, reason)
+    ACTIVE --> CLOSED : close()
+[fiscalYear.isClosed()]
+
+    REVISION_REQUESTED --> DRAFT : createRevision()
+[new version; current frozen]
 
     CLOSED --> [*]
+
+    note right of ACTIVE
+        entry: enableBudgetChecks()
+        entry: notifyBudgetOwner()
+        entry: publishBudgetActivatedEvent()
+    end note
+
+    note right of REVISION_REQUESTED
+        entry: freezeCurrentVersion()
+        entry: notifyBudgetOwner()
+        entry: createRevisionRecord()
+    end note
+
+    note right of CLOSED
+        entry: archiveBudgetLines()
+        entry: publishBudgetClosedEvent()
+    end note
 ```
 
 ---
 
-## Expense Claim State Machine
+## 5. BankReconciliation State Machine
+
+A bank reconciliation progresses from statement import through automated matching to human review and final completion. Disputes freeze the reconciliation until the bank resolves the discrepancy.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT : Employee creates claim
+    [*] --> INITIATED : initiateReconciliation(bankAccountId, statementId)
 
-    DRAFT --> SUBMITTED : Employee submits claim
-    DRAFT --> [*] : Employee deletes draft
+    INITIATED --> IN_PROGRESS : startMatching()
 
-    SUBMITTED --> PENDING_DEPT_APPROVAL : Routed to Department Head
+    IN_PROGRESS --> PARTIALLY_MATCHED : matchingComplete()
+[unmatchedItems > 0]
+    IN_PROGRESS --> PENDING_REVIEW : matchingComplete()
+[fuzzyMatchCount > 0]
+    IN_PROGRESS --> COMPLETED : matchingComplete()
+[allMatched && balanced]
 
-    PENDING_DEPT_APPROVAL --> DRAFT : Rejected – returned to employee
-    PENDING_DEPT_APPROVAL --> PENDING_FM_APPROVAL : Approved by Dept Head (high-value)
-    PENDING_DEPT_APPROVAL --> APPROVED : Approved by Dept Head (below threshold)
+    PARTIALLY_MATCHED --> PENDING_REVIEW : submitForReview(userId)
+    PARTIALLY_MATCHED --> IN_PROGRESS : addManualMatch(userId, lineId, entryId)
 
-    PENDING_FM_APPROVAL --> DRAFT : Rejected – returned to employee
-    PENDING_FM_APPROVAL --> APPROVED : Finance Manager approves
+    PENDING_REVIEW --> IN_PROGRESS : applyReviewDecisions(userId)
+    PENDING_REVIEW --> COMPLETED : approveReconciliation(userId)
+[allItemsResolved && balanced]
+    PENDING_REVIEW --> DISPUTED : raiseDispute(userId, items[])
 
-    APPROVED --> QUEUED_FOR_PAYMENT : Added to reimbursement batch
-    QUEUED_FOR_PAYMENT --> PAID : Reimbursement transferred to employee
+    DISPUTED --> PENDING_REVIEW : resolveDispute(userId, resolution)
 
-    PAID --> [*]
+    COMPLETED --> [*]
+
+    note right of COMPLETED
+        entry: lockStatementLines()
+        entry: updateLastReconciledDate()
+        entry: publishReconciliationCompletedEvent()
+    end note
+
+    note right of DISPUTED
+        entry: notifyBankOperationsTeam()
+        entry: createDisputeTicket()
+        entry: suspendAutomatedMatching()
+    end note
+
+    note right of PENDING_REVIEW
+        entry: notifyController()
+        entry: generateExceptionReport()
+    end note
 ```
 
 ---
 
-## Payroll Run State Machine
+## 6. FixedAsset State Machine
+
+A fixed asset moves from capital proposal through active depreciation to eventual disposal. Each state transition generates a corresponding journal entry to maintain ledger accuracy.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT : Accountant initiates payroll run
+    [*] --> PROPOSED : proposeAsset(assetData)
 
-    DRAFT --> CALCULATED : Calculations completed
-    DRAFT --> CANCELLED : Cancelled before calculation
+    PROPOSED --> ACTIVE : approve(userId)
+[capitalised in acquisition journal]
+    PROPOSED --> [*] : reject(userId, reason)
 
-    CALCULATED --> PENDING_APPROVAL : Submitted to Finance Manager
+    ACTIVE --> PARTIALLY_DEPRECIATED : runDepreciation()
+[0 < accumulatedDepr < cost - residual]
+    ACTIVE --> DISPOSED : dispose(date, proceeds, method)
+[prior to depreciation start]
 
-    PENDING_APPROVAL --> CALCULATED : Returned for corrections
-    PENDING_APPROVAL --> APPROVED : Finance Manager approves
+    PARTIALLY_DEPRECIATED --> FULLY_DEPRECIATED : runDepreciation()
+[bookValue == residualValue]
+    PARTIALLY_DEPRECIATED --> DISPOSED : dispose(date, proceeds, method)
 
-    APPROVED --> SUBMITTED_TO_BANK : Bank file submitted
-
-    SUBMITTED_TO_BANK --> DISBURSED : Bank confirms clearance
-    SUBMITTED_TO_BANK --> PARTIALLY_FAILED : Some disbursements failed
-
-    PARTIALLY_FAILED --> DISBURSED : Failed entries reprocessed
-    PARTIALLY_FAILED --> FAILED : All retries exhausted
-
-    DISBURSED --> [*]
-    FAILED --> [*]
-    CANCELLED --> [*]
-```
-
----
-
-## Accounting Period State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> OPEN : Period created and activated
-
-    OPEN --> SOFT_CLOSED : Finance Manager initiates soft-close
-    note right of SOFT_CLOSED : Restricted posting\nAdjustments require approval
-
-    SOFT_CLOSED --> OPEN : Reopened for corrections (rare)
-    SOFT_CLOSED --> HARD_CLOSED : CFO approves final close
-
-    note right of HARD_CLOSED : No postings allowed\nFully locked
-
-    HARD_CLOSED --> [*]
-```
-
----
-
-## Fixed Asset State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> REGISTERED : Asset acquired and registered
-
-    REGISTERED --> IN_SERVICE : Asset placed in service (depreciation begins)
-
-    IN_SERVICE --> TRANSFERRED : Asset transferred to another dept/location
-    TRANSFERRED --> IN_SERVICE : Transfer complete
-
-    IN_SERVICE --> IMPAIRED : Write-down applied
-    IMPAIRED --> IN_SERVICE : Impairment reversed
-
-    IN_SERVICE --> FULLY_DEPRECIATED : Net book value reaches residual value
-    FULLY_DEPRECIATED --> DISPOSED : Asset sold or scrapped
-    IN_SERVICE --> DISPOSED : Early disposal
+    FULLY_DEPRECIATED --> DISPOSED : dispose(date, proceeds, method)
 
     DISPOSED --> [*]
+
+    note right of ACTIVE
+        entry: generateAssetCode()
+        entry: createAcquisitionJournalEntry()
+        entry: buildDepreciationSchedule()
+        entry: publishAssetActivatedEvent()
+    end note
+
+    note right of PARTIALLY_DEPRECIATED
+        entry: updateBookValue()
+        entry: postDepreciationJournalEntry()
+        entry: updateRemainingLifeMonths()
+    end note
+
+    note right of FULLY_DEPRECIATED
+        entry: setBookValueToResidualValue()
+        entry: stopDepreciationSchedule()
+        entry: notifyAssetManager()
+    end note
+
+    note right of DISPOSED
+        entry: calculateGainLoss()
+        entry: createDisposalJournalEntry()
+        entry: derecogniseFromAssetRegister()
+        entry: publishAssetDisposedEvent()
+    end note
 ```
-
----
-
-## Payment Run State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING_APPROVAL : Finance Manager creates payment run
-
-    PENDING_APPROVAL --> APPROVED : Finance Manager approves run
-    PENDING_APPROVAL --> CANCELLED : Cancelled before approval
-
-    APPROVED --> BANK_FILE_GENERATED : Bank transfer file generated
-
-    BANK_FILE_GENERATED --> SUBMITTED_TO_BANK : File submitted to banking system
-    BANK_FILE_GENERATED --> CANCELLED : Cancelled after file generation
-
-    SUBMITTED_TO_BANK --> CLEARED : Bank confirms all payments cleared
-    SUBMITTED_TO_BANK --> PARTIALLY_FAILED : Some payments failed
-    SUBMITTED_TO_BANK --> FAILED : All payments failed
-
-    PARTIALLY_FAILED --> CLEARED : Failed payments re-initiated and cleared
-
-    CLEARED --> [*]
-    FAILED --> [*]
-    CANCELLED --> [*]
-```
-
-## Implementation-Ready Finance Control Expansion
-
-### 1) Accounting Rule Assumptions (Detailed)
-- Ledger model is strictly double-entry with balanced journal headers and line-level dimensional tagging (entity, cost-center, project, product, counterparty).
-- Posting policies are versioned and time-effective; historical transactions are evaluated against the rule version active at transaction time.
-- Currency handling requires transaction currency, functional currency, and optional reporting currency; FX revaluation and realized/unrealized gains are separated.
-- Materiality thresholds are explicit and configurable; below-threshold variances may auto-resolve only when policy explicitly allows.
-
-### 2) Transaction Invariants and Data Contracts
-- Every command/event must include `transaction_id`, `idempotency_key`, `source_system`, `event_time_utc`, `actor_id/service_principal`, and `policy_version`.
-- Mutations affecting posted books are append-only. Corrections use reversal + adjustment entries with causal linkage to original posting IDs.
-- Period invariant checks: no unapproved journals in closing period, all sub-ledger control accounts reconciled, and close checklist fully attested.
-- Referential invariants: every ledger line links to a provenance artifact (invoice/payment/payroll/expense/asset/tax document).
-
-### 3) Reconciliation and Close Strategy
-- Continuous reconciliation cadence:
-  - **T+0/T+1** operational reconciliation (gateway, bank, processor, payroll outputs).
-  - **Daily** sub-ledger to GL tie-out.
-  - **Monthly/Quarterly** close certification with controller sign-off.
-- Exception taxonomy is mandatory: timing mismatch, mapping/config error, duplicate, missing source event, external counterparty variance, FX rounding.
-- Close blockers are machine-detectable and surfaced on a close dashboard with ownership, ETA, and escalation policy.
-
-### 4) Failure Handling and Operational Recovery
-- Posting pipeline uses outbox/inbox patterns with deterministic retries and dead-letter quarantine for non-retriable payloads.
-- Duplicate delivery and partial failure scenarios must be proven safe through idempotency and compensating accounting entries.
-- Incident runbooks require: containment decision, scope quantification, replay/rebuild method, reconciliation rerun, and financial controller approval.
-- Recovery drills must be executed periodically with evidence retained for audit.
-
-### 5) Regulatory / Compliance / Audit Expectations
-- Controls must support segregation of duties, least privilege, and end-to-end tamper-evident audit trails.
-- Retention strategy must satisfy jurisdictional requirements for financial records, tax documents, and payroll artifacts.
-- Sensitive data handling includes classification, masking/tokenization for non-production, and secure export controls.
-- Every policy override (manual journal, reopened period, emergency access) requires reason code, approver, and expiration window.
-
-### 6) Data Lineage & Traceability (Requirements → Implementation)
-- Maintain an explicit traceability matrix for this artifact (`detailed-design/state-machine-diagrams.md`):
-  - `Requirement ID` → `Business Rule / Event` → `Design Element` (API/schema/diagram component) → `Code Module` → `Test Evidence` → `Control Owner`.
-- Lineage metadata minimums: source event ID, transformation ID/version, posting rule version, reconciliation batch ID, and report consumption path.
-- Any change touching accounting semantics must include impact analysis across upstream requirements and downstream close/compliance reports.
-- Documentation updates are blocking for release when they alter financial behavior, posting logic, or reconciliation outcomes.
-
-### 7) Phase-Specific Implementation Readiness
-- Specify schema-level constraints: unique idempotency keys, check constraints for debit/credit signs, immutable posting rows, FK coverage.
-- Define API contracts for posting/approval/reconciliation including error codes, retry semantics, and deterministic conflict handling.
-- Include state-transition guards for approval and period-close flows to prevent illegal transitions.
-
-### 8) Implementation Checklist for `state machine diagrams`
-- [ ] Control objectives and success/failure criteria are explicit and testable.
-- [ ] Data contracts include mandatory identifiers, timestamps, and provenance fields.
-- [ ] Reconciliation logic defines cadence, tolerances, ownership, and escalation.
-- [ ] Operational runbooks cover retries, replay, backfill, and close re-certification.
-- [ ] Compliance evidence artifacts are named, retained, and linked to control owners.
-
-
-### Mermaid Control Overlay (Implementation-Ready)
-```mermaid
-flowchart LR
-    Req[Requirements Controls] --> Rules[Posting/Tax/Approval Rules]
-    Rules --> Events[Domain Events with Idempotency Keys]
-    Events --> Ledger[Immutable Ledger Entries]
-    Ledger --> Recon[Automated Reconciliation Jobs]
-    Recon --> Close[Period Close & Certification]
-    Close --> Reports[Regulatory + Management Reports]
-    Reports --> Audit[Evidence Store / Audit Trail]
-    Audit -->|Feedback| Req
-```
-
-

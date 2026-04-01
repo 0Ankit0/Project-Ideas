@@ -1,7 +1,500 @@
 # Implementation Guidelines
 
 ## Overview
-This document provides implementation guidelines, coding standards, and best practices for developing the Finance Management System. Given the regulatory and accuracy requirements of financial software, these guidelines place particular emphasis on data integrity, audit trail completeness, idempotency, and security.
+
+Comprehensive implementation standards and engineering practices for the Finance Management System. Financial software demands exceptional correctness: a single bug in monetary arithmetic, a missed audit event, or a broken idempotency key can cause regulatory violations and irreversible balance corruption. Every guideline here exists because financial software fails in costly, hard-to-detect ways when these practices are absent.
+
+---
+
+## Technology Choices and Rationale
+
+| Concern | Technology | Rationale |
+|---------|-----------|-----------|
+| Transactional database | PostgreSQL 15 | ACID guarantees, advisory locks, row-level security, pgaudit, JSONB for metadata, native DECIMAL type |
+| Event streaming | Apache Kafka (MSK) | At-least-once delivery, consumer group replay, log compaction for snapshots, exactly-once semantics via transactions |
+| Cache | Redis 7 (ElastiCache) | FX rate cache, idempotency key store, distributed lock (Redlock), session token storage |
+| Orchestration | Kubernetes (EKS) | Pod disruption budgets, rolling deploys with health gating, IRSA for per-pod AWS credentials |
+| API framework | FastAPI | Async-first, Pydantic v2 validation, OpenAPI schema generation, dependency injection |
+| ORM | SQLAlchemy 2.x async | Unit-of-work pattern, connection pooling, read/write session splitting |
+| Event outbox | PostgreSQL outbox table | Transactional consistency between DB write and Kafka produce; no dual-write race condition |
+| Secret management | AWS Secrets Manager | Automatic rotation, no secrets in environment variables or ConfigMaps |
+| Encryption | AWS KMS (CMK) | Envelope encryption for financial data at rest; key per data classification |
+
+---
+
+## Project Structure
+
+```
+/services
+├── ledger-service/
+│   ├── src/
+│   │   ├── domain/
+│   │   │   ├── models/          # Aggregate roots, entities, value objects
+│   │   │   │   ├── account.py
+│   │   │   │   ├── journal_entry.py
+│   │   │   │   └── ledger_period.py
+│   │   │   ├── events/          # Domain events (Pydantic schemas)
+│   │   │   │   ├── journal_posted.py
+│   │   │   │   └── period_closed.py
+│   │   │   └── services/        # Domain services (pure logic, no I/O)
+│   │   │       ├── double_entry_validator.py
+│   │   │       └── posting_engine.py
+│   │   ├── application/
+│   │   │   ├── commands/        # CQRS write-side command handlers
+│   │   │   │   ├── post_journal_entry.py
+│   │   │   │   └── close_period.py
+│   │   │   └── queries/         # CQRS read-side query handlers
+│   │   │       ├── get_trial_balance.py
+│   │   │       └── get_account_activity.py
+│   │   ├── infrastructure/
+│   │   │   ├── db/
+│   │   │   │   ├── models.py    # SQLAlchemy ORM models
+│   │   │   │   ├── repositories.py
+│   │   │   │   └── outbox.py    # Outbox table + relay
+│   │   │   ├── kafka/
+│   │   │   │   ├── producer.py
+│   │   │   │   └── consumer.py
+│   │   │   └── cache/
+│   │   │       └── fx_rate_cache.py
+│   │   └── api/
+│   │       ├── routers/
+│   │       │   ├── journal.py
+│   │       │   ├── accounts.py
+│   │       │   └── periods.py
+│   │       ├── deps.py          # DB session, auth, RBAC, idempotency
+│   │       └── schemas/         # Pydantic request/response schemas
+│   ├── tests/
+│   │   ├── unit/
+│   │   ├── integration/
+│   │   └── contract/
+│   ├── migrations/              # Alembic migration scripts
+│   ├── Dockerfile
+│   └── pyproject.toml
+├── journal-service/             # Same structure
+├── ap-service/
+├── ar-service/
+├── budget-service/
+├── reconciliation-service/
+├── fixed-asset-service/
+├── tax-service/
+├── currency-service/
+├── reporting-service/
+├── audit-service/
+└── period-service/
+```
+
+---
+
+## Coding Standards
+
+### Monetary Value Handling
+
+**Rule: Never use `float` or `double` for money. Always use `DECIMAL(19,4)` in PostgreSQL and `Decimal` in Python.**
+
+```python
+# CORRECT
+from decimal import Decimal, ROUND_HALF_UP
+
+amount: Decimal = Decimal("1234.5678")
+rounded = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+# WRONG — precision loss
+amount: float = 1234.5678  # PROHIBITED in financial calculations
+```
+
+```sql
+-- CORRECT — PostgreSQL schema
+amount          NUMERIC(19, 4)  NOT NULL,
+exchange_rate   NUMERIC(19, 10) NOT NULL DEFAULT 1.0000000000,
+-- WRONG
+amount          FLOAT           -- PROHIBITED
+amount          DOUBLE PRECISION -- PROHIBITED
+```
+
+SQLAlchemy mapping:
+```python
+from sqlalchemy import Numeric
+amount = mapped_column(Numeric(19, 4), nullable=False)
+```
+
+### Double-Entry Accounting Enforcement
+
+Every `JournalEntry` must satisfy the invariant: `SUM(debit_amount) == SUM(credit_amount)` before any write to the database.
+
+```python
+def validate_balanced(lines: list[JournalLine]) -> None:
+    total_debit  = sum(l.debit_amount  for l in lines)
+    total_credit = sum(l.credit_amount for l in lines)
+    if total_debit != total_credit:
+        raise UnbalancedJournalError(
+            f"Journal is unbalanced: debits={total_debit}, credits={total_credit}"
+        )
+    if len(lines) < 2:
+        raise InsufficientLinesError("Journal entry requires at least 2 lines")
+```
+
+Validation must run in the domain service **and** be enforced by a database check constraint:
+```sql
+ALTER TABLE journal_entries
+  ADD CONSTRAINT chk_journal_balanced
+  CHECK (
+    (SELECT COALESCE(SUM(debit_amount), 0) FROM journal_lines jl WHERE jl.journal_entry_id = id) =
+    (SELECT COALESCE(SUM(credit_amount), 0) FROM journal_lines jl WHERE jl.journal_entry_id = id)
+  );
+```
+
+### Idempotency Implementation
+
+All state-changing endpoints accept an `Idempotency-Key` header. The key is stored in Redis with a TTL of 24 hours. If a duplicate request arrives within the TTL window, the original response is returned without re-executing the command.
+
+```python
+async def idempotency_guard(
+    idempotency_key: str,
+    redis: Redis,
+    execute: Callable,
+) -> Any:
+    cache_key = f"idempotency:{idempotency_key}"
+    cached = await redis.get(cache_key)
+    if cached:
+        return json.loads(cached)   # Replay stored response
+
+    result = await execute()
+    await redis.set(cache_key, json.dumps(result), ex=86400)  # 24h TTL
+    return result
+```
+
+For Kafka consumers, idempotency is enforced at the database level using a unique constraint on `(source_event_id, source_system)`:
+```sql
+CREATE UNIQUE INDEX CONCURRENTLY uq_journal_source_event
+    ON journal_entries (source_event_id, source_system)
+    WHERE source_event_id IS NOT NULL;
+```
+
+### Outbox Pattern (Transactional Event Publishing)
+
+Never produce to Kafka inside a database transaction. Use the outbox pattern:
+
+```python
+async def post_journal_entry(cmd: PostJournalCommand, db: AsyncSession) -> JournalEntry:
+    async with db.begin():
+        entry = await journal_repo.save(db, entry)
+        # Write outbox record in same transaction — atomically
+        await outbox_repo.insert(db, OutboxEvent(
+            event_type="journal.posted",
+            aggregate_id=str(entry.id),
+            payload=JournalPostedEvent.from_entry(entry).model_dump_json(),
+        ))
+    # Outbox relay (separate process) reads outbox table and produces to Kafka
+    return entry
+```
+
+The outbox relay polls the `outbox_events` table every 500ms, publishes to Kafka, then marks events as `published`. Failures are retried with exponential backoff; non-retriable payloads move to a dead-letter table after 5 attempts.
+
+---
+
+## Database Transaction Management
+
+```python
+# Unit of work — always explicit transaction scope
+async with db.begin():
+    # All reads and writes participate in this transaction
+    entry = await repo.find_for_update(entry_id)   # SELECT ... FOR UPDATE
+    entry.post()
+    await repo.save(entry)
+    # Transaction commits here; rolls back on any exception
+
+# Read-only queries always use the read replica session
+async def get_trial_balance(period_id: int, db_read: AsyncSession) -> TrialBalance:
+    ...
+```
+
+- Use `SELECT ... FOR UPDATE` when checking-then-updating financial balances.
+- Set `statement_timeout = 30s` for all application connections; reports use a separate pool with `statement_timeout = 300s`.
+- Never hold a transaction open while calling external APIs or waiting for user input.
+
+---
+
+## Event Sourcing for Audit Trail
+
+The `audit_events` table is the system of record for all mutations to financial data. It is append-only; no application role has `UPDATE` or `DELETE` on this table.
+
+```sql
+CREATE TABLE audit_events (
+    id              BIGSERIAL PRIMARY KEY,
+    event_id        UUID        NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    event_time_utc  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    actor_id        UUID        NOT NULL,
+    actor_type      TEXT        NOT NULL,  -- 'user' | 'service' | 'system'
+    action          TEXT        NOT NULL,  -- 'journal.post' | 'period.close' | ...
+    entity_type     TEXT        NOT NULL,
+    entity_id       TEXT        NOT NULL,
+    before_state    JSONB,
+    after_state     JSONB       NOT NULL,
+    ip_address      INET,
+    request_id      UUID,
+    idempotency_key TEXT,
+    policy_version  TEXT        NOT NULL
+);
+-- No DELETE, No UPDATE — enforced by DB role
+REVOKE UPDATE, DELETE ON audit_events FROM finance_app_role;
+```
+
+---
+
+## CQRS — Command/Query Responsibility Segregation
+
+```
+Write path: Command → CommandHandler → Domain Service → Repository (primary RDS) → Outbox
+Read path:  Query  → QueryHandler  → Read Model     → Repository (read replica RDS or Redis cache)
+```
+
+- Commands mutate state and emit domain events via outbox.
+- Queries are read-only, routed to read replicas, and may be cached in Redis.
+- Command handlers return only the minimum information needed (the aggregate ID and status). Full details require a subsequent query.
+
+---
+
+## API Versioning Strategy
+
+- All APIs are versioned by URL path: `/api/v1/`, `/api/v2/`
+- A version is maintained for a minimum of 12 months after a new version is released.
+- Breaking changes (removing fields, changing semantics, renaming) always increment the major version.
+- Non-breaking additions (new optional fields, new endpoints) are added to the current version.
+- The `Deprecation` and `Sunset` HTTP headers are set on deprecated endpoints.
+
+```python
+# Router structure
+router_v1 = APIRouter(prefix="/api/v1")
+router_v2 = APIRouter(prefix="/api/v2")
+app.include_router(router_v1)
+app.include_router(router_v2)
+```
+
+---
+
+## Error Handling Standards
+
+```python
+# Domain errors — map to 4xx
+class UnbalancedJournalError(DomainError):        # → 422
+class PeriodClosedError(DomainError):             # → 409
+class DuplicateIdempotencyKeyError(DomainError):  # → 200 (return cached response)
+class InsufficientFundsError(DomainError):        # → 422
+class UnauthorizedApproverError(DomainError):     # → 403
+
+# Infrastructure errors — map to 5xx; always retry-safe
+class DatabaseConnectionError(InfrastructureError):  # → 503
+class KafkaProducerError(InfrastructureError):       # → 503
+
+# Response envelope — consistent across all services
+{
+    "error": {
+        "code": "PERIOD_CLOSED",
+        "message": "Accounting period 2024-03 is closed. Use a reversal entry.",
+        "request_id": "req-abc123",
+        "timestamp": "2024-03-15T10:30:00Z"
+    }
+}
+```
+
+---
+
+## Security Implementation
+
+### RBAC (Role-Based Access Control)
+
+| Role | Permissions |
+|------|-------------|
+| `accountant` | Read + create draft journals, invoices, expenses |
+| `finance_manager` | Accountant + approve journals, AP runs, budgets |
+| `cfo` | Finance Manager + final budget/payroll approval, period close |
+| `controller` | Read-only + period close certification, reconciliation sign-off |
+| `auditor` | Read-only access to all data + audit log export |
+| `admin` | User provisioning only — no access to financial data |
+
+All permissions are enforced server-side in the dependency injection layer:
+```python
+async def require_role(required: Role, user: CurrentUser = Depends(get_current_user)):
+    if required not in user.roles:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+```
+
+### JWT Token Configuration
+- Access token TTL: 15 minutes
+- Refresh token TTL: 8 hours (rotated on use)
+- Algorithm: RS256 (asymmetric — private key in Secrets Manager, public key cached in pod)
+- Claims: `sub`, `roles`, `entity_id`, `iat`, `exp`, `jti` (for revocation)
+
+### Field-Level Encryption
+
+Bank account numbers and tax identifiers are encrypted at the application layer before storage, in addition to database-level KMS encryption:
+
+```python
+from cryptography.fernet import Fernet
+
+def encrypt_sensitive(value: str, key: bytes) -> str:
+    return Fernet(key).encrypt(value.encode()).decode()
+
+def decrypt_sensitive(encrypted: str, key: bytes) -> str:
+    return Fernet(key).decrypt(encrypted.encode()).decode()
+```
+
+The encryption key is fetched from Secrets Manager at startup and rotated every 90 days.
+
+---
+
+## Performance Optimization
+
+### Caching Strategy
+
+| Data | Cache Location | TTL | Invalidation |
+|------|---------------|-----|--------------|
+| FX exchange rates | Redis | 1 hour | Daily cron refresh |
+| Chart of Accounts | Redis | 5 minutes | Evict on CoA update |
+| Trial balance | Redis | 30 seconds | Evict on journal post |
+| User session / JWT | Redis | 15 minutes | Evict on logout |
+| Report status | Redis | Until completion | Evict on report ready |
+| Period status | Redis | 5 minutes | Evict on period change |
+
+### Query Optimization
+
+- All foreign key columns have indexes.
+- Partial indexes on `status = 'pending'` columns for queue-style queries.
+- Covering indexes for trial balance and aging report queries.
+- `EXPLAIN ANALYZE` required in pull request for any new query touching tables with > 100k rows.
+- Reporting queries always target the read replica via the read-only SQLAlchemy session.
+
+```sql
+-- Example covering index for AP aging
+CREATE INDEX CONCURRENTLY idx_invoices_aging
+    ON ap_invoices (vendor_id, due_date, status)
+    INCLUDE (amount_due, currency_code)
+    WHERE status IN ('APPROVED', 'PARTIAL');
+```
+
+---
+
+## Testing Strategy
+
+### Testing Pyramid
+
+```
+E2E Tests (5%)              — Playwright, full browser flows, staging env
+Contract Tests (10%)        — Pact broker, service interface contracts
+Integration Tests (35%)     — Testcontainers (real PostgreSQL + Redis), pytest-asyncio
+Unit Tests (50%)            — Pure domain logic, no I/O, pytest
+```
+
+### Coverage Requirements
+
+| Layer | Minimum Coverage |
+|-------|-----------------|
+| Domain services (posting, validation) | 95% |
+| Application command / query handlers | 85% |
+| API routers | 80% |
+| Infrastructure repositories | 75% |
+
+### Key Test Patterns
+
+```python
+# Unit test — double-entry validation (no database)
+def test_unbalanced_journal_raises():
+    lines = [
+        JournalLine(account_id=1, debit_amount=Decimal("100.00"), credit_amount=Decimal("0")),
+        JournalLine(account_id=2, debit_amount=Decimal("0"), credit_amount=Decimal("99.99")),
+    ]
+    with pytest.raises(UnbalancedJournalError):
+        validate_balanced(lines)
+
+# Integration test — outbox relay publishes to Kafka
+async def test_post_journal_publishes_event(db, kafka_consumer):
+    cmd = PostJournalCommand(lines=[...], idempotency_key="test-key-001")
+    entry = await post_journal_handler.handle(cmd, db)
+    message = await kafka_consumer.poll(timeout=5.0)
+    assert message.topic == "journal.posted"
+    assert json.loads(message.value)["journal_entry_id"] == str(entry.id)
+```
+
+---
+
+## Development Workflow
+
+```mermaid
+flowchart LR
+    subgraph "Development"
+        Feature["Feature Branch\nfrom main"]
+        LocalTest["Local Tests\npytest · docker-compose"]
+        PR["Pull Request\n→ main"]
+    end
+
+    subgraph "CI Gate (Required to Merge)"
+        Lint["Lint + Type Check\nruff · mypy\nMust pass"]
+        UnitCI["Unit Tests\nCoverage ≥ 80%\nMust pass"]
+        IntCI["Integration Tests\nTestcontainers\nMust pass"]
+        SAST["SAST\nSemgrep · Bandit\nNo HIGH findings"]
+        ContractCI["Contract Tests\nPact broker\nMust pass"]
+    end
+
+    subgraph "Deploy Pipeline"
+        Dev["Deploy to dev\nAuto on merge"]
+        StageDeploy["Deploy to staging\nManual promotion"]
+        StagePerfTest["Load Test\nk6 · P99 ≤ 500ms"]
+        ProdApproval["Production Approval\n2 engineers sign off"]
+        ProdDeploy["Deploy to prod\nRolling update"]
+        ProdSmoke["Smoke Tests\nCanary endpoints"]
+    end
+
+    Feature --> LocalTest --> PR
+    PR --> Lint --> UnitCI --> IntCI --> SAST --> ContractCI
+    ContractCI -->|"Merge"| Dev --> StageDeploy --> StagePerfTest
+    StagePerfTest --> ProdApproval --> ProdDeploy --> ProdSmoke
+```
+
+---
+
+## Operational Runbooks
+
+### Runbook: Monthly Period Close
+
+1. **Pre-close checks** (T-3 days): Verify all sub-ledger control accounts are reconciled. Run `period-service reconciliation-check --period YYYY-MM`. All exceptions must have owner-assigned tickets.
+2. **Soft close** (Last day of month, 17:00 local): Set period status to `SOFT_CLOSED`. New journals blocked; AP/AR adjustments still permitted via FM approval.
+3. **Sub-ledger reconciliation** (T+1): Automated job reconciles all sub-ledgers to GL. Dashboard shows break count. Target: zero breaks.
+4. **Hard close** (T+2 after controller sign-off): Set period to `HARD_CLOSED`. No further mutations permitted. Controller attests via close checklist.
+5. **Report generation**: Schedule P&L, Balance Sheet, GL Detail reports via `reporting-service generate-close-reports --period YYYY-MM`.
+6. **Audit evidence**: Export period close checklist sign-off to S3 `finance-documents/close-certification/YYYY-MM/`.
+
+### Runbook: Reconciliation Backfill
+
+Used when a reconciliation job fails mid-run or data arrives out of order.
+
+1. Identify affected reconciliation batch ID from CloudWatch logs.
+2. Mark the failed batch as `CANCELLED` in `reconciliation_batches` table.
+3. Identify the earliest affected transaction date.
+4. Re-run: `reconciliation-service backfill --from-date YYYY-MM-DD --batch-id NEW-UUID`.
+5. Monitor Kafka consumer lag on `recon.run.requested` topic until queue drains.
+6. Verify reconciliation summary report matches expected break count (ideally zero).
+7. If breaks remain, triage each using the exception taxonomy: timing mismatch, mapping error, duplicate, missing source event, FX rounding.
+8. Obtain controller sign-off on any unresolved breaks with materiality assessment.
+
+### Runbook: Payment Run Failure
+
+1. Check `ap_payment_runs` table for run status and last processed entry.
+2. Identify if bank file was already submitted (check `bank_file_submissions` table).
+3. If not submitted: re-trigger payment run from last successful entry using idempotency key.
+4. If submitted but unconfirmed: contact bank to confirm ACH status before re-submitting.
+5. If bank rejected: correct the rejection code, create reversal journal, re-submit.
+6. All actions logged in audit trail with `actor_type: 'operations'` and reason code.
+
+---
+
+## Compliance and Audit Requirements
+
+- Every API endpoint that mutates financial data writes to `audit_events` before returning a response.
+- Manual journal entries above a configurable threshold (default: USD 50,000) require a second approver.
+- Period re-opening requires: `reason_code`, `approver_id` (CFO role minimum), and sets an `expires_at` timestamp after which the period automatically re-closes.
+- All audit events are exported to S3 `finance-documents/audit-exports/` monthly; S3 Object Lock in COMPLIANCE mode prevents deletion for 7 years.
+- Segregation of duties: the user who creates a payment run cannot also approve it. Enforced at the command handler level.
+- Access to production databases is logged via SSM Session Manager and pgaudit. Any direct DB access outside the application generates a Security Hub finding.
 
 ---
 
