@@ -1,101 +1,308 @@
 # Deployment Diagram
 
+## Overview
+
+The Logistics Tracking System runs on a multi-zone Kubernetes cluster (EKS on AWS) spanning three availability zones within the primary region. All application workloads are deployed as Kubernetes `Deployment` objects with replica counts tuned to steady-state load and burst capacity. Stateful components (Kafka, ZooKeeper, databases) run as `StatefulSet` objects backed by persistent volumes provisioned from `gp3` EBS. The cluster is divided into four namespaces to enforce isolation, resource quotas, and network policies.
+
+| Namespace | Purpose |
+|---|---|
+| `logistics-prod` | All production application services |
+| `logistics-staging` | Staging replicas for pre-production validation |
+| `monitoring` | Prometheus, Grafana, Alertmanager, Jaeger |
+| `infra` | Kafka, ZooKeeper, Redis, Elasticsearch, databases |
+
+---
+
+## Kubernetes Deployment Topology
+
 ```mermaid
 flowchart TB
-  Internet --> CDN[WAF/CDN]
-  CDN --> Ingress[API Ingress]
-  subgraph K8s Cluster A (Primary)
-    API[API Pods]
-    Workers[Worker Pods]
-    Relay[Outbox Relay Pods]
-    Prom[Prometheus]
-    Graf[Grafana]
+  Internet([Internet]) --> CF[CloudFlare WAF + CDN]
+  CF --> Kong[Kong API Gateway\nLoadBalancer Service]
+
+  subgraph k8s["Kubernetes Cluster (EKS - 3 AZs)"]
+    subgraph ns_prod["Namespace: logistics-prod"]
+      SHP["shipment-service\n3 replicas"]
+      TRK["tracking-service\n5 replicas"]
+      CIS["carrier-integration-service\n3 replicas"]
+      GPS["gps-processing-service\n5 replicas"]
+      RTE["route-optimization-service\n2 replicas"]
+      NTF["notification-service\n3 replicas"]
+      CST["customs-service\n2 replicas"]
+      RET["returns-service\n2 replicas"]
+      ANL["analytics-service\n2 replicas"]
+    end
+
+    subgraph ns_infra["Namespace: infra"]
+      subgraph kafka["Kafka StatefulSet (3 brokers)"]
+        KB0[kafka-0]
+        KB1[kafka-1]
+        KB2[kafka-2]
+      end
+      subgraph zk["ZooKeeper StatefulSet (3 nodes)"]
+        ZK0[zookeeper-0]
+        ZK1[zookeeper-1]
+        ZK2[zookeeper-2]
+      end
+      subgraph pg["PostgreSQL (CloudNativePG)"]
+        PGP[(PG Primary)]
+        PGR1[(PG Replica 1)]
+        PGR2[(PG Replica 2)]
+      end
+      subgraph tsdb["TimescaleDB"]
+        TSP[(TSDB Primary)]
+        TSR1[(TSDB Replica)]
+      end
+      subgraph redis["Redis Cluster"]
+        RM1[(Redis Master 1)]
+        RM2[(Redis Master 2)]
+        RM3[(Redis Master 3)]
+        RS1[(Redis Replica 1)]
+        RS2[(Redis Replica 2)]
+        RS3[(Redis Replica 3)]
+      end
+      subgraph es["Elasticsearch Cluster (3 nodes)"]
+        ES1[es-node-0]
+        ES2[es-node-1]
+        ES3[es-node-2]
+      end
+    end
+
+    subgraph ns_mon["Namespace: monitoring"]
+      PROM[Prometheus]
+      GRAF[Grafana]
+      ALERT[Alertmanager]
+      JAEGER[Jaeger]
+    end
   end
-  subgraph Data Plane
-    PG[(Managed PostgreSQL)]
-    Kafka[(Managed Kafka)]
-    Redis[(Managed Redis)]
-    Obj[(Object Storage)]
-  end
-  Ingress --> API
-  API --> PG
-  API --> Redis
-  API --> Kafka
-  Workers --> Kafka
-  Relay --> Kafka
-  Workers --> Obj
-  Prom --> API
-  Prom --> Workers
-  Graf --> Prom
+
+  Kong --> SHP
+  Kong --> TRK
+  Kong --> CIS
+  Kong --> GPS
+  Kong --> RTE
+  Kong --> NTF
+  Kong --> CST
+  Kong --> RET
+  Kong --> ANL
+
+  SHP --> PGP
+  TRK --> TSP
+  TRK --> RM1
+  GPS --> TSP
+  GPS --> RM2
+  CIS --> PGP
+  RTE --> PGP
+  ANL --> ES1
+
+  SHP --> KB0
+  TRK --> KB1
+  GPS --> KB2
+  NTF --> KB0
+
+  PROM -.scrape.-> SHP
+  PROM -.scrape.-> TRK
+  PROM -.scrape.-> GPS
+  GRAF --> PROM
+  ALERT --> PROM
 ```
 
-## Diagram Implementation Notes
-- Mermaid source is the canonical, version-controlled diagram artifact.
-- All transitions and interactions assume at-least-once event delivery and idempotent handlers.
-- Pair this diagram with API/event contracts in detailed design docs during implementation.
+---
 
-## End-to-End Event Flow (Implementation Ready)
-1. **Create and validate shipment**
-   - API receives create request with idempotency key.
-   - Service validates addresses, SLA class, and regulatory constraints.
-   - Transaction writes shipment aggregate + outbox event `shipment.created.v1`.
-2. **Plan and pickup**
-   - Planning service consumes create event and emits `shipment.pickup_scheduled.v1`.
-   - Driver app scan emits `shipment.picked_up.v1` with proof metadata.
-3. **Line-haul and hub progression**
-   - Every custody scan emits `shipment.location_updated.v1`.
-   - Milestone service derives `arrived_at_hub`, `departed_hub`, and ETA recalculation events.
-4. **Delivery execution**
-   - Route optimizer emits `shipment.out_for_delivery.v1`.
-   - Delivery app posts attempt event with POD artifacts.
-5. **Exception and recovery**
-   - Any failed invariant emits `shipment.exception_detected.v1` with reason code.
-   - Resolution workflow emits `shipment.exception_resolved.v1` and resumes normal state path or terminal fallback.
-6. **Closure**
-   - Terminal events (`delivered`, `returned_to_sender`, `cancelled`, `lost`) trigger settlement, analytics, and archival pipelines.
+## Service Resource Specifications
 
-## Shipment State Machine Semantics
-| State | Entry Criteria | Allowed Next States | Exit Event | Operational Notes |
+| Service | CPU Request | CPU Limit | Memory Request | Memory Limit | Replicas (min/max) |
+|---|---|---|---|---|---|
+| shipment-service | 250m | 1000m | 512Mi | 1Gi | 3 / 8 |
+| tracking-service | 500m | 2000m | 1Gi | 2Gi | 5 / 20 |
+| carrier-integration-service | 250m | 500m | 512Mi | 1Gi | 3 / 6 |
+| gps-processing-service | 500m | 1500m | 512Mi | 1.5Gi | 5 / 15 |
+| route-optimization-service | 1000m | 4000m | 2Gi | 4Gi | 2 / 4 |
+| notification-service | 100m | 500m | 256Mi | 512Mi | 3 / 10 |
+| customs-service | 250m | 500m | 512Mi | 1Gi | 2 / 4 |
+| returns-service | 250m | 500m | 512Mi | 1Gi | 2 / 4 |
+| analytics-service | 500m | 2000m | 1Gi | 4Gi | 2 / 6 |
+
+---
+
+## Horizontal Pod Autoscaler (HPA) Configuration
+
+### tracking-service HPA
+Scales based on Kafka consumer group lag for the `logistics.gps.location.v1` topic. If lag exceeds 50,000 messages across the consumer group, new pods are added.
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tracking-service-hpa
+  namespace: logistics-prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tracking-service
+  minReplicas: 5
+  maxReplicas: 20
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: kafka_consumer_group_lag
+          selector:
+            matchLabels:
+              topic: logistics.gps.location.v1
+              group: tracking-service-consumer
+        target:
+          type: AverageValue
+          averageValue: "10000"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 3
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+```
+
+### gps-processing-service HPA
+Scales on CPU utilisation. GPS ingest is CPU-bound (coordinate validation, geofence evaluation, deduplication).
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gps-processing-service-hpa
+  namespace: logistics-prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gps-processing-service
+  minReplicas: 5
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+```
+
+---
+
+## TimescaleDB Configuration
+
+The `gps_breadcrumbs` table is the highest-volume table in the system, receiving up to 10,000 GPS pings per second at peak.
+
+```sql
+-- Create hypertable with 1-hour chunks to match GPS ingest cadence
+SELECT create_hypertable(
+  'gps_breadcrumbs',
+  'recorded_at',
+  chunk_time_interval => INTERVAL '1 hour'
+);
+
+-- Compress chunks older than 24 hours (columnar compression reduces storage 10x)
+SELECT add_compression_policy('gps_breadcrumbs', INTERVAL '24 hours');
+
+-- Drop chunks older than 90 days (regulatory minimum is 30 days; 90 days retained for analytics)
+SELECT add_retention_policy('gps_breadcrumbs', INTERVAL '90 days');
+
+-- Continuous aggregate for hourly vehicle summaries (used by analytics-service)
+CREATE MATERIALIZED VIEW vehicle_hourly_summary
+WITH (timescaledb.continuous) AS
+SELECT
+  vehicle_id,
+  time_bucket('1 hour', recorded_at) AS hour,
+  COUNT(*)                            AS ping_count,
+  MAX(speed_kmh)                      AS max_speed_kmh,
+  SUM(distance_meters)                AS total_distance_m
+FROM gps_breadcrumbs
+GROUP BY vehicle_id, hour;
+
+SELECT add_continuous_aggregate_policy(
+  'vehicle_hourly_summary',
+  start_offset  => INTERVAL '2 hours',
+  end_offset    => INTERVAL '1 hour',
+  schedule_interval => INTERVAL '30 minutes'
+);
+```
+
+---
+
+## Kafka Topic Configuration
+
+| Topic | Partitions | Replication Factor | Retention | Notes |
 |---|---|---|---|---|
-| `Draft` | Shipment request created but not committed | `Confirmed`, `Cancelled` | `shipment.confirmed` | No external notifications before confirmation. |
-| `Confirmed` | Capacity and address validation passed | `PickupScheduled`, `Cancelled` | `shipment.pickup_scheduled` | SLA clock starts. |
-| `PickupScheduled` | Pickup slot assigned | `PickedUp`, `Exception`, `Cancelled` | `shipment.picked_up` | Missed pickup auto-raises exception after threshold. |
-| `PickedUp` | Driver/hub scan confirms custody | `InTransit`, `Exception` | `shipment.in_transit` | Chain-of-custody records required. |
-| `InTransit` | Shipment moving between hubs/line-haul legs | `OutForDelivery`, `Exception`, `Lost` | `shipment.out_for_delivery` | Telemetry cadence must remain within SLA. |
-| `OutForDelivery` | Last-mile run started | `Delivered`, `Exception`, `ReturnedToSender` | `shipment.delivered` | Customer contact window and proof policy enforced. |
-| `Exception` | Delay/damage/address/customs issue detected | `InTransit`, `OutForDelivery`, `ReturnedToSender`, `Cancelled`, `Lost` | `shipment.exception_resolved` | Every exception requires owner + ETA to resolution. |
-| `Delivered` | Proof of delivery accepted | *(terminal)* | `shipment.closed` | Immutable except audit annotations. |
-| `ReturnedToSender` | Return workflow completed | *(terminal)* | `shipment.closed` | Financial settlement rules apply. |
-| `Cancelled` | Shipment cancelled prior completion | *(terminal)* | `shipment.closed` | Cancellation reason required for analytics. |
-| `Lost` | Investigation concludes unrecoverable loss | *(terminal)* | `shipment.closed` | Claims/compliance path triggered. |
+| `logistics.shipment.created.v1` | 3 | 3 | 7 days | Low volume, high importance |
+| `logistics.shipment.status.v1` | 3 | 3 | 7 days | All state transitions |
+| `logistics.shipment.exception.v1` | 3 | 3 | 30 days | Long retention for audits |
+| `logistics.gps.location.v1` | 10 | 3 | 24 hours | High throughput; short retention |
+| `logistics.gps.geofence.v1` | 5 | 3 | 3 days | Geofence entry/exit events |
+| `logistics.carrier.webhook.v1` | 6 | 3 | 7 days | Inbound carrier status pushes |
+| `logistics.notification.outbound.v1` | 3 | 3 | 3 days | SMS/email/push dispatch |
+| `logistics.analytics.events.v1` | 5 | 3 | 14 days | Analytics ingestion pipeline |
+
+> **High-throughput GPS topics** (`logistics.gps.*`) use 10 partitions and `acks=all` with `linger.ms=5` for batching. Producer batch size is set to 64 KB to maximise broker throughput.
+
+---
+
+## Persistent Volume Specifications
+
+| StatefulSet | Storage Class | Volume Size | Access Mode | Notes |
+|---|---|---|---|---|
+| kafka-0/1/2 | `gp3` | 500 Gi each | ReadWriteOnce | Log segments; throughput 500 MB/s |
+| zookeeper-0/1/2 | `gp3` | 20 Gi each | ReadWriteOnce | Coordination metadata only |
+| postgres-primary | `io2` | 500 Gi | ReadWriteOnce | 10,000 IOPS provisioned |
+| postgres-replica-1/2 | `gp3` | 500 Gi each | ReadWriteOnce | Read replicas |
+| timescaledb-primary | `io2` | 2 Ti | ReadWriteOnce | GPS breadcrumb storage |
+| timescaledb-replica | `gp3` | 2 Ti | ReadWriteOnce | Read replica for analytics |
+| elasticsearch-0/1/2 | `gp3` | 200 Gi each | ReadWriteOnce | Shipment search index |
+
+---
+
+## Health Check Endpoints
+
+Every service exposes standardised health endpoints on port `8080` (or `8081` for admin). These are wired into Kubernetes `livenessProbe` and `readinessProbe`.
+
+| Service | Liveness | Readiness | Startup | Notes |
+|---|---|---|---|---|
+| shipment-service | `GET /health/live` | `GET /health/ready` | `GET /health/startup` | Ready checks DB + Kafka connectivity |
+| tracking-service | `GET /health/live` | `GET /health/ready` | `GET /health/startup` | Ready checks TimescaleDB + Redis |
+| carrier-integration-service | `GET /health/live` | `GET /health/ready` | — | Liveness includes circuit breaker state |
+| gps-processing-service | `GET /health/live` | `GET /health/ready` | `GET /health/startup` | Ready checks Kafka consumer assignment |
+| route-optimization-service | `GET /health/live` | `GET /health/ready` | — | Startup grace 60s (model load) |
+| notification-service | `GET /health/live` | `GET /health/ready` | — | Ready checks SMTP/SMS gateway |
+| customs-service | `GET /health/live` | `GET /health/ready` | — | — |
+| returns-service | `GET /health/live` | `GET /health/ready` | — | — |
+| analytics-service | `GET /health/live` | `GET /health/ready` | — | Ready checks Elasticsearch |
+
+---
 
 ## Integration Retry and Idempotency Specification
-- **Publish reliability:** Command-handling transactions persist domain mutations and outbox records atomically; relay workers publish with exponential backoff (`base=500ms`, `factor=2`, `max=5m`) and jitter.
+
+- **Publish reliability:** Command-handling transactions persist domain mutations and outbox records atomically. Relay workers publish with exponential backoff (`base=500ms`, `factor=2`, `max=5m`) and jitter.
 - **Deduping contract:** `event_id` is globally unique; consumers persist `(event_id, consumer_name, processed_at, outcome_hash)` before side-effects.
-- **API idempotency:** Mutating endpoints require `Idempotency-Key` and scope keys by `(tenant_id, route, key)`. Duplicate requests return prior status/body.
-- **Webhook retries:** 3 fast retries + 8 slow retries with signed payload replay protection; after exhaustion route to DLQ with replay tooling.
-- **Replay safety:** Backfills run via replay jobs that mark `replay_batch_id`, disable duplicate notifications/billing, and emit audit events.
+- **API idempotency:** Mutating endpoints require `Idempotency-Key` scoped by `(tenant_id, route, key)`. Duplicate requests return prior status/body.
+- **Webhook retries:** 3 fast retries + 8 slow retries with signed payload replay protection; exhausted events route to DLQ.
+- **Replay safety:** Backfill jobs mark `replay_batch_id`, disable duplicate notifications/billing, and emit audit events.
+
+---
 
 ## Monitoring, SLOs, and Alerting
-### Golden Signals
-- Event ingest latency (`scan_received` -> persisted)
-- Commit-to-publish latency (outbox record -> broker ack)
-- Consumer lag per subscription and partition
-- Retry rate, DLQ depth, and redrive success rate
-- Shipment state dwell time by state and lane
-- Delivery attempt failure ratio and exception aging
 
 ### SLO Targets
-- P95 scan-to-visibility: **< 60 seconds**
-- P95 commit-to-publish: **< 5 seconds**
-- P95 exception-detection-to-customer-notification: **< 3 minutes**
-- Daily successful redrive from DLQ: **> 99%** within 4 hours
+- P95 GPS ping-to-TimescaleDB write: **< 500ms**
+- P95 scan-to-customer-visibility: **< 60 seconds**
+- P95 commit-to-publish (outbox relay): **< 5 seconds**
+- P95 exception-detection-to-notification: **< 3 minutes**
+- GPS Kafka consumer lag: **< 30 seconds** of event backlog
 
 ### Alert Policy
-- **SEV-1:** publish pipeline stalled > 5 min, broker unavailable, or state transition processor halted.
-- **SEV-2:** DLQ growth > threshold for 15 min, ETA model stale > 10 min, webhook failure burst.
-- **SEV-3:** schema drift warnings, duplicate event spike, non-critical integration flapping.
-
-### Runbook Minimums
-Each alert must link to owning team, dashboard, triage checklist, mitigation steps, replay command, and stakeholder comms template.
+- **SEV-1:** GPS pipeline lag > 5 minutes, Kafka broker unavailable, PostgreSQL primary down, TimescaleDB write failures.
+- **SEV-2:** HPA at `maxReplicas` for > 10 minutes, Redis cluster degraded, Elasticsearch yellow status.
+- **SEV-3:** Schema drift warnings, duplicate event spikes, non-critical carrier webhook failures.
 
