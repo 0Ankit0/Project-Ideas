@@ -119,6 +119,7 @@ Validator checks include:
 | Telemedicine Platform | Covered by validator |
 | Manufacturing Execution System | Covered by validator |
 | Legal Case Management System | Covered by validator |
+| Application Hosting Platform | Covered by validator |
 
 ## 6) Change Management Rules
 

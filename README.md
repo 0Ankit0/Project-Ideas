@@ -44,6 +44,7 @@ This repository contains production-grade project blueprints with end-to-end doc
 - Telemedicine Platform
 - Manufacturing Execution System
 - Legal Case Management System
+- Application Hosting Platform
 
 ## Documentation Completeness Guarantee
 

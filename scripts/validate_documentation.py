@@ -101,6 +101,8 @@ QUALITY_ENFORCED_PROJECTS = {
     "Telemedicine Platform",
     "Manufacturing Execution System",
     "Legal Case Management System",
+    # New projects — wave 3
+    "Application Hosting Platform",
 }
 
 SINGULAR_TEMPLATE = {
@@ -788,6 +790,29 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "document-management.md",
             "billing-and-time-tracking.md",
             "court-deadlines.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Application Hosting Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            "class-diagrams.md",
+            "sequence-diagrams.md",
+            "state-machine-diagrams.md",
+            "erd-database-schema.md",
+            "component-diagrams.md",
+            "api-design.md",
+            "c4-component-diagram.md",
+            "deployment-engine-and-build-pipeline.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "deployment-failures.md",
+            "scaling-and-resource-limits.md",
+            "build-pipeline-errors.md",
+            "custom-domains-and-ssl.md",
             "api-and-ui.md",
             "security-and-compliance.md",
             "operations.md",
