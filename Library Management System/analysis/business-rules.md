@@ -335,3 +335,14 @@ audit_log {
 - Audit data is replicated to the organisation's immutable audit data store (separate from the operational database) within 5 minutes of creation via the outbox pattern.
 - Monthly automated reports flag any override volume anomalies to the System Administrator for policy review.
 
+
+## Rule Quick Reference
+
+1. Members may borrow up to their tier limit concurrently; additional loans rejected until returns are processed.
+2. Loan periods vary by material type (7d physical, 14d standard, 21d digital); overdue items accrue fines daily.
+3. Renewals are capped per loan; denied if item is on another member's hold queue.
+4. Fines must be cleared before new loans are permitted; balances above threshold block all borrowing.
+5. Holds expire after shelf period; member is notified and next hold in queue is activated.
+6. Digital lending slots are DRM-controlled; simultaneous download cap enforced per membership tier.
+7. Purchase orders above threshold require senior librarian approval before supplier submission.
+8. Accounts with outstanding fines exceeding the block threshold are suspended from new loans automatically.
