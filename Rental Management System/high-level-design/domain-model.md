@@ -1,648 +1,569 @@
-# Domain Model
+# Domain Model — Rental Management System
 
-## Overview
-The domain model shows the key business entities and their relationships in the rental management system. The model is asset-agnostic — it applies equally to car rentals, flat rentals, gear rentals, equipment rentals, and any other rentable category.
-
----
-
-## Complete Domain Model
-
-```mermaid
-erDiagram
-    USER ||--o{ ASSET : owns
-    USER ||--o{ BOOKING : places
-    USER ||--o{ RENTAL_AGREEMENT : party_to
-    USER ||--o{ PAYMENT : makes
-    USER ||--o{ REVIEW : writes
-    USER ||--o{ NOTIFICATION : receives
-    USER ||--o{ DOCUMENT : uploads
-
-    ASSET_CATEGORY ||--o{ ASSET : classifies
-    ASSET_CATEGORY ||--o{ CATEGORY_ATTRIBUTE : defines
-
-    ASSET ||--o{ PRICING_RULE : has
-    ASSET ||--o{ AVAILABILITY_BLOCK : has
-    ASSET ||--o{ BOOKING : receives
-    ASSET ||--o{ ASSET_PHOTO : has
-    ASSET ||--o{ DOCUMENT : has
-    ASSET ||--o{ MAINTENANCE_REQUEST : subject_of
-    ASSET ||--o{ REVIEW : receives
-    ASSET ||--o{ ASSET_ATTRIBUTE_VALUE : has
-
-    BOOKING ||--o{ PAYMENT : paid_by
-    BOOKING ||--|| RENTAL_AGREEMENT : has
-    BOOKING ||--|| SECURITY_DEPOSIT : has
-    BOOKING ||--o{ CONDITION_ASSESSMENT : has
-    BOOKING ||--o{ ADDITIONAL_CHARGE : incurs
-    BOOKING ||--o{ INVOICE : generates
-    BOOKING ||--o{ BOOKING_EVENT : emits
-
-    RENTAL_AGREEMENT ||--o{ DOCUMENT : generates
-    RENTAL_AGREEMENT ||--o{ AGREEMENT_AMENDMENT : has
-
-    SECURITY_DEPOSIT ||--o{ DEPOSIT_DEDUCTION : has
-
-    CONDITION_ASSESSMENT ||--o{ ASSESSMENT_ITEM : contains
-    CONDITION_ASSESSMENT ||--o{ ASSESSMENT_PHOTO : has
-
-    INVOICE ||--o{ PAYMENT : paid_by
-
-    MAINTENANCE_REQUEST ||--o{ REQUEST_EVENT : emits
-    MAINTENANCE_REQUEST ||--o{ MAINTENANCE_PHOTO : has
-    MAINTENANCE_REQUEST ||--|| MAINTENANCE_COST : has
-
-    USER_PAYOUT ||--o{ BOOKING : settles
-```
+This document defines the core domain entities, their attributes, methods, and
+relationships for the Rental Management System. The model follows Domain-Driven
+Design (DDD) principles with clearly bounded contexts, rich domain objects, and
+explicit aggregate boundaries.
 
 ---
 
-## User Domain
+## Bounded Contexts
+
+| Context | Aggregates |
+|---|---|
+| **Catalogue** | Asset, AssetCategory, RentalRate, RateModifier |
+| **Booking** | BookingRequest, Customer |
+| **Operations** | Rental, RentalContract, SecurityDeposit |
+| **Condition** | Damage, ConditionReport |
+| **Finance** | Payment, Invoice |
+| **Maintenance** | MaintenanceJob |
+
+---
+
+## Class Diagram
 
 ```mermaid
 classDiagram
-    class User {
+    direction TB
+
+    class Asset {
         +UUID id
-        +String email
-        +String phone
-        +String fullName
-        +String passwordHash
-        +UserRole role
-        +UserStatus status
-        +Boolean emailVerified
-        +Boolean phoneVerified
-        +DateTime createdAt
-        +DateTime lastLoginAt
-        +register()
-        +login()
-        +updateProfile()
-        +resetPassword()
+        +String name
+        +String description
+        +AssetStatus status
+        +String make
+        +String model
+        +Int year
+        +String licensePlate
+        +String vin
+        +Decimal dailyRate
+        +Decimal hourlyRate
+        +Decimal depositPct
+        +Decimal declaredValue
+        +Boolean requiresInsurance
+        +Int minRenterAge
+        +UUID categoryId
+        +String locationId
+        +DateTime lastMaintenanceAt
+        +Int currentMileage
+        +isAvailable(start DateTime, end DateTime) Boolean
+        +calculateRate(duration Duration) Decimal
+        +lockForPickup(bookingId UUID) void
+        +release() void
+        +scheduleMaintenace(at DateTime) MaintenanceJob
+        +markUnderMaintenance() void
     }
 
-    class OwnerProfile {
-        +UUID id
-        +UUID userId
-        +String businessName
-        +String tradingName
-        +OwnerVerificationStatus verificationStatus
-        +Decimal commissionRate
-        +String bankAccountDetails
-        +DateTime verifiedAt
-        +getAssets()
-        +getBookings()
-        +getPortfolioSummary()
-    }
-
-    class CustomerProfile {
-        +UUID id
-        +UUID userId
-        +CustomerVerificationStatus idVerificationStatus
-        +String drivingLicenceNumber
-        +String passportNumber
-        +Decimal outstandingBalance
-        +getActiveBookings()
-        +getPaymentHistory()
-    }
-
-    class StaffProfile {
-        +UUID id
-        +UUID userId
-        +UUID ownerUserId
-        +String specialisation
-        +Boolean isAvailable
-        +getAssignedTasks()
-        +setAvailability()
-    }
-
-    class Notification {
-        +UUID id
-        +UUID userId
-        +String eventType
-        +String title
-        +String body
-        +Boolean isRead
-        +JSON payload
-        +DateTime createdAt
-    }
-
-    User "1" --> "0..1" OwnerProfile
-    User "1" --> "0..1" CustomerProfile
-    User "1" --> "0..1" StaffProfile
-    User "1" --> "*" Notification
-```
-
----
-
-## Asset Domain
-
-```mermaid
-classDiagram
     class AssetCategory {
         +UUID id
         +String name
         +String slug
-        +String description
         +String iconUrl
-        +UUID parentCategoryId
-        +Boolean isActive
-        +getAttributes()
-        +getAssets()
+        +String policy
+        +Decimal defaultDepositPct
+        +Int minRentalHours
+        +Int maxRentalDays
+        +Boolean insuranceMandatory
+        +Int minRenterAge
+        +getDefaultRate() Decimal
+        +applyPolicy(rental Rental) PolicyResult
     }
 
-    class CategoryAttribute {
-        +UUID id
-        +UUID categoryId
-        +String name
-        +String slug
-        +AttributeType type
-        +Boolean isRequired
-        +Boolean isFilterable
-        +JSON options
-        +Integer displayOrder
-    }
-
-    class Asset {
-        +UUID id
-        +UUID ownerUserId
-        +UUID categoryId
-        +String name
-        +String description
-        +AssetStatus status
-        +Boolean isPublished
-        +String locationAddress
-        +Decimal locationLat
-        +Decimal locationLng
-        +Decimal depositAmount
-        +Integer minRentalDurationHours
-        +Integer maxRentalDurationDays
-        +Integer bookingLeadTimeHours
-        +Decimal averageRating
-        +Integer reviewCount
-        +DateTime createdAt
-        +publish()
-        +unpublish()
-        +checkAvailability(start, end)
-        +calculatePrice(start, end)
-    }
-
-    class AssetAttributeValue {
+    class RentalRate {
         +UUID id
         +UUID assetId
-        +UUID attributeId
-        +String value
-    }
-
-    class AssetPhoto {
-        +UUID id
-        +UUID assetId
-        +String url
-        +String thumbnailUrl
-        +Integer position
-        +Boolean isCover
-        +String caption
-    }
-
-    class PricingRule {
-        +UUID id
-        +UUID assetId
-        +RateType rateType
-        +Decimal rateAmount
+        +RateType type
+        +Decimal rate
         +String currency
-        +Boolean isPeakRate
-        +Date peakStartDate
-        +Date peakEndDate
-        +DayOfWeek[] peakDaysOfWeek
-        +Decimal discountPercentage
-        +Integer minUnitsForDiscount
-        +isApplicable(period) Boolean
-        +calculateCost(units) Decimal
+        +Date validFrom
+        +Date validTo
+        +Boolean isActive
+        +isCurrent() Boolean
+        +overlaps(other RentalRate) Boolean
     }
 
-    class AvailabilityBlock {
+    class RateModifier {
         +UUID id
         +UUID assetId
-        +AvailabilityBlockType type
-        +DateTime startAt
-        +DateTime endAt
-        +String reason
-        +UUID bookingId
-        +UUID maintenanceRequestId
-        +create()
-        +release()
+        +ModifierType type
+        +Decimal factor
+        +String applicableCondition
+        +Date startDate
+        +Date endDate
+        +Int priority
+        +String description
+        +isApplicable(context RateContext) Boolean
+        +apply(baseRate Decimal) Decimal
     }
 
-    AssetCategory "1" --> "*" AssetCategory : parentOf
-    AssetCategory "1" --> "*" CategoryAttribute
-    AssetCategory "1" --> "*" Asset
-    Asset "1" --> "*" AssetAttributeValue
-    Asset "1" --> "*" AssetPhoto
-    Asset "1" --> "*" PricingRule
-    Asset "1" --> "*" AvailabilityBlock
-```
-
----
-
-## Booking Domain
-
-```mermaid
-classDiagram
-    class Booking {
+    class Customer {
         +UUID id
-        +String bookingNumber
+        +String email
+        +String phoneNumber
+        +String firstName
+        +String lastName
+        +Date dateOfBirth
+        +LoyaltyTier tier
+        +Int loyaltyPoints
+        +Boolean idVerified
+        +Boolean blacklisted
+        +String blacklistReason
+        +UUID defaultPaymentMethodId
+        +DateTime createdAt
+        +canRent() Boolean
+        +getApplicableDiscount() Decimal
+        +verifyAge(minAge Int) Boolean
+        +addLoyaltyPoints(points Int) void
+        +redeemLoyaltyPoints(points Int) Boolean
+        +suspend(reason String) void
+    }
+
+    class BookingRequest {
+        +UUID id
+        +UUID customerId
         +UUID assetId
-        +UUID customerUserId
-        +UUID ownerUserId
+        +DateTime requestedStart
+        +DateTime requestedEnd
         +BookingStatus status
-        +DateTime rentalStartAt
-        +DateTime rentalEndAt
-        +DateTime actualReturnAt
-        +Decimal baseFee
-        +Decimal peakSurcharge
-        +Decimal taxAmount
-        +Decimal totalFee
+        +UUID quoteId
+        +Decimal quotedAmount
         +Decimal depositAmount
-        +String cancellationReason
+        +String promoCode
+        +String preAuthId
+        +DateTime expiresAt
+        +DateTime confirmedAt
         +DateTime cancelledAt
-        +DateTime createdAt
-        +confirm()
-        +cancel(reason)
-        +modify(newStart, newEnd)
-        +initiateReturn()
-        +close()
+        +String cancellationReason
+        +confirm(preAuthId String) void
+        +cancel(reason String) void
+        +expire() void
+        +convertToRental() Rental
+        +isExpired() Boolean
+        +calculateCancellationFee() Decimal
     }
 
-    class BookingEvent {
+    class Rental {
         +UUID id
         +UUID bookingId
-        +String eventType
-        +String message
-        +UUID actorUserId
-        +JSON metadata
-        +DateTime createdAt
+        +UUID customerId
+        +UUID assetId
+        +RentalStatus status
+        +DateTime actualStart
+        +DateTime scheduledEnd
+        +DateTime actualEnd
+        +Int startMileage
+        +Int endMileage
+        +String startFuelLevel
+        +String endFuelLevel
+        +Decimal baseAmount
+        +Decimal taxAmount
+        +Decimal totalAmount
+        +Decimal lateFeeCharged
+        +UUID contractId
+        +UUID conditionReportPreId
+        +UUID conditionReportPostId
+        +extend(newEnd DateTime) ExtensionResult
+        +initiateReturn(staffId UUID) ReturnSession
+        +calculateLateFee() Decimal
+        +close() void
+        +calculateTotalOwed() Decimal
+    }
+
+    class RentalContract {
+        +UUID id
+        +UUID rentalId
+        +String contractUrl
+        +String contractHash
+        +DateTime generatedAt
+        +DateTime signedAt
+        +String signatureData
+        +String signerIpAddress
+        +String signerUserAgent
+        +Boolean isVoided
+        +String voidReason
+        +verify() Boolean
+        +void(reason String) void
+        +getSignedPdf() Blob
     }
 
     class SecurityDeposit {
         +UUID id
-        +UUID bookingId
+        +UUID rentalId
+        +UUID customerId
         +Decimal amount
         +DepositStatus status
-        +String gatewayRef
-        +Decimal deductionTotal
-        +Decimal refundAmount
-        +DateTime collectedAt
-        +DateTime settledAt
-        +addDeduction(reason, amount, evidence)
-        +processRefund()
-        +getTotalDeductions()
+        +String preAuthId
+        +String captureId
+        +DateTime heldAt
+        +DateTime releasedAt
+        +DateTime assessmentDeadline
+        +Decimal deductedAmount
+        +String deductionReason
+        +hold() void
+        +capture() void
+        +release() void
+        +deduct(amount Decimal, reason String) void
+        +forfeiture(reason String) void
+        +startAssessmentWindow(hours Int) void
+        +isAssessmentWindowOpen() Boolean
     }
 
-    class DepositDeduction {
+    class ConditionReport {
         +UUID id
-        +UUID depositId
-        +String reason
-        +Decimal amount
-        +String evidenceUrl
-        +DateTime createdAt
+        +UUID rentalId
+        +UUID assetId
+        +UUID staffId
+        +ReportType type
+        +String[] photoUrls
+        +String notes
+        +Int mileageReading
+        +String fuelLevel
+        +Boolean hasDamage
+        +DateTime capturedAt
+        +String geoLocation
+        +compare(other ConditionReport) Delta
+        +addPhoto(url String) void
+        +finalise() void
     }
 
-    class RentalAgreement {
+    class Damage {
         +UUID id
-        +UUID bookingId
-        +UUID templateId
-        +AgreementStatus status
-        +String eSignRequestId
-        +String signedDocumentUrl
-        +DateTime sentAt
-        +DateTime customerSignedAt
-        +String customerSignatureIp
-        +DateTime ownerSignedAt
-        +String ownerSignatureIp
-        +Integer version
-        +send()
-        +customerSign(ip)
-        +ownerSign(ip)
-        +amend(changes)
-    }
-
-    class AgreementAmendment {
-        +UUID id
-        +UUID agreementId
-        +String reason
-        +String amendedDocumentUrl
-        +AgreementStatus status
-        +DateTime createdAt
-        +DateTime signedAt
-    }
-
-    Booking "1" --> "*" BookingEvent
-    Booking "1" --> "1" SecurityDeposit
-    Booking "1" --> "1" RentalAgreement
-    SecurityDeposit "1" --> "*" DepositDeduction
-    RentalAgreement "1" --> "*" AgreementAmendment
-```
-
----
-
-## Invoice & Payment Domain
-
-```mermaid
-classDiagram
-    class Invoice {
-        +UUID id
-        +String invoiceNumber
-        +UUID bookingId
-        +UUID customerUserId
-        +UUID ownerUserId
-        +InvoiceType type
-        +Decimal subtotal
-        +Decimal taxAmount
-        +Decimal totalAmount
-        +Decimal paidAmount
-        +InvoiceStatus status
-        +Date dueDate
-        +DateTime createdAt
-        +DateTime paidAt
-        +addLineItem(description, amount)
-        +recordPayment(paymentId)
-        +generateReceipt()
-        +getOutstandingAmount()
-    }
-
-    class InvoiceLineItem {
-        +UUID id
-        +UUID invoiceId
+        +UUID rentalId
+        +UUID conditionReportId
+        +UUID assetId
+        +DamageType type
+        +Severity severity
         +String description
-        +LineItemType type
-        +Decimal amount
-        +Decimal taxRate
-    }
-
-    class AdditionalCharge {
-        +UUID id
-        +UUID bookingId
-        +AdditionalChargeType type
-        +String description
-        +Decimal amount
-        +String evidenceUrl
-        +ChargeStatus status
-        +String disputeReason
-        +DateTime createdAt
+        +String[] photoUrls
+        +Decimal repairCostEstimate
+        +Decimal repairCostActual
+        +DamageStatus status
+        +Boolean isDisputed
+        +DateTime reportedAt
         +DateTime resolvedAt
-        +dispute(reason)
-        +approve()
-        +waive()
+        +UUID insuranceClaimId
+        +assess(cost Decimal) void
+        +dispute(reason String) void
+        +resolve(outcome String) void
+        +raiseInsuranceClaim() InsuranceClaim
+        +calculateCustomerLiability() Decimal
     }
 
     class Payment {
         +UUID id
-        +String referenceType
-        +UUID referenceId
-        +UUID payerUserId
-        +PaymentMethod method
-        +PaymentStatus status
+        +UUID rentalId
+        +UUID customerId
         +Decimal amount
         +String currency
-        +String gatewayRef
-        +JSON gatewayResponse
-        +Boolean isOffline
-        +DateTime createdAt
-        +DateTime confirmedAt
-        +process()
-        +refund()
+        +PaymentStatus status
+        +PaymentType type
+        +String gatewayReference
+        +String gatewayProvider
+        +DateTime initiatedAt
+        +DateTime completedAt
+        +Int retryCount
+        +String failureReason
+        +process() void
+        +refund(amount Decimal, reason String) Refund
+        +capture() void
+        +void() void
+        +retry() void
     }
 
-    class OwnerPayout {
+    class Invoice {
         +UUID id
-        +UUID ownerUserId
-        +Decimal grossAmount
-        +Decimal commissionAmount
-        +Decimal netAmount
-        +PayoutStatus status
-        +String bankRef
-        +String batchId
-        +DateTime periodStart
-        +DateTime periodEnd
-        +DateTime processedAt
-        +calculate()
-        +process()
+        +UUID rentalId
+        +UUID customerId
+        +String invoiceNumber
+        +Decimal subtotal
+        +Decimal taxAmount
+        +Decimal total
+        +InvoiceStatus status
+        +DateTime issuedAt
+        +DateTime dueAt
+        +String pdfUrl
+        +LineItem[] lineItems
+        +generate() void
+        +markPaid(paymentId UUID) void
+        +void(reason String) void
     }
 
-    Invoice "1" --> "*" InvoiceLineItem
-    Invoice "1" --> "*" Payment
-    Booking "1" --> "*" AdditionalCharge
-```
-
----
-
-## Condition Assessment Domain
-
-```mermaid
-classDiagram
-    class ConditionAssessment {
+    class MaintenanceJob {
         +UUID id
-        +UUID bookingId
         +UUID assetId
-        +UUID conductedByUserId
-        +AssessmentType type
-        +AssessmentStatus status
-        +String notes
-        +String reportUrl
+        +UUID assignedTechnicianId
+        +JobStatus status
+        +MaintenanceType type
+        +String description
         +DateTime scheduledAt
-        +DateTime conductedAt
-        +DateTime customerSignedAt
-        +String customerSignatureIp
-        +conduct(checklist, photos)
-        +generateReport()
-        +compareWithPreRental()
-    }
-
-    class AssessmentItem {
-        +UUID id
-        +UUID assessmentId
-        +String area
-        +String description
-        +ItemCondition condition
-        +Boolean hasDamage
-        +String damageDescription
-    }
-
-    class AssessmentPhoto {
-        +UUID id
-        +UUID assessmentId
-        +UUID assessmentItemId
-        +String url
-        +String caption
-        +DateTime uploadedAt
-    }
-
-    ConditionAssessment "1" --> "*" AssessmentItem
-    ConditionAssessment "1" --> "*" AssessmentPhoto
-```
-
----
-
-## Maintenance Domain
-
-```mermaid
-classDiagram
-    class MaintenanceRequest {
-        +UUID id
-        +String requestNumber
-        +UUID assetId
-        +UUID ownerUserId
-        +UUID assignedToUserId
-        +RequestPriority priority
-        +RequestStatus status
-        +String title
-        +String description
-        +String resolutionNotes
-        +DateTime createdAt
-        +DateTime assignedAt
         +DateTime startedAt
         +DateTime completedAt
-        +DateTime closedAt
-        +assign(staffUserId)
-        +start()
-        +complete(notes, photos)
-        +approve()
-        +reopen(reason)
-        +getTotalCost()
+        +Decimal estimatedCost
+        +Decimal actualCost
+        +String[] photoUrls
+        +String resolutionNotes
+        +start() void
+        +complete(notes String, cost Decimal) void
+        +cancel(reason String) void
+        +reschedule(newDate DateTime) void
+        +isOverdue() Boolean
     }
 
-    class MaintenanceCost {
-        +UUID id
-        +UUID requestId
-        +CostCategory category
-        +String description
-        +Decimal amount
-        +DateTime recordedAt
-    }
+    %% ── Catalogue Context ──────────────────────────────────────────────────
+    AssetCategory "1" --> "many" Asset : classifies
+    Asset "1" --> "many" RentalRate : has
+    Asset "1" --> "many" RateModifier : modified by
 
-    class PreventiveService {
-        +UUID id
-        +UUID assetId
-        +UUID assignedToUserId
-        +String title
-        +String description
-        +ServiceRecurrence recurrence
-        +Integer intervalDays
-        +Date nextDueDate
-        +TaskStatus status
-        +schedule()
-        +complete(notes)
-        +generateNext()
-    }
+    %% ── Booking Context ────────────────────────────────────────────────────
+    Customer "1" --> "many" BookingRequest : submits
+    Asset "1" --> "many" BookingRequest : subject of
 
-    MaintenanceRequest "1" --> "0..1" MaintenanceCost
+    %% ── Operations Context ─────────────────────────────────────────────────
+    BookingRequest "1" --> "0..1" Rental : converts to
+    Customer "1" --> "many" Rental : undertakes
+    Asset "1" --> "many" Rental : rented via
+    Rental "1" --> "1" RentalContract : governed by
+    Rental "1" --> "1" SecurityDeposit : secured by
+    Rental "1" --> "0..2" ConditionReport : documented by
+
+    %% ── Condition & Finance ────────────────────────────────────────────────
+    Rental "1" --> "many" Damage : may have
+    ConditionReport "1" --> "many" Damage : surfaces
+    Rental "1" --> "many" Payment : settled by
+    Rental "1" --> "1" Invoice : billed via
+
+    %% ── Maintenance ────────────────────────────────────────────────────────
+    Asset "1" --> "many" MaintenanceJob : requires
 ```
 
 ---
 
 ## Enumeration Types
 
-```mermaid
-classDiagram
-    class UserRole {
-        <<enumeration>>
-        OWNER
-        CUSTOMER
-        STAFF
-        ADMIN
-    }
+### `AssetStatus`
+| Value | Description |
+|---|---|
+| `AVAILABLE` | Ready for rental |
+| `RESERVED` | Locked by a confirmed booking |
+| `RENTED` | Currently on an active rental |
+| `UNDER_MAINTENANCE` | Off-fleet for servicing |
+| `DECOMMISSIONED` | Permanently retired from fleet |
 
-    class AssetStatus {
-        <<enumeration>>
-        DRAFT
-        AVAILABLE
-        BOOKED
-        UNDER_MAINTENANCE
-        RETIRED
-    }
+### `BookingStatus`
+| Value | Description |
+|---|---|
+| `PENDING_PAYMENT` | Created, awaiting deposit pre-auth |
+| `CONFIRMED` | Deposit pre-authorised, asset locked |
+| `CHECKED_OUT` | Rental is active |
+| `COMPLETED` | Rental closed successfully |
+| `CANCELLED` | Cancelled before checkout |
+| `EXPIRED` | Quote or hold timed out |
+| `NO_SHOW` | Customer did not appear for pickup |
 
-    class BookingStatus {
-        <<enumeration>>
-        PENDING
-        CONFIRMED
-        ACTIVE
-        PENDING_CLOSURE
-        CLOSED
-        CANCELLED
-        DECLINED
-    }
+### `RentalStatus`
+| Value | Description |
+|---|---|
+| `ACTIVE` | Rental in progress |
+| `EXTENDED` | End date has been pushed out |
+| `OVERDUE` | Past scheduled return, not yet returned |
+| `RETURNED` | Asset handed back, in assessment window |
+| `CLOSED` | All charges settled, deposit resolved |
+| `DISPUTED` | Customer has raised a formal dispute |
 
-    class AgreementStatus {
-        <<enumeration>>
-        DRAFT
-        PENDING_CUSTOMER_SIGNATURE
-        PENDING_OWNER_SIGNATURE
-        SIGNED
-        AMENDED
-        TERMINATED
-    }
+### `DepositStatus`
+| Value | Description |
+|---|---|
+| `PRE_AUTHORISED` | Card hold placed, not captured |
+| `CAPTURED` | Funds captured (damage or overdue) |
+| `RELEASED` | Full refund issued to customer |
+| `PARTIALLY_RELEASED` | Portion deducted, remainder refunded |
+| `FORFEITED` | Full deposit retained |
 
-    class InvoiceStatus {
-        <<enumeration>>
-        DRAFT
-        SENT
-        PARTIALLY_PAID
-        PAID
-        OVERDUE
-        WAIVED
-    }
+### `LoyaltyTier`
+| Value | Discount | Points Multiplier |
+|---|---|---|
+| `BRONZE` | 0% | 1× |
+| `SILVER` | 5% | 1.5× |
+| `GOLD` | 10% | 2× |
+| `PLATINUM` | 15% | 3× |
 
-    class RequestStatus {
-        <<enumeration>>
-        OPEN
-        ASSIGNED
-        IN_PROGRESS
-        COMPLETED
-        CLOSED
-        REOPENED
-        CANCELLED
-    }
+### `DamageType`
+`SCRATCH` · `DENT` · `BROKEN_GLASS` · `INTERIOR_STAIN` · `MECHANICAL_FAILURE`
+`TYRE_DAMAGE` · `MISSING_ACCESSORY` · `FLOOD_DAMAGE` · `COLLISION`
 
-    class RateType {
-        <<enumeration>>
-        HOURLY
-        DAILY
-        WEEKLY
-        MONTHLY
-    }
+### `Severity`
+`COSMETIC` · `MINOR` · `MODERATE` · `SEVERE` · `TOTAL_LOSS`
 
-    class AssessmentType {
-        <<enumeration>>
-        PRE_RENTAL
-        POST_RENTAL
-        ROUTINE
-    }
+### `RateType`
+`HOURLY` · `DAILY` · `WEEKLY` · `MONTHLY` · `WEEKEND` · `PEAK` · `OFF_PEAK`
 
-    class AdditionalChargeType {
-        <<enumeration>>
-        DAMAGE
-        LATE_RETURN
-        CLEANING
-        FUEL
-        EXCESS_MILEAGE
-        OTHER
-    }
+### `ModifierType`
+`SEASONAL_SURCHARGE` · `LOYALTY_DISCOUNT` · `LONG_TERM_DISCOUNT`
+`PROMO_CODE` · `LAST_MINUTE_SURCHARGE` · `INSURANCE_BUNDLE`
+
+### `MaintenanceType`
+`ROUTINE_SERVICE` · `CORRECTIVE_REPAIR` · `DAMAGE_REPAIR` · `TYRE_CHANGE`
+`CLEANING` · `RECALL_FIX` · `ANNUAL_INSPECTION`
+
+### `JobStatus`
+`SCHEDULED` · `IN_PROGRESS` · `COMPLETED` · `CANCELLED` · `OVERDUE`
+
+### `PaymentType`
+`RENTAL_CHARGE` · `DEPOSIT_PRE_AUTH` · `DEPOSIT_CAPTURE` · `DEPOSIT_RELEASE`
+`LATE_FEE` · `DAMAGE_CHARGE` · `EXTENSION_CHARGE` · `REFUND`
+
+---
+
+## Entity Descriptions
+
+### Asset
+The central domain object representing a rentable physical item (vehicle, equipment,
+property, etc.). An asset belongs to exactly one `AssetCategory` and transitions
+between statuses through well-defined state machine transitions. It owns its rate
+schedule (`RentalRate`) and can have multiple `RateModifier` records that the
+`PricingEngine` evaluates at quote time.
+
+Business rules:
+- An asset cannot be booked if its status is not `AVAILABLE`.
+- `lockForPickup()` is idempotent: calling it on an already-reserved asset returns
+  the existing reservation.
+- `declaredValue` drives the insurance requirement threshold; if the value exceeds
+  the category threshold, `requiresInsurance` is automatically set `true`.
+
+---
+
+### AssetCategory
+Groups assets with shared rental policies. Categories define default deposit
+percentages, minimum rental durations, and insurance mandates. Individual assets
+may override category defaults.
+
+---
+
+### RentalRate
+A time-bounded price record for an asset. Multiple records may exist per asset
+(e.g., a peak-season rate and an off-peak rate), but only one rate of each `RateType`
+may be active for a given date. The `PricingEngine` selects the most specific
+applicable rate at quote time.
+
+---
+
+### RateModifier
+A multiplicative factor applied on top of the base rate. Modifiers are evaluated
+in `priority` order. A `PROMO_CODE` modifier is validated by the `BookingService`
+before being passed to the `PricingEngine`.
+
+---
+
+### Customer
+Represents a registered renter. A customer must be `idVerified` to create their
+first booking. The `blacklisted` flag blocks all new bookings. Loyalty tier
+progression is computed nightly by a batch job based on cumulative rental spend.
+
+Business rules:
+- `canRent()` returns `false` if `blacklisted = true`, `idVerified = false`, or
+  there is an open unpaid balance.
+- `verifyAge(minAge)` compares `dateOfBirth` against today minus `minAge` years.
+
+---
+
+### BookingRequest
+An intent to rent expressed by a customer. It is created in `PENDING_PAYMENT` state
+and advances to `CONFIRMED` once the deposit pre-auth succeeds. An unconfirmed
+booking expires automatically after the `expiresAt` timestamp (default: 15 minutes).
+On expiry the asset lock is released.
+
+---
+
+### Rental
+The authoritative record of an active or closed rental engagement. A `Rental` is
+created from a `BookingRequest` at checkout. It records the physical state of the
+asset at pickup (`startMileage`, `startFuelLevel`) and at return. Late-fee
+calculation uses the formula:
+
+> `lateFee = ceil((actualEnd − scheduledEnd).hours) × (dailyRate / 24) × 1.5`
+
+---
+
+### RentalContract
+A PDF document generated at checkout, containing all rental terms, pricing,
+conditions, and the customer's digital signature. The document is stored immutably
+in S3. `contractHash` (SHA-256) is used to verify document integrity. A contract
+may be voided only before the rental becomes `ACTIVE`.
+
+---
+
+### SecurityDeposit
+Tracks the lifecycle of the customer's security deposit from pre-authorisation
+through to release or deduction. The `assessmentDeadline` is set to 48 hours after
+the asset is returned. If no `Damage` record is raised before the deadline, the
+`DepositService` automatically calls `release()`.
+
+---
+
+### ConditionReport
+A structured checklist and photo record of the asset's physical state at a given
+point in time. There are two reports per rental: `PRE_RENTAL` (captured at checkout)
+and `POST_RENTAL` (captured at return). The `compare()` method produces a structured
+delta that drives the `DamageService`.
+
+---
+
+### Damage
+A record of a specific defect identified at return. Each `Damage` belongs to a
+`Rental` and references the `ConditionReport` that surfaced it. Customers may raise
+a `dispute` within the assessment window. If an insurance policy applies, a claim
+is raised automatically.
+
+---
+
+### Payment
+Represents a single monetary transaction. Supports the full payment lifecycle:
+pre-auth → capture → void/refund. The `retryCount` and `failureReason` fields are
+populated by the `DunningEngine` during automated retry cycles.
+
+---
+
+### Invoice
+A formal billing document issued per rental. Line items include the base rental
+charge, taxes, late fees, and any damage deductions. The invoice is sealed as a
+PDF and attached to the closing email notification.
+
+---
+
+### MaintenanceJob
+Tracks a maintenance work order for an asset. While a job is `IN_PROGRESS` or
+`SCHEDULED`, the asset status is `UNDER_MAINTENANCE` and cannot be booked. On
+`complete()`, the asset status reverts to `AVAILABLE` and `lastMaintenanceAt` is
+updated.
+
+---
+
+## Aggregate Boundaries
+
 ```
-## Implementation-Specific Addendum: Aggregate boundaries
+Aggregate Root: Asset
+  └── RentalRate (value objects)
+  └── RateModifier (value objects)
 
-### Why this diagram matters
-Define transaction boundaries, invariants, and eventual consistency relationships.
+Aggregate Root: BookingRequest
+  (references Customer.id and Asset.id — no direct object references)
 
-### Mermaid implementation scenario
-```mermaid
-flowchart LR
-    A[DomainModelStart] --> B[Validate booking window and policy version]
-    B --> C{Conflict or exception?}
-    C -- No --> D[Persist state transition + emit domain event]
-    C -- Yes --> E[Run compensating action and alternate allocation]
-    D --> F[Update pricing/deposit ledger projections]
-    E --> F
-    F --> G[Notify customer and operations channels]
+Aggregate Root: Rental
+  └── RentalContract
+  └── SecurityDeposit
+  └── ConditionReport (pre)
+  └── ConditionReport (post)
+  └── Damage[]
+  └── Payment[]
+  └── Invoice
+
+Aggregate Root: Customer
+  (references Rental.id list — loaded lazily)
+
+Aggregate Root: MaintenanceJob
+  (references Asset.id)
 ```
 
-### Required validation checklist
-- Confirm every branch in this diagram maps to an API response code and domain event.
-- Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
-- Ensure maintenance blocks and compliance checks can preempt transitions when required.
+Cross-aggregate references are by identity (UUID) only. Aggregate roots are the
+sole entry points for state mutation; no external service modifies internal
+entities directly.

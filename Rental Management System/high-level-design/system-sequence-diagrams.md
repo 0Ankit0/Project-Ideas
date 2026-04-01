@@ -1,223 +1,310 @@
-# System Sequence Diagrams
+# System Sequence Diagrams — Rental Management System
 
-## Overview
-Black-box system sequence diagrams showing interactions between actors and the platform for the primary use cases of the rental management system.
+This document captures the key interaction flows between actors and system components
+for the Rental Management System. Each diagram uses UML sequence notation and
+represents production-level behaviour including error paths, asynchronous events,
+and compensating transactions.
 
 ---
 
-## Customer Searches and Books an Asset
+## 1. Online Booking Flow
+
+A registered customer searches for available assets, selects one, receives a dynamic
+price quote, creates a booking, and pays a pre-authorised security deposit. The asset
+is then locked for the customer's window and a confirmation is dispatched.
 
 ```mermaid
 sequenceDiagram
-    actor Customer
-    participant Platform as Rental Management Platform
-    participant PG as Payment Gateway
-    actor Owner
+    autonumber
+    participant Customer
+    participant WebApp
+    participant BookingService
+    participant AssetService
+    participant PricingEngine
+    participant PaymentGateway
+    participant NotificationService
 
-    Customer->>Platform: GET /assets?category=car&start=...&end=...
-    Platform-->>Customer: Available assets with pricing preview
+    Customer->>WebApp: Enter search criteria (category, dates, location)
+    WebApp->>AssetService: GET /assets/search?category=&start=&end=&location=
+    AssetService-->>WebApp: 200 OK — list of available assets with thumbnail URLs
 
-    Customer->>Platform: GET /assets/{assetId}
-    Platform-->>Customer: Asset details, photos, attributes, availability calendar
+    Customer->>WebApp: Select asset, view detail page
+    WebApp->>AssetService: GET /assets/{assetId}
+    AssetService-->>WebApp: 200 OK — full asset detail (specs, photos, policies)
 
-    Customer->>Platform: GET /assets/{assetId}/price?start=...&end=...
-    Platform-->>Customer: Pricing breakdown { baseFee, peakSurcharge, tax, deposit, total }
+    WebApp->>AssetService: GET /assets/{assetId}/availability?start=&end=
+    AssetService-->>WebApp: 200 OK — { available: true, blockedSlots: [] }
 
-    Customer->>Platform: POST /bookings { assetId, start, end }
-    Platform->>PG: Hold / charge security deposit
-    PG-->>Platform: Deposit confirmed
-    Platform-->>Customer: 201 Booking created { bookingId, status: PENDING/CONFIRMED }
-    Platform--)Owner: Notification: new booking request
+    WebApp->>PricingEngine: POST /pricing/quote { assetId, customerId, start, end, promoCode }
+    PricingEngine->>AssetService: GET /assets/{assetId}/rates
+    AssetService-->>PricingEngine: base daily/hourly rate + deposit percentage
+    PricingEngine-->>WebApp: 200 OK — { baseAmount, taxes, depositAmount, lineItems[] }
+
+    Customer->>WebApp: Confirm booking details and proceed to payment
+    WebApp->>BookingService: POST /bookings { customerId, assetId, start, end, quoteId }
+    BookingService->>AssetService: GET /assets/{assetId}/availability (re-validate)
+    AssetService-->>BookingService: 200 OK — still available
+
+    BookingService->>PricingEngine: POST /pricing/finalise { quoteId }
+    PricingEngine-->>BookingService: 200 OK — finalised amounts (quote locked for 15 min)
+
+    BookingService-->>WebApp: 201 Created — { bookingId, status: PENDING_PAYMENT, expiresAt }
+
+    WebApp->>PaymentGateway: POST /payments/pre-auth { bookingId, amount: depositAmount, card }
+    PaymentGateway-->>WebApp: 200 OK — { authCode, preAuthId, expiresAt }
+
+    WebApp->>BookingService: PATCH /bookings/{bookingId}/payment { preAuthId, authCode }
+    BookingService->>AssetService: POST /assets/{assetId}/lock { bookingId, until: pickupDeadline }
+    AssetService-->>BookingService: 200 OK — asset status → RESERVED
+
+    BookingService-->>WebApp: 200 OK — { bookingId, status: CONFIRMED }
+
+    BookingService--)NotificationService: EVENT booking.confirmed { bookingId, customerId, assetId, dates }
+    NotificationService-->>Customer: Email — Booking Confirmation (PDF itinerary attached)
+    NotificationService-->>Customer: SMS — "Your booking #BK-00123 is confirmed. Pick-up: 15 Jun 09:00"
 ```
 
 ---
 
-## Owner Confirms Booking and Sends Rental Agreement
+## 2. Asset Checkout Flow
+
+Staff uses the mobile app to walk through the checkout process: they verify the
+booking, record the asset's pre-rental condition, capture mileage and fuel readings,
+generate a legally-binding rental contract, collect the customer's digital signature,
+and activate the rental.
 
 ```mermaid
 sequenceDiagram
-    actor Owner
-    participant Platform as Rental Management Platform
-    participant ESign as E-Signature Provider
-    actor Customer
+    autonumber
+    participant Customer
+    participant Staff as Staff (MobileApp)
+    participant CheckoutService
+    participant RentalService
+    participant ContractService
+    participant SignatureService
 
-    Owner->>Platform: GET /bookings/{bookingId}
-    Platform-->>Owner: Booking details + customer profile
+    Staff->>CheckoutService: POST /checkout/initiate { bookingId, staffId }
+    CheckoutService->>RentalService: GET /bookings/{bookingId}
+    RentalService-->>CheckoutService: booking details (customerId, assetId, dates, depositPreAuthId)
+    CheckoutService-->>Staff: 200 OK — checkout session { sessionId, checklistItems[] }
 
-    Owner->>Platform: POST /bookings/{bookingId}/confirm
-    Platform-->>Owner: 200 { status: CONFIRMED }
-    Platform--)Customer: Notification: booking confirmed
+    Staff->>CheckoutService: POST /checkout/{sessionId}/verify-id { customerId, documentScan }
+    CheckoutService-->>Staff: 200 OK — identity verified, age check passed
 
-    Owner->>Platform: POST /bookings/{bookingId}/agreement { templateId }
-    Platform-->>Owner: 201 Agreement draft generated
+    Staff->>CheckoutService: POST /checkout/{sessionId}/condition { photos[], notes, fuel: FULL, mileage: 12450 }
+    CheckoutService-->>Staff: 200 OK — pre-rental condition recorded { conditionReportId }
 
-    Owner->>Platform: POST /bookings/{bookingId}/agreement/send
-    Platform->>ESign: Send document to customer for signature
-    ESign-->>Platform: eSignRequestId
-    Platform-->>Owner: 200 { status: PENDING_CUSTOMER_SIGNATURE }
-    Platform--)Customer: Email: sign your rental agreement
+    Staff->>ContractService: POST /contracts/generate { bookingId, conditionReportId, staffId }
+    ContractService->>RentalService: GET /bookings/{bookingId}/financials
+    RentalService-->>ContractService: rental amounts, deposit, policies, late-fee schedule
+    ContractService-->>Staff: 200 OK — { contractId, contractUrl, pages: 4 }
 
-    Customer->>ESign: Review and sign agreement
-    ESign->>Platform: Webhook: customerSigned { timestamp, ip }
-    Platform--)Owner: Notification: customer signed, please countersign
+    Staff->>Customer: Present contract on tablet for review
+    Customer->>SignatureService: POST /signatures { contractId, signatureData, timestamp, geoLocation }
+    SignatureService-->>Customer: 200 OK — signature captured { signatureId }
 
-    Owner->>Platform: POST /bookings/{bookingId}/agreement/countersign
-    Platform->>ESign: Record owner signature
-    ESign-->>Platform: Final signed PDF URL
-    Platform-->>Owner: 200 Agreement fully signed
-    Platform--)Customer: Email: signed agreement PDF
+    SignatureService--)ContractService: EVENT contract.signed { contractId, signatureId }
+    ContractService-->>Staff: contract finalised — PDF sealed with e-signature
+
+    Staff->>CheckoutService: POST /checkout/{sessionId}/complete { signatureId }
+    CheckoutService->>RentalService: POST /rentals { bookingId, conditionReportId, contractId, actualStart }
+    RentalService-->>CheckoutService: 201 Created — { rentalId, status: ACTIVE }
+
+    CheckoutService--)RentalService: EVENT rental.activated { rentalId, assetId, customerId }
+    RentalService-->>Staff: 200 OK — rental is ACTIVE, keys authorised for release
+    RentalService-->>Customer: Push notification — "Your rental has started. Return by: 18 Jun 17:00"
 ```
 
 ---
 
-## Pre-Rental Condition Assessment
+## 3. Asset Return and Deposit Release Flow
+
+Staff processes the return: checks condition against the pre-rental report, records
+closing mileage and fuel, raises damage claims if defects are found, charges any late
+fees, notifies the customer, and manages the deposit release or deduction within the
+48-hour damage assessment window.
 
 ```mermaid
 sequenceDiagram
-    actor Staff
-    participant Platform as Rental Management Platform
-    actor Customer
+    autonumber
+    participant Customer
+    participant Staff as Staff (MobileApp)
+    participant ReturnService
+    participant DamageService
+    participant DepositService
+    participant PaymentGateway
+    participant NotificationService
 
-    Platform--)Staff: Task assigned: pre-rental assessment for booking {bookingId}
+    Staff->>ReturnService: POST /returns/initiate { rentalId, staffId }
+    ReturnService-->>Staff: 200 OK — return session { sessionId, preRentalCondition, expectedReturn }
 
-    Staff->>Platform: GET /assessments/{assessmentId}
-    Platform-->>Staff: Assessment task with category-specific checklist
+    Staff->>ReturnService: POST /returns/{sessionId}/condition { photos[], fuel: 3_4, mileage: 12920, notes }
+    ReturnService-->>Staff: 200 OK — post-rental condition recorded { conditionReportId }
 
-    Staff->>Platform: POST /assessments/{assessmentId}/items { items[] }
-    Platform-->>Staff: 200 Items saved
+    ReturnService->>ReturnService: Compare pre vs post condition reports
 
-    Staff->>Platform: POST /assessments/{assessmentId}/photos { photos[] }
-    Platform-->>Staff: 200 Photos uploaded
-
-    Staff->>Platform: POST /assessments/{assessmentId}/submit
-    Platform-->>Staff: 200 Assessment submitted
-    Platform--)Customer: Notification: review and sign pre-rental assessment
-
-    Customer->>Platform: GET /assessments/{assessmentId}
-    Platform-->>Customer: Assessment report with photos
-
-    Customer->>Platform: POST /assessments/{assessmentId}/countersign
-    Platform-->>Customer: 200 Countersigned; handover complete
-    Platform--)Staff: Notification: handover confirmed
-```
-
----
-
-## Customer Pays Invoice
-
-```mermaid
-sequenceDiagram
-    actor Customer
-    participant Platform as Rental Management Platform
-    participant PG as Payment Gateway
-    actor Owner
-
-    Platform--)Customer: Notification: invoice due { amount, dueDate }
-
-    Customer->>Platform: GET /invoices/{invoiceId}
-    Platform-->>Customer: Invoice details { lineItems, total, dueDate }
-
-    Customer->>Platform: POST /invoices/{invoiceId}/pay { paymentMethod }
-    Platform->>PG: Initiate payment { amount, method }
-    PG-->>Platform: Payment session / redirect URL
-    Platform-->>Customer: 200 { paymentUrl }
-
-    Customer->>PG: Complete payment
-    PG->>Platform: Webhook: paymentConfirmed { gatewayRef, amount }
-    Platform-->>Platform: Mark invoice PAID; update ledger
-    Platform--)Customer: Email: payment receipt
-    Platform--)Owner: Notification: payment received
-```
-
----
-
-## Post-Rental Return and Settlement
-
-```mermaid
-sequenceDiagram
-    actor Customer
-    participant Platform as Rental Management Platform
-    actor Staff
-    participant PG as Payment Gateway
-    actor Owner
-
-    Customer->>Platform: POST /bookings/{bookingId}/return { actualReturnAt }
-    Platform-->>Customer: 200 Return initiated
-    Platform--)Staff: Notification: perform post-rental assessment
-
-    Staff->>Platform: POST /assessments { bookingId, type: POST_RENTAL }
-    Staff->>Platform: PUT /assessments/{id}/submit { items[], photos[] }
-    Platform-->>Staff: 200 Assessment submitted
-
-    Platform->>Platform: Compare pre vs post assessment
-
-    alt No Damage, On Time
-        Platform->>PG: Initiate full deposit refund
-        PG-->>Platform: Refund confirmed
-        Platform--)Customer: Notification: deposit refunded
-    else Damage or Late Return
-        Platform--)Owner: Notification: review post-rental assessment
-        Owner->>Platform: POST /bookings/{bookingId}/additional-charges { charges[] }
-        Platform-->>Owner: 200 Charges recorded
-        Platform--)Customer: Notification: additional charges applied
-        Customer->>Platform: POST /invoices/{finalInvoiceId}/pay
-        Platform->>PG: Charge additional fees
-        PG-->>Platform: Confirmed
+    alt No damage detected
+        ReturnService-->>Staff: condition delta — no damage flagged
+    else Damage detected
+        ReturnService->>DamageService: POST /damage-reports { rentalId, conditionReportId, damageItems[] }
+        DamageService-->>ReturnService: 201 Created — { damageReportId, estimatedRepairCost: 350.00 }
+        ReturnService-->>Staff: damage report created — customer will be notified
     end
 
-    Platform->>Platform: Close booking; unblock asset calendar
-    Platform--)Owner: Notification: rental closed
+    ReturnService->>ReturnService: Calculate late fee (actualReturn vs scheduledReturn)
+
+    alt Returned late
+        ReturnService->>DepositService: GET /deposits/{rentalId}
+        DepositService-->>ReturnService: { depositId, heldAmount: 500.00 }
+        ReturnService->>PaymentGateway: POST /charges { rentalId, amount: lateFee, reason: LATE_RETURN }
+        PaymentGateway-->>ReturnService: 200 OK — { chargeId, status: CAPTURED }
+    end
+
+    ReturnService->>ReturnService: Mark rental status → RETURNED
+
+    ReturnService--)NotificationService: EVENT return.processed { rentalId, customerId, lateFee, damageReportId }
+    NotificationService-->>Customer: Email — Return Receipt (mileage, fuel, charges summary)
+    NotificationService-->>Customer: SMS — "Return received. Deposit review in progress — 48h window."
+
+    alt No damage report
+        DepositService->>PaymentGateway: POST /deposits/{depositId}/release
+        PaymentGateway-->>DepositService: 200 OK — deposit refunded to original payment method
+        DepositService--)NotificationService: EVENT deposit.released { customerId, amount: 500.00 }
+        NotificationService-->>Customer: Email — "Your deposit of $500 has been released."
+    else Damage report exists
+        DepositService->>DepositService: Start 48-hour damage assessment window
+        DepositService--)NotificationService: EVENT damage.assessment.started { customerId, deadline }
+        NotificationService-->>Customer: Email — "Damage identified. Assessment due by [deadline]. You may dispute."
+
+        Note over DamageService,DepositService: 48h later — damage assessment complete
+        DamageService->>DepositService: POST /deposits/{depositId}/deduct { amount: repairCost, damageReportId }
+        DepositService->>PaymentGateway: POST /charges { depositId, amount: repairCost, reason: DAMAGE }
+        PaymentGateway-->>DepositService: 200 OK — { chargeId, status: CAPTURED }
+
+        DepositService->>PaymentGateway: POST /deposits/{depositId}/release { remainingAmount }
+        PaymentGateway-->>DepositService: 200 OK — remainder refunded
+
+        DepositService--)NotificationService: EVENT deposit.partially.released { customerId, deducted, refunded }
+        NotificationService-->>Customer: Email — Damage charge breakdown + remaining deposit refund notice
+    end
 ```
 
 ---
 
-## Maintenance Request Lifecycle
+## 4. Rental Extension Flow
+
+A customer requests to extend an active rental from the web app. The system verifies
+the asset is not reserved by another booking, recalculates the price for the
+additional period, charges the stored payment method, updates the rental end date,
+and notifies the customer.
 
 ```mermaid
 sequenceDiagram
-    actor Owner
-    participant Platform as Rental Management Platform
-    actor Staff
+    autonumber
+    participant Customer
+    participant WebApp
+    participant RentalService
+    participant AssetService
+    participant PricingEngine
+    participant PaymentGateway
 
-    Owner->>Platform: POST /maintenance-requests { assetId, title, description, priority }
-    Platform-->>Owner: 201 { requestId, status: OPEN }
-    Platform->>Platform: Block asset availability calendar
+    Customer->>WebApp: Navigate to "My Rentals" → select active rental → "Request Extension"
+    Customer->>WebApp: Enter new return date/time
 
-    Owner->>Platform: PUT /maintenance-requests/{id}/assign { staffUserId }
-    Platform-->>Owner: 200 Assigned
-    Platform--)Staff: Notification: new maintenance task
+    WebApp->>RentalService: GET /rentals/{rentalId}
+    RentalService-->>WebApp: 200 OK — { rentalId, assetId, currentEnd, status: ACTIVE }
 
-    Staff->>Platform: PUT /maintenance-requests/{id}/status { status: IN_PROGRESS }
-    Platform-->>Staff: 200 Updated
+    WebApp->>AssetService: GET /assets/{assetId}/availability?start=currentEnd&end=newEnd
+    AssetService-->>WebApp: 200 OK — { available: true }
 
-    Staff->>Platform: PUT /maintenance-requests/{id}/complete { notes, photos, materials }
-    Platform-->>Staff: 200 Marked completed
-    Platform--)Owner: Notification: work completed - review needed
+    alt Asset not available
+        AssetService-->>WebApp: 409 Conflict — asset reserved by another booking after currentEnd
+        WebApp-->>Customer: "Extension not available for the requested period."
+    else Asset available
+        WebApp->>PricingEngine: POST /pricing/extension-quote { rentalId, newEnd }
+        PricingEngine->>RentalService: GET /rentals/{rentalId}/rate-context
+        RentalService-->>PricingEngine: original rate tier, loyalty discount, promo applied
+        PricingEngine-->>WebApp: 200 OK — { extensionAmount, dailyRate, taxes, totalDue }
 
-    Owner->>Platform: PUT /maintenance-requests/{id}/approve
-    Platform-->>Owner: 200 Approved and closed
-    Owner->>Platform: POST /maintenance-requests/{id}/cost { amount, category }
-    Platform-->>Owner: 200 Cost logged
-    Platform->>Platform: Unblock asset availability calendar
+        Customer->>WebApp: Confirm extension and authorise charge
+
+        WebApp->>PaymentGateway: POST /payments/charge { rentalId, amount: extensionAmount, savedCardToken }
+        PaymentGateway-->>WebApp: 200 OK — { chargeId, status: CAPTURED }
+
+        WebApp->>RentalService: PATCH /rentals/{rentalId}/extend { newEnd, chargeId, extensionAmount }
+        RentalService->>AssetService: PATCH /assets/{assetId}/reservation { bookingEnd: newEnd }
+        AssetService-->>RentalService: 200 OK — availability window updated
+
+        RentalService-->>WebApp: 200 OK — { rentalId, newEnd, status: ACTIVE }
+        WebApp-->>Customer: "Extension confirmed. New return date: [newEnd]"
+
+        RentalService--)RentalService: Publish EVENT rental.extended { rentalId, customerId, newEnd, charged }
+        RentalService-->>Customer: Email — Extension Confirmation with updated rental summary
+        RentalService-->>Customer: Push notification — "Rental extended to [newEnd]"
+    end
 ```
-## Implementation-Specific Addendum: System-level command choreography
 
-### Why this diagram matters
-Clarify orchestration vs choreography and timeout behavior per integration.
+---
 
-### Mermaid implementation scenario
+## 5. Late Payment and Dunning Flow
+
+When a charge fails post-rental (e.g., damage deduction), the system retries the
+payment, escalates to dunning, and eventually blocks the customer if the debt
+remains unresolved.
+
 ```mermaid
-flowchart LR
-    A[SystemSequenceDiagStart] --> B[Validate booking window and policy version]
-    B --> C{Conflict or exception?}
-    C -- No --> D[Persist state transition + emit domain event]
-    C -- Yes --> E[Run compensating action and alternate allocation]
-    D --> F[Update pricing/deposit ledger projections]
-    E --> F
-    F --> G[Notify customer and operations channels]
+sequenceDiagram
+    autonumber
+    participant PaymentService
+    participant PaymentGateway
+    participant CustomerService
+    participant NotificationService
+    participant DunningEngine
+
+    PaymentService->>PaymentGateway: POST /charges { customerId, amount, reason: DAMAGE_DEDUCTION }
+    PaymentGateway-->>PaymentService: 402 Payment Required — card declined
+
+    PaymentService--)DunningEngine: EVENT payment.failed { customerId, amount, attempt: 1 }
+
+    DunningEngine->>NotificationService: Send dunning notice attempt 1
+    NotificationService-->>CustomerService: Email — "Payment of $350 failed. Please update your card."
+
+    Note over DunningEngine: Wait 24h
+
+    DunningEngine->>PaymentGateway: POST /charges (retry attempt 2)
+    PaymentGateway-->>DunningEngine: 402 Payment Required — still declined
+
+    DunningEngine->>NotificationService: Send dunning notice attempt 2
+    NotificationService-->>CustomerService: Email — "2nd notice: outstanding balance $350. Account may be suspended."
+
+    Note over DunningEngine: Wait 48h
+
+    DunningEngine->>PaymentGateway: POST /charges (retry attempt 3)
+    PaymentGateway-->>DunningEngine: 402 Payment Required — still declined
+
+    DunningEngine->>CustomerService: PATCH /customers/{customerId}/status { blacklisted: true, reason: UNPAID_BALANCE }
+    CustomerService-->>DunningEngine: 200 OK — customer flagged
+
+    DunningEngine->>NotificationService: Send final dunning notice
+    NotificationService-->>CustomerService: Email — "Account suspended. Contact support to resolve outstanding balance."
+
+    DunningEngine--)PaymentService: EVENT dunning.escalated { customerId, amount, referToCreditTeam: true }
 ```
 
-### Required validation checklist
-- Confirm every branch in this diagram maps to an API response code and domain event.
-- Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
-- Ensure maintenance blocks and compliance checks can preempt transitions when required.
+---
+
+## Notes on Diagram Conventions
+
+| Symbol | Meaning |
+|--------|---------|
+| `->>` | Synchronous request |
+| `-->>` | Synchronous response |
+| `-)` | Asynchronous fire-and-forget event |
+| `Note over` | Contextual annotation or timer |
+| `alt / else / end` | Conditional branching |
+
+All services communicate over HTTPS REST internally via the API Gateway.
+Asynchronous events (`->>`) are published to Apache Kafka topics and consumed by
+subscriber services.
+
+Error responses follow RFC 7807 `application/problem+json` format throughout.
