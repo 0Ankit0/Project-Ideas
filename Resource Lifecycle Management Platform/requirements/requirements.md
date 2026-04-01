@@ -1,130 +1,166 @@
-# Requirements
+# Requirements — Resource Lifecycle Management Platform
 
-Implementation-ready functional and non-functional requirements for the **Resource Lifecycle Management Platform (RLMP)**. Every requirement is stated as a testable MUST/SHALL statement, linked to an owner team and a verification method.
+## 1. Introduction
 
-## Scope
-
-The RLMP governs the full lifespan of physical, virtual, and digital assets from first intake through final decommissioning. It supports enterprise IT assets (laptops, servers, peripherals), shared spaces (meeting rooms, labs), vehicles, tools, and any other managed resource that must be tracked, reserved, allocated, and eventually retired. The platform enforces policy gates at every lifecycle transition and produces a tamper-evident audit trail for compliance and financial reconciliation.
-
-## Actors
-
-| Actor | Description |
-|---|---|
-| **Requestor** | Any employee or system that submits a resource request or reservation |
-| **Resource Manager** | Approves provisioning, manages catalog, and sets allocation policies |
-| **Custodian** | Holds physical or logical custody of an allocated resource |
-| **Operations / SRE** | Monitors platform health, operates exception runbooks |
-| **Compliance Officer** | Reviews audit evidence, manages retention obligations |
-| **Finance** | Handles deposit, damage assessment, and financial reconciliation |
-| **System (automated)** | Scheduled jobs, policy engine, overdue detector |
+This document captures all functional and non-functional requirements for the Resource Lifecycle
+Management Platform (RLMP). Requirements are traced to business rules (BR-xx) and user stories
+(US-xx) where applicable.
 
 ---
 
-## Functional Requirements
+## 2. Functional Requirements
 
-### Provisioning and Catalog
+### 2.1 Resource Catalog Management
 
-| ID | Requirement | Acceptance Criteria | Related Rules |
-|---|---|---|---|
-| FR-PROV-01 | The system SHALL validate tenant identity, entitlement scope, and resource template integrity before creating a resource record. | Invalid provisioning attempts are rejected with a structured error code within 2 s; no partial resource record is persisted on failure. | BR-1, BR-2 |
-| FR-PROV-02 | The system SHALL assign a globally unique, immutable `resource_id` at provisioning time. | No two resources share the same `resource_id` across any tenant or environment; ID is present in all downstream events. | BR-1 |
-| FR-PROV-03 | The system SHALL capture intake metadata including category, condition grade, serial/asset tag, and responsible cost centre at registration time. | All mandatory fields pass schema validation; record is searchable by tag within 5 s of creation. | BR-2 |
-| FR-PROV-04 | The system SHALL support template-based bulk provisioning for up to 1,000 resources in a single operation with transactional rollback on partial failure. | Batch import either commits all records or rolls back entirely; a per-record error report is returned on failure. | BR-1, BR-5 |
-| FR-PROV-05 | The system SHALL emit a `resource.provisioned` domain event upon successful catalog entry. | Event is observable on the event bus within 500 ms; contains `resource_id`, `category`, `tenant_id`, `correlation_id`. | BR-5 |
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-01 | The system shall allow operators to define ResourceTypes with a configurable JSON attribute schema, unit of measure, and maintenance interval. | Must | — |
+| FR-02 | The system shall allow operators to catalog individual ResourceUnits under a ResourceType, capturing serial number, barcode/QR identifier, acquisition date, and location. | Must | — |
+| FR-03 | The system shall support bulk import of resource units via CSV upload with field-validation error reporting per row. | Should | — |
+| FR-04 | The system shall maintain a full audit trail of catalog changes (create, update, retire) with operator identity and timestamp. | Must | — |
+| FR-05 | The system shall expose a real-time availability calendar per resource, showing AVAILABLE / RESERVED / ALLOCATED / MAINTENANCE / RETIRED windows. | Must | — |
 
-### Reservation and Allocation
+### 2.2 Reservation Management
 
-| ID | Requirement | Acceptance Criteria | Related Rules |
-|---|---|---|---|
-| FR-ALLOC-01 | The system SHALL enforce no-overlap reservation windows for the same resource; conflicting requests MUST be rejected with a 409 and a retry token. | Concurrent reservations for the same resource and overlapping time windows never both succeed; the losing request receives a structured 409 within 1 s. | BR-3, BR-6 |
-| FR-ALLOC-02 | The system SHALL enforce per-tenant and per-requestor resource quotas defined in policy. | Requests exceeding configured quota are denied at policy evaluation time; quota state is updated atomically with reservation creation. | BR-3 |
-| FR-ALLOC-03 | The system SHALL support priority-ordered allocation so higher-priority requestors can displace lower-priority pending reservations, subject to policy. | Priority displacement produces an audit event for both affected reservations; displaced requestor receives a notification within 30 s. | BR-3, BR-4 |
-| FR-ALLOC-04 | The system SHALL attach an SLA timer to every reservation; approaching and breached SLAs SHALL trigger escalation events. | SLA timer state is persisted; 80% SLA elapsed triggers a warning event; 100% triggers an escalation event with assigned owner. | BR-3 |
-| FR-ALLOC-05 | The system SHALL transition a resource from `Reserved` to `Allocated` upon confirmed checkout, recording `actor_id`, `checkout_time`, and condition snapshot. | Checkout confirmation is idempotent; duplicate confirms do not alter state or duplicate events; condition snapshot is stored. | BR-5, BR-7 |
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-06 | The system shall allow authenticated customers to create reservations specifying resource type, quantity, start time, and end time. | Must | US-01 |
+| FR-07 | The system shall prevent double-reservation via optimistic locking with a row-version check on Resource.availability before committing. | Must | BR-01 |
+| FR-08 | The system shall enforce a minimum lead time: 30 minutes for standard resources, 24 hours for premium resources. | Must | BR-02 |
+| FR-09 | The system shall notify the customer via email and SMS within 60 seconds of reservation confirmation. | Must | US-01 |
+| FR-10 | The system shall allow operators to cancel any reservation, automatically notifying affected customers and releasing availability windows. | Must | US-05 |
+| FR-11 | The system shall allow customers to cancel their own reservation up to the lead-time cutoff with no penalty; cancellations within the lead-time window incur a configurable fee. | Should | US-02 |
+| FR-12 | The system shall support reservation hold periods: unconfirmed reservations expire after a configurable TTL (default 15 min) and revert to AVAILABLE. | Must | — |
 
-### Custody and Condition Tracking
+### 2.3 Allocation and Assignment
 
-| ID | Requirement | Acceptance Criteria | Related Rules |
-|---|---|---|---|
-| FR-CUST-01 | The system SHALL record custody transfers with actor identity and timestamp at every handoff event. | Every custody record includes `from_actor`, `to_actor`, `timestamp`, and `correlation_id`; transfer events are immutable. | BR-5, BR-7 |
-| FR-CUST-02 | The system SHALL capture condition assessment (grade A–D, free-text notes, optional photo evidence reference) at checkout and check-in. | Condition delta between checkout and check-in is computed and stored; delta is surfaced in the incident/settlement workflow when grade degrades. | BR-7, BR-8 |
-| FR-CUST-03 | The system SHALL support scheduled and ad-hoc inspections, recording inspector identity, timestamp, and result. | Inspection creates an `inspection.completed` event; failed inspection triggers a maintenance or incident workflow. | BR-7 |
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-13 | The system shall create an Allocation record linking a confirmed Reservation to a specific ResourceUnit upon operator assignment. | Must | US-03 |
+| FR-14 | The system shall validate that the selected ResourceUnit is in AVAILABLE or RESERVED state before completing allocation. | Must | BR-01 |
+| FR-15 | The system shall support multi-resource allocations where a single reservation maps to multiple physical units across locations. | Should | — |
 
-### Overdue and Lifecycle Recovery
+### 2.4 Checkout and Check-In
 
-| ID | Requirement | Acceptance Criteria | Related Rules |
-|---|---|---|---|
-| FR-OVER-01 | The system SHALL automatically detect overdue allocations when the agreed return date passes without a check-in event. | Overdue detector runs at maximum 5-minute intervals; `allocation.overdue` event is emitted within 10 minutes of breach. | BR-4 |
-| FR-OVER-02 | The system SHALL support a configurable escalation ladder: notify → warn → escalate to manager → forced-return workflow. | Each escalation step has a configurable delay; all steps are logged; escalation state is visible in the operations dashboard. | BR-4, BR-9 |
-| FR-OVER-03 | The system SHALL allow operations to initiate a forced-return with mandatory justification, transferring custody back to the platform without custodian action. | Forced-return requires approver role + reason code; produces an `allocation.forced_return` event and initiates inspection. | BR-4, BR-9 |
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-16 | The system shall initiate a deposit hold against the customer's payment method before completing checkout; checkout is blocked if the hold fails. | Must | BR-03, US-03 |
+| FR-17 | The system shall record a CheckoutRecord with custodian identity, checkout timestamp, pre-condition notes, and photo references. | Must | US-06 |
+| FR-18 | The system shall allow barcode/QR scanning to identify the ResourceUnit during checkout and check-in. | Must | US-06 |
+| FR-19 | The system shall enforce a mandatory ConditionReport on check-in; if not filed within 2 hours, the system auto-creates a P2 Incident. | Must | BR-04 |
+| FR-20 | The system shall record a CheckInRecord with custodian identity, return timestamp, post-condition notes, and photo references. | Must | US-07 |
 
-### Settlement and Incident Resolution
+### 2.5 Condition Assessment and Reporting
 
-| ID | Requirement | Acceptance Criteria | Related Rules |
-|---|---|---|---|
-| FR-SETT-01 | The system SHALL create an incident case when a condition delta, overdue breach, or loss report is detected. | Incident cases are created within 30 s of trigger; linked to `resource_id`, `allocation_id`, and responsible actor. | BR-8, BR-9 |
-| FR-SETT-02 | The system SHALL support configurable deposit hold and damage charge calculations based on condition grade and policy rate cards. | Settlement amounts are traceable to the rate card version active at time of allocation; all calculations are auditable. | BR-8 |
-| FR-SETT-03 | The system SHALL integrate with the financial ledger via an outbox-based event to record charges, refunds, and deposit releases. | Financial events are exactly-once delivered to the ledger; reconciliation report confirms no missing or duplicate charges daily. | BR-5, BR-8 |
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-21 | The system shall allow custodians to file ConditionReports with damage severity (NONE / MINOR / MODERATE / SEVERE), free-text description, and up to 10 photo attachments. | Must | US-07 |
+| FR-22 | The system shall automatically create an Incident when a ConditionReport records damage severity of MODERATE or higher. | Must | BR-06 |
+| FR-23 | The system shall place a hold on deposit release when a damage Incident is created; release is blocked until settlement approval. | Must | BR-06 |
 
-### Decommissioning
+### 2.6 Maintenance Management
 
-| ID | Requirement | Acceptance Criteria | Related Rules |
-|---|---|---|---|
-| FR-DECOM-01 | The system SHALL require financial closure (zero outstanding charges) and retention lock release before a resource can transition to `Decommissioned`. | Decommission command fails if open settlement cases or retention holds exist; error code identifies the blocking condition. | BR-10 |
-| FR-DECOM-02 | The system SHALL require approval authority sign-off for decommission of high-value resources (configurable cost threshold). | Approval workflow is triggered when asset value exceeds threshold; decommission cannot proceed without an approval record. | BR-10 |
-| FR-DECOM-03 | The system SHALL archive all resource and lifecycle records to cold storage with retention metadata before physical disposal. | Archive job completes within 24 h of decommission approval; archive manifest is stored and accessible for compliance audit. | BR-10 |
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-24 | The system shall allow operators to schedule MaintenanceJobs with type (PREVENTIVE / CORRECTIVE / EMERGENCY), assigned technician, and estimated duration. | Must | US-04 |
+| FR-25 | The system shall block all new reservations for a resource when an active MaintenanceJob exists for that resource. | Must | BR-05 |
+| FR-26 | The system shall auto-cancel all future reservations conflicting with a newly created maintenance window and notify affected customers. | Must | BR-05 |
+| FR-27 | The system shall track a MaintenanceSchedule (calendar triggers) per ResourceType with configurable intervals. | Should | — |
 
-### Audit and Observability
+### 2.7 Incident Management
 
-| ID | Requirement | Acceptance Criteria | Related Rules |
-|---|---|---|---|
-| FR-AUDIT-01 | The system SHALL record every state-changing command with `actor_id`, `correlation_id`, `reason_code`, `timestamp`, and `before/after state`. | 100 % of state changes have complete audit records queryable within 1 s. | BR-1 |
-| FR-AUDIT-02 | The system SHALL expose a compliance report API returning full audit trails for any resource across its entire lifecycle. | Report API returns data within 5 s for any single resource; response includes all transitions, actors, and events. | BR-1 |
-| FR-AUDIT-03 | The system SHALL stream all domain events to a SIEM-compatible sink with no loss under normal operation. | Zero event loss under P99 load; event lag to SIEM sink is < 10 s. | BR-5 |
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-28 | The system shall allow custodians and operators to report Incidents with type (DAMAGE / LOSS / THEFT / OVERDUE), severity, description, and supporting evidence. | Must | US-08 |
+| FR-29 | The system shall implement the overdue escalation ladder: 1 h → automated reminder; 4 h → manager escalation; 24 h → Incident report + legal hold. | Must | BR-08 |
+| FR-30 | The system shall link Incidents to the originating CheckoutRecord, ConditionReport, and ResourceUnit. | Must | — |
+
+### 2.8 Settlement and Finance
+
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-31 | The system shall calculate settlement amounts as: refund = deposit − (assessed_damage_charge + late_fees). | Must | BR-07 |
+| FR-32 | The system shall require Finance Manager approval before executing deposit disbursements or charge captures. | Must | US-09 |
+| FR-33 | The system shall post settlement outcomes to the ERP/SAP ledger via integration within 5 minutes of approval. | Must | — |
+| FR-34 | The system shall provide a customer-facing settlement breakdown report with itemised charges. | Must | US-09 |
+
+### 2.9 SLA Management
+
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-35 | The system shall allow operators to define SLAProfiles with availability windows (e.g., 99.5% monthly), breach thresholds, and credit values. | Must | US-10 |
+| FR-36 | The system shall detect SLA breaches in real-time when a resource is unavailable beyond the SLA window. | Must | BR-09 |
+| FR-37 | The system shall automatically issue SLA credits to the customer account upon breach detection without manual intervention. | Must | BR-09 |
+
+### 2.10 Policy and Configuration
+
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-38 | The system shall support configurable Policies per ResourceType covering: lead time, deposit amount, late-fee rate, damage rate card, and cancellation penalties. | Must | — |
+| FR-39 | The system shall evaluate all applicable policies via the OPA (Open Policy Agent) engine at reservation and checkout time. | Must | — |
+
+### 2.11 Multi-Location and Portals
+
+| ID | Requirement | Priority | Trace |
+|----|-------------|----------|-------|
+| FR-40 | The system shall support multi-location inventory with location-scoped availability calendars and cross-location transfer workflows. | Should | — |
+| FR-41 | The system shall provide an operator portal for resource management, reservation oversight, and incident handling. | Must | US-05 |
+| FR-42 | The system shall provide a customer portal for self-service reservation, checkout status, and settlement history. | Must | US-01 |
 
 ---
 
-## Non-Functional Requirements
+## 3. Non-Functional Requirements
+
+### 3.1 Performance
 
 | ID | Requirement | Target |
-|---|---|---|
-| NFR-AVAIL-01 | Platform API availability (provisioning, allocation, checkout, checkin command APIs) | ≥ 99.9 % monthly |
-| NFR-LAT-01 | P95 command-path latency (reserve, checkout, checkin) | ≤ 500 ms |
-| NFR-LAT-02 | P95 query-path latency (resource search, audit trail) | ≤ 1,000 ms |
-| NFR-CONS-01 | Allocation consistency model | Serializable per `(resource_id, window)` pair; no dirty reads |
-| NFR-SCALE-01 | Concurrent active allocations per tenant | ≥ 100,000 |
-| NFR-SCALE-02 | Resource catalog entries per deployment | ≥ 5,000,000 |
-| NFR-DR-01 | Recovery Point Objective (RPO) | ≤ 5 minutes |
-| NFR-DR-02 | Recovery Time Objective (RTO) | ≤ 30 minutes |
-| NFR-SEC-01 | All data at rest and in transit | AES-256 + TLS 1.3 minimum |
-| NFR-RET-01 | Audit log retention | ≥ 7 years (configurable per compliance profile) |
-| NFR-OBS-01 | Structured logging coverage | 100 % of all service boundaries |
-| NFR-OBS-02 | P99 event-bus consumer lag (overdue detector, settlement worker) | ≤ 60 s |
+|----|-------------|--------|
+| NFR-01 | Reservation creation API (conflict check + write) | p95 ≤ 300 ms under 500 rps |
+| NFR-02 | Availability calendar query | p95 ≤ 100 ms via Elasticsearch read path |
+| NFR-03 | Checkout deposit hold initiation | p95 ≤ 2 s including payment gateway round-trip |
+| NFR-04 | Event delivery from outbox to consumers | p99 ≤ 5 s end-to-end |
+| NFR-05 | SLA breach detection latency | ≤ 60 s from breach event to credit issuance |
 
----
+### 3.2 Availability and Reliability
 
-## Exception Handling Requirements
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-06 | Platform API uptime SLA | ≥ 99.9% monthly |
+| NFR-07 | Data durability (PostgreSQL + WAL shipping) | RPO ≤ 5 min, RTO ≤ 30 min |
+| NFR-08 | Reservation service must be available during primary DB failover | Standby promotion ≤ 60 s |
+| NFR-09 | Kafka consumer group must process the DLQ within 4 hours of incident | ≤ 4 h DLQ drain SLA |
 
-- Every failed command MUST return a structured error body with `error_code`, `correlation_id`, and `retry_after` where applicable.
-- Retried operations MUST reuse the original `idempotency_key` to prevent duplicate business effects.
-- Compensating transactions MUST be idempotent and auditable.
-- DLQ messages MUST include original payload, failure reason, retry count, and first-failure timestamp.
-- Every exception type (validation, policy, concurrency, financial, timeout) MUST have a named runbook entry in the operations guide.
+### 3.3 Consistency and Correctness
 
----
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-10 | Reservation conflict detection must be linearisable | Optimistic locking + retry; zero double-bookings |
+| NFR-11 | Financial transactions (deposit, charge, refund) must be idempotent | Idempotency keys enforced at gateway and service layers |
+| NFR-12 | All domain events must be delivered at-least-once with deduplication at consumer | Outbox pattern + Kafka consumer idempotency |
+| NFR-13 | Lifecycle state transitions must be atomic | DB transaction wrapping state write + outbox insert |
 
-## Traceability
+### 3.4 Security
 
-- Business rule definitions: [../analysis/business-rules.md](../analysis/business-rules.md)
-- Use case descriptions: [../analysis/use-case-descriptions.md](../analysis/use-case-descriptions.md)
-- API specification: [../detailed-design/api-design.md](../detailed-design/api-design.md)
-- Lifecycle state machine: [../detailed-design/state-machine-diagrams.md](../detailed-design/state-machine-diagrams.md)
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-14 | All API endpoints must require a valid JWT issued by the IAM/SSO service | 401 on missing/expired token |
+| NFR-15 | Tenant isolation: every query must be scoped to the authenticated tenant_id | Row-level security on all tenant-owned tables |
+| NFR-16 | PII fields (customer_name, contact_email) must be encrypted at rest (AES-256) | AWS KMS managed keys |
+| NFR-17 | All state-changing operations must be logged to the SIEM within 10 s | Audit events forwarded via Kafka → SIEM topic |
+| NFR-18 | Deposit amounts and settlement figures are financial data and must be stored with DECIMAL(18,4) precision | No floating-point arithmetic on monetary values |
 
-## Implementation Checklist
+### 3.5 Scalability
 
-- [x] Functional requirements decomposed to testable acceptance criteria
-- [x] Non-functional targets specified with numeric bounds
-- [x] Exception handling requirements defined
-- [ ] Requirements reviewed by engineering, operations, and governance stakeholders
-- [ ] Traceability links verified against design artifacts
-- [ ] Acceptance tests authored for each FR
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-19 | Core API pods must auto-scale from 3 to 20 replicas based on CPU utilisation | HPA: target 70% CPU |
+| NFR-20 | Kafka partitioning must support horizontal consumer scaling to 20 workers per topic | Min 20 partitions per high-throughput topic |
+| NFR-21 | Elasticsearch indices must support sharding for ≥ 10 M resource-availability records | Index lifecycle management with rollover at 50 GB |
+
+### 3.6 Observability
+
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-22 | All services must emit structured JSON logs with trace_id, span_id, and tenant_id | OpenTelemetry SDK integration |
+| NFR-23 | Metrics must be scraped by Prometheus and visualised in Grafana | Dashboards per service with SLI/SLO indicators |
+| NFR-24 | Distributed tracing must cover the end-to-end reservation → checkout flow | Jaeger with sampling rate ≥ 1% |

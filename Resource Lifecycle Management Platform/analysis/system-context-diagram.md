@@ -1,125 +1,138 @@
-# System Context Diagram
+# System Context Diagram — Resource Lifecycle Management Platform
 
-High-level view of the **Resource Lifecycle Management Platform** and all external systems, users, and integrations it interacts with.
+## Purpose
 
-## Context Description
-
-The RLMP is the central system of record for asset lifecycle management. It sits between human actors (requestors, managers, custodians, compliance, finance, operations) and a set of external technical systems (identity provider, financial ledger, SIEM, notification delivery, and integrating enterprise systems).
+This document describes the Resource Lifecycle Management Platform (RLMP) in the context of its
+external environment. It defines the system boundary, identifies all external actors and systems,
+and describes the nature of each integration.
 
 ---
 
-## System Context Diagram (C4 Level 1)
+## C4 Level 1 — System Context Diagram
 
 ```mermaid
-flowchart TB
-  %% People
-  Requestor(["👤 Requestor\nEmployee who reserves\nand uses resources"])
-  Custodian(["👤 Custodian\nHolds physical/logical\ncustody of assets"])
-  Manager(["👤 Resource Manager\nManages catalog,\npolicies, approvals"])
-  Compliance(["👤 Compliance Officer\nAudit trails, retention\npolicy management"])
-  Finance(["👤 Finance\nSettlement review\nand charge posting"])
-  Ops(["👤 Operations / SRE\nPlatform monitoring,\nforced returns, DLQ"])
+C4Context
+    title System Context — Resource Lifecycle Management Platform
 
-  %% Central System
-  RLMP["🖥️ Resource Lifecycle\nManagement Platform\n\nProvisioning · Reservation\nAllocation · Custody\nOverdue Detection\nSettlement · Decommissioning"]
+    Person(requestor, "Requestor", "Customer who reserves and uses physical or logical resources")
+    Person(custodian, "Custodian", "Field staff handling physical checkout and check-in with barcode scanning")
+    Person(resMgr, "Resource Manager", "Operator managing catalog, scheduling, and incident response")
+    Person(finMgr, "Finance Manager", "Approves settlements and manages deposit reconciliation")
+    Person(opsAdmin, "Operations Admin", "Configures policies, SLA profiles, resource types")
+    Person(compliance, "Compliance Officer", "Audits lifecycle events and incident reports")
 
-  %% External Systems
-  IAM["🔐 Identity Provider\n(OAuth 2.0 / OIDC)\nAuthentication &\nRole Management"]
-  Ledger["💰 Financial Ledger\nReceives deposit holds,\ncharges, and refunds\nas domain events"]
-  SIEM["🔍 SIEM / Audit Store\nReceives all domain\nevents for compliance\nand security monitoring"]
-  Notif["📬 Notification Service\nEmail · SMS · Push\nDelivery for reminders,\nalerts, and escalations"]
-  ERP["🏢 ERP / CMDB\nSource of asset data,\ncost centres, and\npurchase orders"]
-  Barcode["📷 Barcode / RFID Scanner\nHardware used by\ncustodians for checkout\nand check-in scans"]
+    System(rlmp, "Resource Lifecycle Management Platform", "Manages resource catalog, reservations, checkout/check-in, maintenance, incidents, settlements, and SLA tracking")
 
-  %% Actor → RLMP
-  Requestor -->|"Search catalog,\ncreate/cancel reservations,\ndispute charges"| RLMP
-  Custodian -->|"Checkout, check-in,\ntransfer custody,\nreport loss"| RLMP
-  Manager -->|"Provision resources,\nset policies,\ndecommission approval"| RLMP
-  Compliance -->|"Pull audit trails,\nmanage retention rules"| RLMP
-  Finance -->|"Review settlements,\napprove/dispute charges"| RLMP
-  Ops -->|"Monitor events,\nforced return,\nDLQ replay"| RLMP
+    System_Ext(iam, "IAM / SSO", "Issues and validates JWTs. Provides RBAC roles and tenant context for all authenticated requests.")
+    System_Ext(pay, "Payment Gateway", "Processes deposit holds, charge captures, and refund disbursements. Supports idempotent requests via idempotency keys.")
+    System_Ext(notify, "Notification Service (SMS/Email)", "Delivers reservation confirmations, overdue reminders, incident alerts, and settlement notifications to customers and operators.")
+    System_Ext(erp, "ERP / SAP", "Receives asset register updates (resource catalog events) and financial postings (settlement charges and refunds) for accounting.")
+    System_Ext(siem, "SIEM", "Receives structured audit-log events for security monitoring, anomaly detection, and compliance reporting.")
+    System_Ext(scanner, "Barcode / QR Scanner", "Physical device or mobile SDK used to identify ResourceUnits at checkout and check-in. Communicates via REST API or BLE bridge.")
 
-  %% RLMP → External Systems
-  RLMP -->|"Validate JWT,\nlookup user roles"| IAM
-  RLMP -->|"Publish financial events\nvia outbox (exactly-once)"| Ledger
-  RLMP -->|"Stream all domain events\nfor compliance & SIEM"| SIEM
-  RLMP -->|"Send reminders,\nalerts, escalations"| Notif
-  RLMP -->|"Import asset data,\ncost centre sync"| ERP
-  Barcode -->|"Asset tag scan\ntriggers checkout/checkin\ncommand"| RLMP
+    Rel(requestor, rlmp, "Creates reservations, views availability, checks settlement status", "HTTPS/REST")
+    Rel(custodian, rlmp, "Scans barcodes, completes checkouts and check-ins, files condition reports", "HTTPS/REST + mobile app")
+    Rel(resMgr, rlmp, "Manages catalog, schedules maintenance, handles incidents", "HTTPS/REST + operator portal")
+    Rel(finMgr, rlmp, "Reviews and approves settlements", "HTTPS/REST + finance portal")
+    Rel(opsAdmin, rlmp, "Configures policies, SLA profiles, resource types", "HTTPS/REST + admin portal")
+    Rel(compliance, rlmp, "Queries audit logs and incident reports", "HTTPS/REST + compliance portal")
+
+    Rel(rlmp, iam, "Validates JWT on every request; fetches user roles and tenant context", "HTTPS/REST")
+    Rel(rlmp, pay, "Initiates deposit holds at checkout; captures or releases on settlement approval", "HTTPS/REST + idempotency keys")
+    Rel(rlmp, notify, "Publishes notification events via Kafka; Notification Service delivers to end users", "Kafka events")
+    Rel(rlmp, erp, "Publishes ResourceCataloged / ChargeSettled events; ERP consumes for asset register and GL posting", "Kafka events")
+    Rel(rlmp, siem, "Streams structured audit events: state transitions, policy decisions, security-sensitive operations", "Kafka → SIEM connector")
+    Rel(scanner, rlmp, "Submits barcode scan results during checkout and check-in workflows", "HTTPS/REST")
 ```
 
 ---
 
-## External System Descriptions
+## External System Profiles
 
-| External System | Protocol / Integration | Data Exchanged | Criticality |
-|---|---|---|---|
-| **Identity Provider** | OAuth 2.0 / OIDC (JWT) | User identity, role claims, group memberships | Critical – all API calls require valid JWT |
-| **Financial Ledger** | Async event (outbox → event bus) | Deposit holds, damage charges, refunds, reconciliation confirmations | High – financial integrity depends on this |
-| **SIEM / Audit Store** | Event stream (Kafka / Kinesis) | All domain events with actor, correlation ID, timestamps | High – compliance and forensic audit |
-| **Notification Service** | HTTP API / message queue | Reminder emails, SMS, push; escalation notifications | Medium – degraded-mode OK with retry |
-| **ERP / CMDB** | REST API (inbound sync) | Asset master data, purchase orders, cost centres | Medium – sync at provisioning time |
-| **Barcode / RFID Scanner** | Local HTTP or mobile app | Asset tag value triggering checkout/checkin commands | High – primary field interaction method |
+### IAM / SSO
+
+| Attribute | Detail |
+|-----------|--------|
+| **Purpose** | Central identity provider for all RLMP actors |
+| **Protocol** | OAuth 2.0 / OpenID Connect; JWT tokens (RS256) |
+| **Integration Point** | API Gateway validates Bearer token on every inbound request |
+| **Data Exchanged** | Access token, user_id, tenant_id, roles[] |
+| **Failure Mode** | Hard dependency — all requests rejected if IAM is unreachable |
+| **SLA Requirement** | ≥ 99.99% availability; token validation must complete < 20 ms (local JWKS cache) |
+
+### Payment Gateway
+
+| Attribute | Detail |
+|-----------|--------|
+| **Purpose** | Authorise and capture deposits; disburse refunds on settlement |
+| **Protocol** | HTTPS REST with HMAC-signed requests; idempotency key header |
+| **Integration Point** | Checkout Service calls `/holds`, `/captures`, `/refunds` |
+| **Data Exchanged** | payment_method_id, amount, currency, idempotency_key, hold_reference |
+| **Failure Mode** | Soft dependency — deposit hold failure blocks checkout; retry with exponential backoff up to 3 attempts |
+| **SLA Requirement** | p95 hold initiation ≤ 2 s; settlement disbursement ≤ 30 s |
+
+### Notification Service (SMS/Email)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Purpose** | Deliver transactional notifications to customers and operators |
+| **Protocol** | Kafka consumer on `notifications.outbound` topic |
+| **Notification Types** | Reservation confirmed, Reservation cancelled, Checkout completed, Overdue reminder (1 h/4 h/24 h), Incident created, Settlement approved |
+| **Failure Mode** | Async — RLMP fires-and-forgets via Kafka; retry handled by Notification Service |
+| **Data Exchanged** | notification_type, recipient, template_id, template_vars, idempotency_key |
+
+### ERP / SAP
+
+| Attribute | Detail |
+|-----------|--------|
+| **Purpose** | Asset register (resource catalog) and financial accounting (settlements) |
+| **Protocol** | Kafka consumer on `erp.sync` topic; SAP IDoc adapter on receiving end |
+| **Data Exchanged** | ResourceCataloged (asset creation), ChargeSettled (GL posting), DepositReleased (refund posting) |
+| **Failure Mode** | Async — RLMP publishes events; ERP lag is acceptable up to 15 min |
+| **Reconciliation** | Nightly reconciliation job cross-checks RLMP settlement totals vs. SAP posting totals |
+
+### SIEM
+
+| Attribute | Detail |
+|-----------|--------|
+| **Purpose** | Security event monitoring, anomaly detection, compliance audit trail |
+| **Protocol** | Kafka connector → SIEM ingest pipeline (Splunk / Elastic SIEM) |
+| **Events Forwarded** | All state-transition events, policy-evaluation decisions, failed auth attempts, override actions |
+| **Data Classification** | Audit-grade; records must be tamper-evident, retained for ≥ 7 years |
+| **Latency SLO** | Audit events delivered to SIEM within 10 s of origination |
+
+### Barcode / QR Scanner
+
+| Attribute | Detail |
+|-----------|--------|
+| **Purpose** | Identify physical ResourceUnits by their barcode or QR code during checkout and check-in |
+| **Protocol** | REST POST to `/checkouts` or `/check-ins` with scanned_barcode field; mobile SDK for BLE scanners |
+| **Offline Mode** | Custodian mobile app queues scans locally; syncs on reconnection |
+| **Validation** | Barcode validated against resource_units.barcode_id with exact match; returns resource_unit_id |
 
 ---
 
-## Trust Boundaries
+## Data Flow Summary
 
 ```mermaid
 flowchart LR
-  subgraph Internet["Public Internet"]
-    Browser["Web Browser\n/ Mobile App"]
-    Scanner["Scanner App"]
-  end
-  subgraph DMZ["DMZ / API Gateway"]
-    GW["API Gateway\nTLS Termination\nJWT Validation\nRate Limiting"]
-  end
-  subgraph Private["Private Application Network"]
-    RLMP_Core["RLMP Core Services\n(Provisioning, Allocation,\nCustody, Incident,\nSettlement, Decommission)"]
-    PolicySvc["Policy Engine"]
-    EventBus["Event Bus (Kafka)"]
-  end
-  subgraph DataZone["Data Zone (Encrypted)"]
-    Postgres["PostgreSQL\n(Primary Datastore)"]
-    ColdStorage["Cold Storage\n(Archive)"]
-  end
-  subgraph ExtZone["External Integrations"]
-    IAM_Ext["Identity Provider"]
-    Ledger_Ext["Financial Ledger"]
-    SIEM_Ext["SIEM"]
-    Notif_Ext["Notification Service"]
-  end
-
-  Browser --> GW
-  Scanner --> GW
-  GW --> RLMP_Core
-  RLMP_Core --> PolicySvc
-  RLMP_Core --> Postgres
-  RLMP_Core --> EventBus
-  RLMP_Core --> ColdStorage
-  GW --> IAM_Ext
-  EventBus --> Ledger_Ext
-  EventBus --> SIEM_Ext
-  RLMP_Core --> Notif_Ext
+    Requestor -->|HTTPS| RLMP
+    Custodian -->|HTTPS + BLE| RLMP
+    Scanner -->|REST| RLMP
+    RLMP -->|JWT validate| IAM
+    RLMP -->|Deposit hold / release| PayGW[Payment Gateway]
+    RLMP -->|Kafka events| NotifySvc[Notification Service]
+    RLMP -->|Kafka events| ERP
+    RLMP -->|Kafka events| SIEM
 ```
 
 ---
 
-## Integration Contract Summary
+## Security Boundary
 
-| Integration | Direction | Consistency Model | Failure Mode |
-|---|---|---|---|
-| Identity Provider | Inbound (token validation) | Synchronous, cached 60 s | Deny request if IAM unreachable; alert ops |
-| Financial Ledger | Outbound (event) | Async, exactly-once via outbox | Queue events; retry with exponential backoff |
-| SIEM | Outbound (event stream) | Async, at-least-once | Events queued; loss acceptable only if SIEM fully down |
-| Notification Service | Outbound (event consumer) | Async, at-least-once | Retry with backoff; missed notification non-blocking |
-| ERP / CMDB | Bidirectional (sync job) | Eventual, daily batch | Alert on sync failure; manual reconciliation available |
-| Scanner | Inbound (command) | Synchronous | Retry via mobile app; offline mode stores scan locally |
-
----
-
-## Cross-References
-
-- Detailed service topology: [../high-level-design/architecture-diagram.md](../high-level-design/architecture-diagram.md)
-- C4 Container and Component views: [../high-level-design/c4-diagrams.md](../high-level-design/c4-diagrams.md)
-- Infrastructure topology: [../infrastructure/deployment-diagram.md](../infrastructure/deployment-diagram.md)
+All inbound traffic passes through the API Gateway, which enforces:
+1. **TLS 1.3** termination
+2. **JWT validation** (RS256 signature + expiry check via local JWKS cache)
+3. **Tenant isolation** — `tenant_id` extracted from JWT claims and injected into all downstream service calls
+4. **Rate limiting** — 1,000 rps per tenant; 100 rps per individual user
+5. **WAF rules** — OWASP Top 10 rule set applied at edge
