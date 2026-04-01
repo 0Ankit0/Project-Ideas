@@ -730,3 +730,14 @@ Override patterns are reviewed weekly by the compliance team. Recurring override
 ### Automatic Override Expiry
 
 Override tokens are single-use by default. Multi-use tokens (for batch operations) carry an `expires_at` timestamp and a `max_uses` counter. Once either limit is reached, the token is invalidated and subsequent requests receive HTTP 403.
+
+## Enforced Rule Summary
+
+1. All inbound contacts must be assigned a ticket within 60 seconds of creation; SLA clock starts immediately.
+2. Priority 1 incidents require acknowledgement within 15 minutes and resolution within 4 hours; breach triggers escalation.
+3. Tickets inactive for 5 business days in 'pending customer' status are auto-closed with notification.
+4. CSAT surveys are sent within 24 hours of ticket closure; surveys are mandatory for P1 and P2 tickets.
+5. Agent transfers must include context notes; blind transfers are blocked by the platform workflow engine.
+6. Queue assignments are based on skill tags; ticket is re-queued if assigned agent lacks required skill.
+7. Call recordings are retained for 90 days for quality assurance; PCI-DSS calls are paused during card entry.
+8. Escalation to supervisor requires customer consent; escalation path must complete within defined SLA window.
