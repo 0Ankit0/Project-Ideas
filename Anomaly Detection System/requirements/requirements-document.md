@@ -1,303 +1,424 @@
-# Requirements Document - Anomaly Detection System
+# Requirements Document — Anomaly Detection System
 
-> **Domain Independence**: Generic terminology adaptable to fraud, quality control, IT monitoring, healthcare, security, etc.
+**Version:** 2.0  
+**Status:** Approved  
+**Last Updated:** 2025-01-01  
+**Authors:** Product Management, Platform Engineering  
+**Reviewers:** Architecture Board, Security Team
 
 ---
 
-## 1. Project Overview
+## Table of Contents
+
+1. [Introduction](#1-introduction)
+2. [Stakeholders](#2-stakeholders)
+3. [Scope](#3-scope)
+4. [Functional Requirements](#4-functional-requirements)
+5. [Non-Functional Requirements](#5-non-functional-requirements)
+6. [Integration Requirements](#6-integration-requirements)
+7. [Security Requirements](#7-security-requirements)
+8. [Data Requirements](#8-data-requirements)
+9. [Compliance Requirements](#9-compliance-requirements)
+10. [Constraints and Assumptions](#10-constraints-and-assumptions)
+
+---
+
+## 1. Introduction
 
 ### 1.1 Purpose
-An AI-powered anomaly detection system that monitors data streams in real-time, identifies unusual patterns, and generates alerts. Built with Python and modern ML frameworks, the system uses unsupervised learning to detect anomalies without labeled training data.
 
-### 1.2 Scope
+This document defines the complete set of functional and non-functional requirements for the Anomaly Detection System (ADS). It serves as the authoritative specification for engineering teams, QA, and stakeholders throughout the development lifecycle.
 
-| In Scope | Out of Scope |
-|----------|--------------|
-| Real-time data ingestion | Data source management |
-| Pattern learning | Root cause analysis (v1) |
-| Anomaly detection | Automated remediation |
-| Alert generation | Business intelligence |
-| Dashboard visualization | Predictive forecasting |
-| Model training & evaluation | |
+### 1.2 Product Vision
 
-### 1.3 Domain Adaptability
+ADS will be the primary platform enabling engineering and operations teams to detect, understand, and respond to anomalies in their time-series metric data. It will reduce mean time to detect (MTTD) from hours to seconds, reduce alert fatigue by 70%, and provide actionable root-cause context for every incident.
 
-| Feature | Fraud Detection | IT Monitoring | Healthcare | Manufacturing |
-|---------|----------------|---------------|------------|---------------|
-| Data Point | Transaction | Metric | Vital Sign | Sensor Reading |
-| Metric | Amount, Location | CPU, Memory | Heart Rate | Temperature |
-| Anomaly | Unusual transaction | System failure | Abnormal vital | Defective product |
-| Alert | Block card | Wake on-call | Notify doctor | Stop line |
+### 1.3 Background
+
+The proliferation of microservices, IoT devices, and cloud infrastructure has created a monitoring gap: teams have more metrics than they can manually review. Rule-based threshold alerting produces thousands of low-signal alerts. Machine-learning-based anomaly detection closes this gap by learning what "normal" looks like for each metric and alerting only on statistically significant deviations.
+
+### 1.4 Document Conventions
+
+- **SHALL** — Mandatory requirement
+- **SHOULD** — Strongly recommended
+- **MAY** — Optional / nice to have
+- **FR-XXX** — Functional Requirement identifier
+- **NFR-XXX** — Non-Functional Requirement identifier
 
 ---
 
-## 2. Functional Requirements
+## 2. Stakeholders
 
-### 2.1 Data Ingestion
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-DI-001 | System shall ingest data from streaming sources (Kafka, Pub/Sub) | Must Have |
-| FR-DI-002 | System shall support batch data import | Should Have |
-| FR-DI-003 | System shall accept REST API data pushes | Must Have |
-| FR-DI-004 | System shall handle multiple data types (numeric, categorical) | Must Have |
-| FR-DI-005 | System shall buffer data during model updates | Should Have |
-| FR-DI-006 | System shall validate incoming data schema | Must Have |
-
-### 2.2 Feature Engineering
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-FE-001 | System shall compute statistical features (mean, std, percentiles) | Must Have |
-| FR-FE-002 | System shall extract time-based features | Must Have |
-| FR-FE-003 | System shall support rolling window aggregations | Must Have |
-| FR-FE-004 | System shall normalize/scale features | Must Have |
-| FR-FE-005 | System shall detect and handle missing values | Should Have |
-
-### 2.3 Anomaly Detection
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-AD-001 | System shall detect point anomalies (single outliers) | Must Have |
-| FR-AD-002 | System shall detect contextual anomalies (time-based) | Must Have |
-| FR-AD-003 | System shall detect collective anomalies (patterns) | Should Have |
-| FR-AD-004 | System shall support multiple detection algorithms | Must Have |
-| FR-AD-005 | System shall calculate anomaly scores (0-1) | Must Have |
-| FR-AD-006 | System shall support custom threshold configuration | Must Have |
-| FR-AD-007 | System shall handle concept drift | Should Have |
-
-### 2.4 Algorithms Supported
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-ALG-001 | Statistical: Z-Score, IQR | Must Have |
-| FR-ALG-002 | ML: Isolation Forest | Must Have |
-| FR-ALG-003 | ML: Local Outlier Factor (LOF) | Must Have |
-| FR-ALG-004 | ML: One-Class SVM | Should Have |
-| FR-ALG-005 | Deep Learning: Autoencoder | Should Have |
-| FR-ALG-006 | Time-Series: ARIMA-based | Should Have |
-| FR-ALG-007 | Ensemble: Multiple model voting | Could Have |
-
-### 2.5 Alerting
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-AL-001 | System shall generate alerts for detected anomalies | Must Have |
-| FR-AL-002 | System shall support multiple alert channels (email, Slack, webhook) | Must Have |
-| FR-AL-003 | System shall support alert severity levels | Must Have |
-| FR-AL-004 | System shall implement alert deduplication | Should Have |
-| FR-AL-005 | System shall support alert suppression rules | Should Have |
-| FR-AL-006 | System shall track alert acknowledgment | Should Have |
-| FR-AL-007 | System shall support escalation policies | Could Have |
-
-### 2.6 Dashboard & Visualization
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-VIS-001 | System shall display real-time anomaly feed | Must Have |
-| FR-VIS-002 | System shall show time-series with anomaly markers | Must Have |
-| FR-VIS-003 | System shall provide anomaly history | Must Have |
-| FR-VIS-004 | System shall show model performance metrics | Should Have |
-| FR-VIS-005 | System shall support custom date range filters | Should Have |
-
-### 2.7 Model Management
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-MM-001 | System shall train models on historical data | Must Have |
-| FR-MM-002 | System shall support online learning | Should Have |
-| FR-MM-003 | System shall version trained models | Must Have |
-| FR-MM-004 | System shall evaluate model performance | Must Have |
-| FR-MM-005 | System shall support A/B testing models | Could Have |
-
-### 2.8 Configuration
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-CFG-001 | System shall allow threshold configuration per metric | Must Have |
-| FR-CFG-002 | System shall support sensitivity adjustment | Must Have |
-| FR-CFG-003 | System shall allow algorithm selection | Must Have |
-| FR-CFG-004 | System shall support scheduled model retraining | Should Have |
+| Stakeholder | Role | Interests |
+|-------------|------|-----------|
+| SRE Teams | Primary User | Fast anomaly detection, low false positives, alert routing |
+| DevOps Engineers | Primary User | Infrastructure metric monitoring, incident response |
+| Data Scientists | Secondary User | Model management, algorithm selection, retraining |
+| Product Managers | Secondary User | Business KPI anomaly detection, dashboards |
+| Security Teams | Secondary User | Security anomaly detection, audit logs |
+| Platform Engineering | Builder | System reliability, scalability, maintainability |
+| Finance / Business | Tertiary | Cost efficiency, SLA compliance |
+| Compliance Officers | Tertiary | Data governance, audit trails |
 
 ---
 
-## 3. Non-Functional Requirements
+## 3. Scope
 
-### 3.1 Performance
+### 3.1 In Scope
 
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-P-001 | Real-time detection latency | < 1 second |
-| NFR-P-002 | Event processing throughput | 100K+ events/sec |
-| NFR-P-003 | API response time (p95) | < 200ms |
-| NFR-P-004 | Model inference time | < 10ms |
+- Ingestion of time-series metric data via REST, gRPC, Prometheus remote-write, and StatsD
+- Statistical and ML-based anomaly detection (online and batch)
+- Automatic baseline learning and seasonal pattern detection
+- Alert rule management and multi-channel routing
+- Incident management lifecycle
+- Model training, versioning, and deployment pipeline
+- Multi-tenant data isolation with per-tenant quotas
+- REST API for all platform operations
+- Server-Sent Events (SSE) and WebSocket streaming APIs
+- Dashboard and visualization support
+- Feedback loop for model improvement
+- Integration connectors for PagerDuty, OpsGenie, Slack, MS Teams
 
-### 3.2 Accuracy
+### 3.2 Out of Scope
 
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-A-001 | True positive rate (recall) | > 95% |
-| NFR-A-002 | False positive rate | < 5% |
-| NFR-A-003 | Precision | > 90% |
-
-### 3.3 Scalability
-
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-S-001 | Data points monitored | 10M+ |
-| NFR-S-002 | Concurrent data sources | 1000+ |
-| NFR-S-003 | Historical data retention | 1 year+ |
-
-### 3.4 Availability
-
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-AV-001 | System uptime | 99.99% |
-| NFR-AV-002 | Alert delivery SLA | < 5 seconds |
-| NFR-AV-003 | Graceful degradation | Fallback to rule-based |
+- Log anomaly detection (handled by separate platform)
+- Application performance monitoring (APM) agents
+- Custom UI frontend (API-first, third-party dashboards)
+- Long-term data warehousing (beyond configured retention)
+- Cost optimization recommendations
 
 ---
 
-## 4. Algorithm Requirements
+## 4. Functional Requirements
 
-### 4.1 Statistical Methods
-- Z-Score: Detect outliers beyond N standard deviations
-- IQR: Interquartile range-based detection
-- Moving Average: Deviation from rolling mean
+### 4.1 Data Ingestion
 
-### 4.2 Machine Learning
-- Isolation Forest: Tree-based outlier isolation
-- Local Outlier Factor: Density-based detection
-- One-Class SVM: Decision boundary-based
+**FR-ING-001** — The system SHALL accept metric data points via HTTP POST to `/v1/metrics/ingest` with payloads containing stream ID, timestamp, numeric value, and optional labels.
 
-### 4.3 Deep Learning
-- Autoencoders: Reconstruction error-based
-- LSTM: Sequence prediction error
-- Variational Autoencoder: Probabilistic detection
+**FR-ING-002** — The system SHALL support Prometheus remote-write protocol (protobuf) for bulk metric ingestion.
+
+**FR-ING-003** — The system SHALL support StatsD UDP protocol on port 8125 for legacy metric senders.
+
+**FR-ING-004** — The system SHALL support gRPC streaming ingestion for high-throughput producers (>10,000 points/second per stream).
+
+**FR-ING-005** — The system SHALL validate incoming data points: timestamp within ±1 hour of server time, value is finite float64, stream ID belongs to authenticated tenant.
+
+**FR-ING-006** — The system SHALL reject data points with timestamps older than 24 hours (configurable per tenant) and return HTTP 422 with error code `TIMESTAMP_TOO_OLD`.
+
+**FR-ING-007** — The system SHALL deduplicate data points with identical (stream_id, timestamp) within a 5-minute window.
+
+**FR-ING-008** — The system SHALL apply per-tenant rate limits and return HTTP 429 when exceeded, with `Retry-After` header.
+
+**FR-ING-009** — The system SHALL buffer ingested data in Kafka before writing to TimescaleDB, ensuring no data loss on downstream failures.
+
+**FR-ING-010** — The system SHALL support batch ingestion of up to 10,000 data points per API request.
+
+### 4.2 Data Source Management
+
+**FR-DS-001** — The system SHALL allow tenants to create data sources of types: `prometheus`, `statsd`, `cloudwatch`, `datadog`, `custom_push`, `custom_pull`.
+
+**FR-DS-002** — The system SHALL validate data source connectivity on creation and report errors if the endpoint is unreachable.
+
+**FR-DS-003** — The system SHALL support scraping intervals from 1 second to 24 hours for pull-based data sources.
+
+**FR-DS-004** — The system SHALL automatically discover metric streams from pull-based data sources using configured selectors/labels.
+
+**FR-DS-005** — The system SHALL store data source credentials encrypted at rest using AES-256-GCM.
+
+### 4.3 Metric Stream Management
+
+**FR-MS-001** — The system SHALL allow tenants to create metric streams with a unique name, data source reference, optional labels, and retention policy.
+
+**FR-MS-002** — The system SHALL support metric streams in states: `warming_up`, `active`, `degraded`, `archived`, `deleted`.
+
+**FR-MS-003** — The system SHALL track the last received timestamp, point count, and data gap statistics per stream.
+
+**FR-MS-004** — The system SHALL emit a `STREAM_DATA_GAP` event when no data is received for a configurable gap threshold (default 5 minutes).
+
+**FR-MS-005** — The system SHALL support archiving streams that have been inactive for >30 days (configurable).
+
+### 4.4 Anomaly Model Management
+
+**FR-MOD-001** — The system SHALL support the following detection algorithms: Z-Score, IQR, EWMA, Isolation Forest, LSTM Autoencoder, Prophet, ARIMA, STL Decomposition.
+
+**FR-MOD-002** — The system SHALL allow tenants to create models with a specified algorithm, hyperparameters, and associated metric streams.
+
+**FR-MOD-003** — The system SHALL maintain model versions with immutable artifacts, enabling rollback to any previous version.
+
+**FR-MOD-004** — The system SHALL support ensemble models that combine scores from multiple algorithms using configurable weighting.
+
+**FR-MOD-005** — The system SHALL track model performance metrics per version: precision, recall, F1-score, false positive rate.
+
+**FR-MOD-006** — The system SHALL detect model drift (KS test p-value < 0.05) and automatically schedule retraining.
+
+**FR-MOD-007** — The system SHALL store model artifacts (serialized model, feature scalers, metadata) in object storage with versioned paths.
+
+### 4.5 Training Pipeline
+
+**FR-TRN-001** — The system SHALL support on-demand training job creation via API.
+
+**FR-TRN-002** — The system SHALL support scheduled training jobs with configurable cron expressions.
+
+**FR-TRN-003** — Training jobs SHALL be executed in isolated containers with resource limits (configurable CPU/memory).
+
+**FR-TRN-004** — The system SHALL report training job status: `queued`, `running`, `succeeded`, `failed`, `cancelled`.
+
+**FR-TRN-005** — On training completion, the system SHALL automatically evaluate the new model version against a held-out validation dataset.
+
+**FR-TRN-006** — The system SHALL not auto-promote a new model version if its recall drops more than 10% compared to the current active version.
+
+**FR-TRN-007** — Training job logs SHALL be streamed in real time via SSE endpoint `/v1/training-jobs/{id}/logs`.
+
+### 4.6 Anomaly Detection
+
+**FR-DET-001** — The system SHALL score every ingested data point against all active models for the corresponding metric stream.
+
+**FR-DET-002** — Anomaly scores SHALL be in the range [0.0, 1.0] where 1.0 is maximum anomaly confidence.
+
+**FR-DET-003** — The system SHALL classify anomalies by type: `spike`, `dip`, `trend_shift`, `level_shift`, `pattern_break`, `contextual`, `collective`.
+
+**FR-DET-004** — The system SHALL assign a severity level based on score thresholds: `critical` (≥0.9), `high` (≥0.75), `medium` (≥0.5), `low` (≥0.25).
+
+**FR-DET-005** — The system SHALL publish anomaly events to a real-time stream accessible via SSE and WebSocket.
+
+**FR-DET-006** — The system SHALL maintain a rolling baseline (mean, stddev, percentiles) per metric stream, updated incrementally.
+
+**FR-DET-007** — The system SHALL perform seasonal decomposition to separate trend, seasonal, and residual components before scoring.
+
+**FR-DET-008** — The system SHALL support contextual anomaly detection using peer groups (metric streams with similar labels).
+
+**FR-DET-009** — P99 detection latency from data point ingestion to anomaly event publication SHALL be < 200 ms.
+
+**FR-DET-010** — The system SHALL support batch re-scoring of historical data for model backtesting.
+
+### 4.7 Alert Rule Management
+
+**FR-ALR-001** — The system SHALL allow tenants to define alert rules with: anomaly score threshold, severity filter, metric stream filter, model filter.
+
+**FR-ALR-002** — Alert rules SHALL support conditions: `score_above`, `score_below`, `consecutive_anomalies`, `anomaly_rate_above`.
+
+**FR-ALR-003** — Alert rules SHALL support a cooldown period (1 minute to 24 hours) to prevent re-alerting during the same incident.
+
+**FR-ALR-004** — Alert rules SHALL support flapping detection: suppress alerts if the metric oscillates across the threshold more than N times in W minutes.
+
+**FR-ALR-005** — The system SHALL support alert silences that suppress alerts during specified time windows (e.g., maintenance).
+
+**FR-ALR-006** — Alert silences SHALL support recurring schedules (daily/weekly) and one-time windows.
+
+**FR-ALR-007** — The system SHALL support alert escalation chains: if alert is unacknowledged after T minutes, escalate to next recipient.
+
+**FR-ALR-008** — Alert rules SHALL support label-based routing to different notification channels.
+
+### 4.8 Alert Notification
+
+**FR-NOT-001** — The system SHALL route alerts to: PagerDuty (Events API v2), OpsGenie (REST API), Slack (Incoming Webhooks), Microsoft Teams (Adaptive Cards), email (SMTP/SES), generic webhook (HTTP POST).
+
+**FR-NOT-002** — Notifications SHALL include: anomaly score, severity, metric stream name, timestamp, anomaly type, affected value, expected range.
+
+**FR-NOT-003** — The system SHALL retry failed notification deliveries with exponential backoff (max 5 retries over 30 minutes).
+
+**FR-NOT-004** — The system SHALL track notification delivery status: `pending`, `delivered`, `failed`, `suppressed`.
+
+**FR-NOT-005** — The system SHALL provide a notification preview endpoint to test integration configurations.
+
+### 4.9 Incident Management
+
+**FR-INC-001** — The system SHALL automatically group anomaly events into incidents based on temporal proximity (within 5 minutes, configurable) and metric correlation.
+
+**FR-INC-002** — Incidents SHALL support lifecycle states: `open`, `acknowledged`, `investigating`, `resolved`, `closed`.
+
+**FR-INC-003** — The system SHALL maintain an incident timeline recording all state changes, anomaly events, comments, and resolutions.
+
+**FR-INC-004** — Users SHALL be able to add comments to incidents via the API.
+
+**FR-INC-005** — The system SHALL perform root-cause scoring: identify the metric stream most likely to be causal based on temporal ordering and Granger causality.
+
+**FR-INC-006** — Incidents SHALL be closeable only after all constituent anomaly events are resolved.
+
+**FR-INC-007** — The system SHALL generate incident reports (PDF/JSON) including timeline, root cause, and impact assessment.
+
+### 4.10 Feedback and Model Improvement
+
+**FR-FBK-001** — Users SHALL be able to mark any anomaly event as true positive or false positive via API.
+
+**FR-FBK-002** — False positive feedback SHALL suppress re-alerting for the same pattern for a configurable period (default 7 days).
+
+**FR-FBK-003** — Accumulated feedback (default: 50+ records) SHALL trigger automatic model retraining.
+
+**FR-FBK-004** — The system SHALL track feedback statistics per model version: TP count, FP count, precision over feedback set.
+
+**FR-FBK-005** — Feedback records SHALL be exportable as labeled training datasets in CSV and JSONL formats.
 
 ---
 
-## 5. Constraints
+## 5. Non-Functional Requirements
 
-| Type | Constraint |
-|------|------------|
-| Technical | Python 3.9+ required |
-| Technical | GPU optional for deep learning |
-| Performance | Model retraining < 1 hour |
-| Data | Minimum 1 week of historical data |
+### 5.1 Performance
+
+**NFR-PERF-001** — Ingest throughput: system SHALL sustain 1,000,000 data points/second aggregate across all tenants.
+
+**NFR-PERF-002** — Detection latency P50 < 50 ms, P95 < 100 ms, P99 < 200 ms from ingestion to anomaly event.
+
+**NFR-PERF-003** — API response time: P95 < 100 ms for read endpoints, P99 < 500 ms for write endpoints.
+
+**NFR-PERF-004** — Model training for 30-day dataset SHALL complete within 10 minutes for statistical models, 60 minutes for LSTM.
+
+**NFR-PERF-005** — Dashboard queries over 7-day windows SHALL complete in < 2 seconds.
+
+### 5.2 Scalability
+
+**NFR-SCAL-001** — The ingestion layer SHALL scale horizontally to handle 10× throughput spikes without configuration changes.
+
+**NFR-SCAL-002** — The system SHALL support up to 10,000 tenants and 1,000,000 active metric streams.
+
+**NFR-SCAL-003** — TimescaleDB chunks SHALL be auto-compressed after 7 days; retention policies SHALL purge data per tenant configuration.
+
+**NFR-SCAL-004** — Kafka consumer groups SHALL auto-rebalance within 30 seconds of pod addition/removal.
+
+### 5.3 Availability
+
+**NFR-AVAIL-001** — The API gateway SHALL achieve 99.9% monthly availability (< 43.8 minutes downtime/month).
+
+**NFR-AVAIL-002** — The ingestion pipeline SHALL achieve 99.95% availability (< 21.9 minutes downtime/month).
+
+**NFR-AVAIL-003** — The system SHALL support zero-downtime deployments via rolling updates and blue-green strategy.
+
+**NFR-AVAIL-004** — All stateful components SHALL be deployed with at minimum N+1 redundancy.
+
+### 5.4 Reliability
+
+**NFR-REL-001** — No data points SHALL be lost during a single node failure in any tier.
+
+**NFR-REL-002** — Kafka topics SHALL be configured with replication factor 3 and min.insync.replicas=2.
+
+**NFR-REL-003** — TimescaleDB SHALL use synchronous streaming replication to at least one standby replica.
+
+**NFR-REL-004** — Alert notification failures SHALL be retried and reported but SHALL NOT cause system data loss.
+
+### 5.5 Security
+
+**NFR-SEC-001** — All API traffic SHALL use TLS 1.2+ with forward secrecy.
+
+**NFR-SEC-002** — All data at rest SHALL be encrypted with AES-256.
+
+**NFR-SEC-003** — Authentication SHALL use JWT (RS256) tokens with 1-hour expiry.
+
+**NFR-SEC-004** — RBAC SHALL enforce minimum privilege: Viewer cannot modify resources, Editor cannot manage users, Admin has full access.
+
+**NFR-SEC-005** — All mutating API operations SHALL be logged to an immutable audit log.
+
+### 5.6 Maintainability
+
+**NFR-MAINT-001** — Code coverage SHALL be maintained at ≥ 80% for all services.
+
+**NFR-MAINT-002** — All services SHALL expose `/health`, `/ready`, and `/metrics` (Prometheus) endpoints.
+
+**NFR-MAINT-003** — Structured JSON logs with correlation IDs SHALL be emitted by all services.
+
+**NFR-MAINT-004** — Distributed traces SHALL be emitted using OpenTelemetry and exported to Jaeger.
 
 ---
 
-## 6. Stakeholders & Personas
+## 6. Integration Requirements
 
-| Role | Goals | Primary Needs |
-|------|-------|---------------|
-| Business Owner | Reduce risk and losses | KPIs, ROI, alerting outcomes |
-| Operations/On-Call | Fast triage and resolution | Clear alerts, noise control, runbooks |
-| Data Scientist | Model quality | Experimentation, feedback labels, drift insights |
-| Platform Engineer | Reliable pipelines | Scalability, observability, automation |
-| Security Officer | Compliance and auditability | Access control, audit trails |
+### 6.1 Inbound Integrations
 
-## 7. Assumptions & Dependencies
+| Source | Protocol | Auth | Data Format |
+|--------|----------|------|-------------|
+| Prometheus | Remote-write (protobuf) | Bearer token | Prometheus TimeSeries |
+| StatsD | UDP 8125 | None (network-level) | StatsD wire format |
+| CloudWatch | AWS SDK poll | IAM role / access key | JSON |
+| Datadog | REST API poll | DD API key | JSON |
+| Custom Push | HTTP/gRPC | Bearer token | ADS wire format |
 
-| Type | Assumption/Dependency | Impact |
-|------|------------------------|--------|
-| Data | At least 1–4 weeks of historical data available | Cold-start mitigation needed if not met |
-| Data | Event timestamps are provided in UTC | Time alignment requires normalization |
-| Infra | Kafka/PubSub available for streaming | Fallback to batch if unavailable |
-| People | Domain experts will review alerts | Required for feedback loop |
-| Security | Identity provider supports OAuth2/JWT | Required for SSO/RBAC |
+### 6.2 Outbound Integrations
 
-## 8. Compliance, Privacy & Security Requirements
+| Destination | Protocol | Auth | Use Case |
+|-------------|----------|------|----------|
+| PagerDuty | HTTPS REST | API key | On-call alerting |
+| OpsGenie | HTTPS REST | API key | Alert routing |
+| Slack | Incoming webhook | Webhook URL | Team notifications |
+| MS Teams | Incoming webhook | Webhook URL | Team notifications |
+| Email | SMTP / SES | Credentials | Notification emails |
+| Generic webhook | HTTPS POST | HMAC-SHA256 | Custom integrations |
 
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-C-001 | Encrypt data in transit (TLS 1.2+) | 100% of traffic |
-| NFR-C-002 | Encrypt data at rest (AES-256) | All storage layers |
-| NFR-C-003 | Role-based access control (RBAC) | All APIs and UI |
-| NFR-C-004 | Audit logs for config changes and alert actions | Immutable logs |
-| NFR-C-005 | Data retention policy enforced | Configurable by tenant |
-| NFR-C-006 | PII masking in logs and UI | Default enabled |
+---
 
-## 9. Observability & Auditability
+## 7. Security Requirements
 
-| Signal | Scope | Examples |
-|--------|-------|----------|
-| Metrics | Ingestion, scoring, alerting | throughput, p95 latency, alert rate |
-| Logs | Structured event logs | schema validation errors, model version |
-| Traces | Distributed traces | end-to-end latency for a data point |
-| Audit | User actions | rule changes, acknowledgements |
+### 7.1 Authentication and Authorization
 
-## 10. Reliability, DR & Capacity
+| Requirement | Description |
+|-------------|-------------|
+| SR-AUTH-001 | API keys must be hashed (SHA-256) before storage; plaintext key shown only at creation |
+| SR-AUTH-002 | JWT tokens must be signed with RS256 and include tenant_id, user_id, roles claims |
+| SR-AUTH-003 | RBAC must be enforced at the API gateway before request forwarding |
+| SR-AUTH-004 | Service-to-service calls must use mutual TLS (mTLS) via Istio |
+| SR-AUTH-005 | Admin operations (tenant create, user role change) require MFA confirmation |
 
-| Requirement | Target |
-|-------------|--------|
-| RTO (Recovery Time Objective) | ≤ 30 minutes |
-| RPO (Recovery Point Objective) | ≤ 5 minutes |
-| Multi-AZ redundancy | Required for production |
-| Back-pressure handling | Graceful degradation |
-| Capacity scaling | Horizontal autoscaling |
+### 7.2 Data Protection
 
-## 11. Accessibility & Localization
+| Requirement | Description |
+|-------------|-------------|
+| SR-DATA-001 | All PII must be classified and subject to retention limits |
+| SR-DATA-002 | Database backups must be encrypted with a separate key from data-at-rest key |
+| SR-DATA-003 | Metric data must be tenant-isolated at the database schema level |
+| SR-DATA-004 | Deletion requests must cascade within 30 days (GDPR Art. 17) |
 
-- WCAG 2.1 AA compliant UI controls.
-- Keyboard navigable dashboards and alert actions.
-- Timezone-aware display and configurable locale formatting.
+---
 
-## 12. Acceptance Criteria
+## 8. Data Requirements
 
-- System detects anomalies within 1 second for p95 traffic.
-- Alert delivery meets SLA across all enabled channels.
-- False positive rate < 5% in steady state.
-- Model versioning and rollback supported within 5 minutes.
-- Audit log entries exist for all config and alert actions.
+### 8.1 Retention Policies
 
-## 13. Risks & Mitigations
+| Data Type | Default Retention | Configurable Range |
+|-----------|------------------|-------------------|
+| Raw metric data points | 30 days | 7 days – 2 years |
+| Aggregated (hourly) metrics | 1 year | 30 days – 5 years |
+| Anomaly events | 1 year | 90 days – 5 years |
+| Alert records | 2 years | 1 year – 7 years |
+| Incident records | 3 years | 2 years – 10 years |
+| Training job artifacts | 1 year | 90 days – 3 years |
+| Audit logs | 7 years | 3 years – 10 years |
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Data drift | Rising false positives/negatives | Drift detection, retraining triggers |
-| Alert storms | On-call fatigue | Deduplication, suppression, batching |
-| Schema drift | Pipeline failures | Schema registry, validation gates |
-| Cold start | Poor initial accuracy | Heuristics + warm-up period |
-| Latency spikes | SLA breach | Autoscaling, load shedding |
+### 8.2 Data Volume Estimates
 
-## 14. Glossary
+| Metric | Value |
+|--------|-------|
+| Average metric point size | 64 bytes (compressed) |
+| Points/second per active stream | 1–60 |
+| Active streams per tenant | 100–100,000 |
+| Anomaly events per stream per day | 0–50 |
+| Model artifact size | 1 MB – 500 MB |
 
-| Term | Definition |
-|------|------------|
-| **Anomaly** | Data point that deviates from expected pattern |
-| **Point Anomaly** | Single outlier data point |
-| **Contextual Anomaly** | Anomaly only in specific context (e.g., time) |
-| **Collective Anomaly** | Sequence of points that together are anomalous |
-| **Concept Drift** | Change in underlying data patterns over time |
-| **False Positive** | Normal data incorrectly flagged as anomaly |
-| **Anomaly Score** | Numeric measure of how anomalous (0-1) |
+---
 
-## Purpose and Scope
-Defines measurable product requirements for anomaly detection capabilities, including functional, non-functional, audit, and model-governance expectations.
+## 9. Compliance Requirements
 
-## Assumptions and Constraints
-- Fraud, abuse, and operational-anomaly classes are versioned in a shared taxonomy owned by Risk Ops.
-- Requirements map 1:1 to acceptance tests and telemetry metrics before implementation starts.
-- Regulatory-impacting requirements include an explicit evidence artifact and retention period.
+| Standard | Requirement |
+|----------|-------------|
+| GDPR | Data subject requests (access, deletion) within 30 days; DPA signed with sub-processors |
+| SOC 2 Type II | Annual audit; access control, availability, confidentiality, processing integrity controls |
+| ISO 27001 | ISMS policies; risk register; incident response plan |
+| PCI-DSS | Not applicable (no payment card data) |
+| HIPAA | BAA required if tenant processes PHI; encryption in transit and at rest |
 
-### End-to-End Example with Realistic Data
-A requirement `REQ-RISK-014` states: “for card-not-present events over $5,000, decision response <= 250 ms p95 and explainability payload must include top 3 reasons.” For test event `txn_884190` (`amount=9875`, `ip_country=RO`, `billing_country=US`), system returns `score=0.97` and reason codes in SLA.
+---
 
-## Decision Rationale and Alternatives Considered
-- Kept hard SLOs in requirements (not only ops docs) to prevent late-stage performance surprises.
-- Rejected vague “near real-time” wording because it cannot be tested or audited.
-- Chose requirement traceability matrix over free-form narrative to support regulator review.
+## 10. Constraints and Assumptions
 
-## Failure Modes and Recovery Behaviors
-- Conflicting KPI requests from Risk and Product -> escalation path via architecture review board with dated decision log.
-- Requirement without telemetry mapping -> marked non-implementable until metric contract exists.
+### 10.1 Constraints
 
-## Security and Compliance Implications
-- Requirement IDs include data-classification tags (PII, SPI, model-sensitive) so controls are inherited automatically.
-- Evidence retention and right-to-access obligations are attached to each requirement with compliance owner.
+- The system must run on Kubernetes 1.28+ and support EKS, GKE, and AKS.
+- Go and Python are the only permitted implementation languages for backend services.
+- All third-party ML libraries must be Apache 2.0 or MIT licensed.
+- Maximum model artifact size is 500 MB per version.
+- Kafka message retention for raw-metrics topic is 24 hours.
 
-## Operational Runbooks and Observability Notes
-- Runbook links each critical requirement to dashboards and alert thresholds.
-- Release gate blocks deployment if requirement-level canary checks fail.
+### 10.2 Assumptions
+
+- Tenants provide valid, numeric time-series data; semantic validation of values is out of scope.
+- Training data is assumed to be stationary over the training window (or seasonality-adjusted).
+- Network connectivity to notification endpoints (PagerDuty, Slack, etc.) is available from the cluster.
+- Object storage (S3-compatible) is provisioned and accessible from all services.
+- TimescaleDB hypertable chunk size is tuned for a 1-week interval by the operations team.
