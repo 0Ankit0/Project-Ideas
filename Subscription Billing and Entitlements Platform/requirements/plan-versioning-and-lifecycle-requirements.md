@@ -1,140 +1,156 @@
-# Plan, Versioning, Invoice Lifecycle, and Reconciliation Requirements
+# Plan Versioning and Lifecycle Requirements
 
-## Objective
-Define explicit product requirements for:
-- Plan and price versioning models
-- Invoice lifecycle behavior
-- Proration consistency
-- Entitlement enforcement paths
-- Reconciliation and error recovery
+## 1. Introduction
 
-## Plan and Price Versioning Requirements
+This document defines the detailed requirements governing how subscription plans are versioned, how plan lifecycle state transitions occur, how subscribers are insulated from plan changes through grandfathering and version locking, and how billing cycles and proration are managed across plan changes. These requirements govern the behaviour of the Plan Service and Subscription Service and are the authoritative reference for any design or implementation decisions related to plan evolution.
 
-### Functional Requirements
-1. The platform MUST support immutable **PlanVersion** records so historical subscriptions remain replayable.
-2. A plan MAY have multiple active regional price books; each price book MUST carry an effective start/end window.
-3. Existing subscriptions MUST continue on their pinned version unless explicitly migrated.
-4. Migration policies MUST support immediate, next-billing-cycle, and contract-renewal cutover modes.
-5. Plan deprecation MUST block new sales while preserving renewals for grandfathered subscribers.
+---
 
-### Non-Functional Requirements
-- Plan/price version resolution latency ≤ 50 ms at p95 for checkout and billing jobs.
-- Version history MUST be retained for at least 7 years for financial audit.
+## 2. Plan Lifecycle States
 
-## Invoice Lifecycle Requirements
+### 2.1 State Definitions
 
-### Lifecycle States
-Draft → Finalized → Issued → (Paid | Partially Paid | Overdue | Voided | Uncollectible)
+**PVL-001** — A Plan must always exist in exactly one of the following lifecycle states: **Draft**, **Published**, **Deprecated**, or **Archived**. State transitions are governed by the rules in section 2.2.
 
-### Functional Requirements
-1. Draft invoices MUST be editable only before finalization and only by authorized roles.
-2. Finalization MUST lock monetary lines, tax totals, and exchange-rate snapshots.
-3. Issuance MUST produce an immutable customer-visible invoice artifact and send notification events.
-4. Payment allocation MUST support partial capture and overpayment credits.
-5. Overdue invoices MUST trigger dunning policy schedules with configurable retries and channels.
+**PVL-002** — A Plan in **Draft** state is being configured by a Billing Admin. No subscriber may select a Draft Plan. A Draft Plan may be edited freely, including changing prices, features, and trial configuration, without creating a new PlanVersion.
 
-## Proration Requirements
-1. Mid-cycle upgrades/downgrades MUST create deterministic proration entries using second-level time boundaries.
-2. Proration policy MUST support at least:
-   - Credit-unused-time + charge-new-plan-time
-   - No-credit immediate upgrade
-   - End-of-term downgrade
-3. Rounding strategy MUST be configurable by currency (bankers-rounding vs half-up) and applied consistently.
-4. Taxes for prorated lines MUST be recomputed from normalized taxable bases.
+**PVL-003** — A Plan transitions to **Published** state when a Billing Admin explicitly publishes it. At the moment of publication, the system must create an immutable PlanVersion record capturing the complete state of the Plan at that moment, including all Prices, Entitlements, trial configuration, and billing intervals. The publish action is audited with the admin identity and timestamp.
 
-## Entitlement Enforcement Requirements
-1. Entitlements MUST be derived from active subscription items and effective feature flags.
-2. Enforcement MUST support two paths:
-   - **Synchronous token check** for API gating
-   - **Asynchronous materialized view** for UI/admin projections
-3. Entitlement updates MUST propagate within 30 seconds after payment/plan events.
-4. Grace period rules MUST allow soft enforcement during dunning state transitions.
+**PVL-004** — A Plan in **Published** state is available for new subscriptions. It is returned by the public plan catalog API. A Published Plan may not be directly edited in a way that modifies subscriber-facing attributes; a new Draft must be created and published, which creates a new PlanVersion.
 
-## Reconciliation and Error Recovery Requirements
-1. Daily reconciliation MUST compare:
-   - Rated usage vs invoice line quantities
-   - Payment provider settlements vs ledger postings
-   - Entitlement grants vs paid eligibility
-2. Variance thresholds MUST be configurable per tenant and event type.
-3. Failed workflows MUST be recoverable via idempotent replay from event logs.
-4. Recovery actions MUST record operator, reason, before/after states, and correlation IDs.
-5. All automated recovery jobs MUST publish outcome metrics and alerts.
+**PVL-005** — A Plan transitions to **Deprecated** state when a Billing Admin marks it as deprecated, typically after a replacement plan has been Published. A Deprecated Plan is hidden from the public plan catalog API. Existing subscriptions on Deprecated PlanVersions remain active and are not automatically migrated. No new subscriptions may be created on a Deprecated Plan.
 
-## Acceptance Criteria
-- Given a plan version change, when an existing subscription renews, then invoice lines use pinned price version unless migration policy says otherwise.
-- Given a mid-cycle upgrade, when proration runs, then credit/debit lines reconcile to elapsed/remaining term proportions.
-- Given payment failure and grace policy, when entitlement check occurs, then access is downgraded according to policy tier and date.
-- Given reconciliation drift, when threshold exceeds policy, then incident is raised and replay/repair procedure is executable without double-posting.
+**PVL-006** — A Plan transitions to **Archived** state when it has no active or paused subscriptions and has been Deprecated for at least 90 days. Archived Plans are read-only. No new subscriptions may be created. Archived Plans are retained permanently for historical billing reference. The Archived transition may be triggered manually by a Billing Admin or automatically by the system after the 90-day deprecation hold period.
 
-## Beginner-Friendly Explanation
-This chapter translates business language into implementation expectations:
-- **Why immutable versions?** Because invoices must remain explainable years later.
-- **Why invoice states?** They prevent accidental edits after financial commitments are locked.
-- **Why proration policy options?** Different businesses choose different fairness/commercial rules.
-- **Why separate entitlement paths?** Runtime decisions need speed; reporting needs richer history.
-- **Why reconciliation?** Distributed systems fail in small ways; recon catches silent drift.
+### 2.2 Allowed State Transitions
 
-## Example Scenario (End-to-End)
-A customer upgrades from Basic to Pro on day 12 of a 30-day cycle:
-1. System reads current subscription's pinned version.
-2. System calculates unused Basic time credit and remaining Pro charge.
-3. Invoice line items are generated with traceable version references.
-4. Payment succeeds; entitlement moves from Basic limits to Pro limits.
-5. Recon job later verifies usage, invoice totals, payment settlement, and entitlement status match.
-
-## Out-of-Scope Clarification
-To keep this chapter readable, it does not define:
-- Region-specific tax formulas (covered by tax domain docs).
-- Payment processor-specific retry semantics (covered by dunning docs).
-- UI copy/UX details (covered by product specs).
-
-
-## Implementation Readiness Details
-
-### Capability Matrix (Must-Have vs Should-Have)
-| Capability | Must-Have (MVP) | Should-Have (Phase 2) |
-|---|---|---|
-| Immutable plan versions | ✅ | |
-| Scheduled migrations | ✅ | |
-| Bulk customer migration simulator | | ✅ |
-| Invoice state machine with guardrails | ✅ | |
-| Proration policy plug-ins | ✅ | |
-| Entitlement grace policy | ✅ | |
-| Automated reconciliation jobs | ✅ | |
-| Auto-remediation suggestions | | ✅ |
-
-### Data Retention and Compliance Requirements
-- Plan/price/version and invoice transition history must be retained for statutory financial retention windows.
-- Reconciliation outputs must be versioned, signed (checksum), and reproducible from source snapshots.
-- Manual overrides must include reason code taxonomy and ticket linkage for audit.
-
-### Non-Functional Targets by Domain
-| Domain | p95 Latency | Freshness / SLA | Durability |
+| From State | To State | Trigger | Conditions |
 |---|---|---|---|
-| Entitlement check API | 100 ms | <= 30 sec propagation after payment | 99.99% decision availability |
-| Invoice finalization | 2 s | same transaction commit | no partial finalize writes |
-| Proration calculation | 200 ms per amendment | deterministic replay | idempotent output keys |
-| Reconciliation batch | N/A | daily completion by 08:00 local tenant time | reproducible reports |
+| Draft | Published | Admin publish action | Plan must have at least one active Price and one billing interval defined |
+| Published | Deprecated | Admin deprecate action | No mandatory condition; admin may deprecate at any time |
+| Published | Draft | Not allowed | A Published plan cannot revert to Draft; edits must create a new version |
+| Deprecated | Archived | Admin archive or system auto-archive | No active or paused subscriptions reference this plan |
+| Deprecated | Published | Not allowed | A Deprecated plan cannot be re-published; a new plan must be created |
+| Archived | Any | Not allowed | Archived is a terminal state |
 
-## Requirement Diagram (Traceability)
-```mermaid
-flowchart TD
-    A[Plan Version Published] --> B[Subscription Pins Version]
-    B --> C[Invoice Draft Generation]
-    C --> D[Invoice Finalization Lock]
-    D --> E[Payment Attempt]
-    E -->|Success| F[Entitlement Active]
-    E -->|Failure| G[Grace / Dunning]
-    G --> H[Limited or Suspended Entitlement]
-    F --> I[Reconciliation: Usage↔Invoice↔Ledger↔Entitlement]
-    H --> I
-    I --> J{Drift Found?}
-    J -- No --> K[Close Period]
-    J -- Yes --> L[Replay or Compensation]
-    L --> I
-```
+---
 
-## Open Design Decisions (To Resolve Before Build)
-1. Whether proration uses calendar-month exact boundaries or normalized 30-day equivalents for all plans.
-2. Whether entitlement hard-block begins at dunning stage N or after contractual grace_end timestamp only.
-3. Whether reconciliation should block period close on Class B drift or only Class A drift.
+## 3. Plan Versioning
+
+### 3.1 Version Creation
+
+**PVL-007** — Every time a Billing Admin publishes changes to an existing Published Plan, the system must create a new PlanVersion with a version number incremented by 1 from the highest existing PlanVersion for that Plan. Version numbers are positive integers starting at 1.
+
+**PVL-008** — A PlanVersion record must be immutable once created. No field on a PlanVersion — including prices, feature entitlements, trial duration, billing interval, or currency amounts — may be modified after the PlanVersion is created. Any change requires a new PlanVersion.
+
+**PVL-009** — Each PlanVersion must store: plan_id, version_number, status (Active, Deprecated), created_at timestamp, published_by (admin user ID), effective_from date, and a complete snapshot of all Prices and Entitlements as they were at publication time.
+
+**PVL-010** — The system must maintain the full version history of all PlanVersions for a Plan indefinitely. Billing Admins must be able to retrieve any historical PlanVersion via the API for audit and dispute resolution purposes.
+
+### 3.2 Version Locking
+
+**PVL-011** — At the moment a Subscription is created, the system must record the plan_version_id of the PlanVersion that was current at that time. This is the subscription's locked PlanVersion. All billing for that subscription, including recurring charges, usage rating, and proration calculations, must use the prices and entitlements from the locked PlanVersion unless the subscriber explicitly upgrades.
+
+**PVL-012** — Version locking must be atomic with subscription creation. The system must not create a subscription and then separately record the plan version; both must be written in the same database transaction to prevent race conditions where a plan version change between the two writes would cause a version mismatch.
+
+**PVL-013** — The system must expose the locked_plan_version_id field on every Subscription in all API responses, allowing Developers to verify which version a subscriber is on.
+
+### 3.3 Grandfathering
+
+**PVL-014** — When a Billing Admin publishes a new PlanVersion (e.g., increasing the monthly price), existing subscriptions locked to previous PlanVersions must not be automatically migrated to the new version. They continue to be billed at the prices defined in their locked PlanVersion indefinitely until explicitly migrated.
+
+**PVL-015** — Grandfathering applies to all pricing components: flat fees, per-seat rates, tiered rates, usage rates, and any included usage allowances. A subscriber on a grandfathered PlanVersion retains all entitlements and pricing from that version even if the current version removes or restricts those features.
+
+**PVL-016** — The system must provide a Billing Admin report that lists all active subscriptions grouped by PlanVersion, showing the version number, the count of subscribers, and the monthly recurring revenue attributable to each version. This enables Admins to assess migration impact.
+
+---
+
+## 4. Subscription Lifecycle States
+
+### 4.1 State Definitions
+
+**PVL-017** — A Subscription must always exist in exactly one of the following lifecycle states: **Trialing**, **Active**, **PastDue**, **Paused**, **Cancelled**, or **Expired**.
+
+**PVL-018** — **Trialing**: The subscription is within the free trial period. No invoices are generated. Entitlement grants are active per the plan's trial entitlement configuration. The subscription will auto-transition to Active when the trial period ends if a payment method is present.
+
+**PVL-019** — **Active**: The subscription is in good standing. Invoices are generated at the end of each billing period. Entitlement grants are fully active. The subscription renews automatically at the next billing date.
+
+**PVL-020** — **PastDue**: A payment has failed and the DunningCycle is in progress. The subscription continues to operate (entitlements remain active during the dunning window unless the plan's dunning_revoke_entitlements flag is set to true). If payment is recovered, the subscription returns to Active. If all dunning retries are exhausted, the subscription moves to Cancelled.
+
+**PVL-021** — **Paused**: The Account Owner has paused the subscription. No invoices are generated and no charges are made. Entitlement grants are revoked unless the plan specifies pause-through access for specific features. The subscription will resume on the configured resume_date.
+
+**PVL-022** — **Cancelled**: The subscription has been ended, either by the Account Owner, by a Billing Admin, or automatically by the system after dunning exhaustion. Entitlement grants are revoked. A Cancelled subscription cannot be reactivated; a new subscription must be created. Cancellation is recorded with the cancellation reason and actor.
+
+**PVL-023** — **Expired**: Used for fixed-term subscriptions (those with a defined end_date at creation, as opposed to open-ended recurring subscriptions). When the end_date is reached, the subscription moves to Expired. Entitlement grants are revoked. No further charges are made. Expired subscriptions are distinct from Cancelled subscriptions in revenue reporting.
+
+### 4.2 Allowed Subscription State Transitions
+
+| From State | To State | Trigger | Notes |
+|---|---|---|---|
+| Trialing | Active | Trial period ends, payment method present | System-initiated at trial_end_date |
+| Trialing | Cancelled | Trial period ends, no payment method after grace | Grace period is configurable, default 24 hours |
+| Trialing | Cancelled | Account Owner requests cancellation | Immediate; no charge |
+| Active | PastDue | Payment charge fails | System-initiated on payment failure |
+| Active | Paused | Account Owner or admin pause request | Requires plan to allow pausing |
+| Active | Cancelled | Account Owner or admin cancels (immediate) | Prorated refund issued if applicable |
+| Active | Cancelled | Account Owner cancels at period end | Subscription stays Active until period end, then Cancelled |
+| Active | Expired | End_date reached (fixed-term only) | System-initiated |
+| PastDue | Active | Payment succeeds during dunning | System-initiated on successful retry or manual payment |
+| PastDue | Cancelled | All dunning retries exhausted | System-initiated; cancellation reason = dunning_exhausted |
+| Paused | Active | Resume_date reached or manual resume | System-initiated or admin-initiated |
+| Paused | Cancelled | Account Owner or admin cancels while paused | Immediate; no charge |
+| Cancelled | (none) | Terminal state | New subscription must be created to re-subscribe |
+| Expired | (none) | Terminal state | New subscription must be created to re-subscribe |
+
+---
+
+## 5. Migration Rules
+
+### 5.1 Voluntary Migration
+
+**PVL-024** — An Account Owner or Billing Admin may migrate a subscription from a grandfathered PlanVersion to a newer PlanVersion at any time by performing a plan change. The plan change must specify: the target plan_version_id, the effective date (immediate or end_of_period), and the proration behaviour (prorate or no_prorate).
+
+**PVL-025** — When an Account Owner initiates an upgrade from a grandfathered version to a higher-priced current version, the system must display the price difference clearly before confirmation, including any proration for the remainder of the current billing period.
+
+### 5.2 Administrative Migration
+
+**PVL-026** — A Billing Admin may initiate a bulk migration of subscribers from a deprecated PlanVersion to a newer PlanVersion. Bulk migrations must be performed in batches with a configurable batch size and delay to avoid database overload. The migration must be fully audited and reversible within 30 days of execution via individual subscription rollbacks.
+
+**PVL-027** — Before executing a bulk migration, the system must generate a preview report showing: total affected subscriptions, billing impact per subscriber (price increase or decrease), total MRR impact, and the list of subscriber email addresses for notification. The Billing Admin must confirm after reviewing the report.
+
+**PVL-028** — All migrated subscribers must receive an email notification at least 14 days before the migration effective date, describing the upcoming price or feature change and providing a link to cancel if they do not wish to continue.
+
+---
+
+## 6. Billing Cycle Management
+
+**PVL-029** — The system must support the following billing intervals: monthly, annual, quarterly, semi-annual, and custom (defined as a fixed number of days between 7 and 365). The billing interval is set at the PlanVersion level and applies to all subscriptions on that version.
+
+**PVL-030** — The billing cycle anchor is set at subscription creation as the day of month (or exact date for annual plans) when invoices are generated and payment is collected. The anchor must be respected across all future renewals. For monthly plans created on the 29th, 30th, or 31st, the system must use the last day of the month for months shorter than the anchor day.
+
+---
+
+## 7. Proration Rules
+
+### 7.1 Proration on Upgrade
+
+**PVL-031** — When a subscription upgrades to a higher-priced plan mid-cycle with effective = immediate, the system must calculate proration as follows:
+- Credit for unused time on old plan: `credit = (days_remaining_in_period / total_days_in_period) x old_plan_price`
+- Charge for remaining time on new plan: `charge = (days_remaining_in_period / total_days_in_period) x new_plan_price`
+- Net invoice amount: `net = charge - credit`
+- If net > 0, an invoice is generated and charged immediately.
+- If net <= 0, a credit is applied to the Account's credit balance.
+
+**PVL-032** — Days are calculated using the calendar day boundary in the Account's billing timezone (UTC by default). The day of the plan change counts as a day on the new plan.
+
+### 7.2 Proration on Downgrade
+
+**PVL-033** — When a subscription downgrades to a lower-priced plan mid-cycle with effective = immediate, the system must calculate proration using the same formula as upgrade. The resulting credit is applied to the Account's credit balance and offset against the next invoice. No refund to the payment method is initiated unless the Billing Admin explicitly requests a refund.
+
+**PVL-034** — When a downgrade is scheduled for effective = end_of_period, no proration occurs in the current period. The subscriber pays the full current plan price for the remainder of the period and begins paying the new plan price at the next billing cycle start.
+
+### 7.3 Proration on Cancellation
+
+**PVL-035** — When a subscription is cancelled with effective = immediate and the plan's refund_on_immediate_cancel policy is set to prorated, the system must calculate a prorated refund for the unused portion of the prepaid period and initiate a refund to the payment method used for the most recent invoice payment.
+
+**PVL-036** — When a plan's refund_on_immediate_cancel policy is set to none, no refund is issued on immediate cancellation. The subscriber loses access immediately and no credit or refund is generated.

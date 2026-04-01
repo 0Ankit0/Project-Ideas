@@ -1,23 +1,89 @@
-# Proration
+# Proration Edge Cases — Subscription Billing and Entitlements Platform
 
-## Scenario
-Mid-cycle upgrades, downgrades, and billing alignment.
+## Introduction
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+Proration is the process of calculating the partial billing amount owed when a customer changes their subscription plan mid-billing cycle. When a customer upgrades from a $50/month plan to a $100/month plan on day 15 of a 30-day cycle, they should receive a credit of $25 (15 unused days at $50/month) and be charged $50 (15 remaining days at $100/month), resulting in a net additional charge of $25.
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+This arithmetic appears simple, but production billing systems encounter proration in conditions that make the calculation non-trivial: timezone offsets shift the proration cutoff across billing dates; concurrent plan change requests produce race conditions; hybrid plans with both fixed and metered components require component-level proration logic; administrative price changes mid-calculation invalidate in-flight computations; and active trials interact with proration in ways that are ambiguous by design.
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
+Proration errors are among the highest-risk billing failures. They affect every mid-cycle plan change, they compound across large customer cohorts, and they frequently go undetected until a customer disputes their invoice. A systematic approach to detection and recovery is essential.
 
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+**Proration formula used throughout this document:**
+
+```
+proration_credit   = (plan_unit_price / billing_period_days) × days_remaining
+proration_charge   = (new_plan_unit_price / billing_period_days) × days_remaining
+net_proration_diff = proration_charge − proration_credit
+```
+
+Days remaining is calculated from the proration cutoff timestamp to the current period end timestamp, using the customer's contract timezone for the cutoff and UTC for the period boundary.
+
+---
+
+## Failure Mode Table
+
+| Failure Mode | Impact | Detection | Mitigation / Recovery |
+|---|---|---|---|
+| **TZ-1: Timezone edge at midnight UTC vs customer local time for proration cutoff** | Customer is credited or charged for an incorrect number of days. A customer in UTC-8 who changes plans at 11:59 PM local time on day 14 is billed as if they changed on day 15 UTC, losing one full day of credit. Systematic across all customers in negative-offset timezones. | Compare `proration_cutoff_utc` stored in `invoice_line_items` against `customer.billing_timezone` for all proration events. Customers in UTC-5 through UTC-12 who changed plans between midnight UTC and their local midnight should show a 1-day discrepancy in proration credit. Alert: `billing_proration_tz_mismatch_count > 0` per day. | 1. Capture proration cutoff as `customer_local_midnight` at the customer's billing timezone. 2. Store both the UTC timestamp and the local date in `invoice_line_items` for auditability. 3. For affected customers, issue a credit note for the difference (1 day × old plan unit price / billing period days). 4. Deploy timezone-aware proration cutoff logic and regression-test all UTC-offset timezones from UTC-12 to UTC+14. |
+| **TZ-2: Multiple plan changes in same billing period (upgrade then downgrade same day)** | Overlapping proration credits and charges produce an incorrect net balance. If credits are calculated sequentially without accounting for the intermediate state, the customer may receive double credit for the same period. Revenue leakage and customer overcharge both possible depending on implementation order. | Query `subscription_plan_changes` for records where `change_date` matches a prior `change_date` within the same `billing_period_id` and `subscription_id`. Alert: `billing_same_period_multi_change_count > 0`. Log pattern: `event=proration_calculation subscription_id=X changes_in_period=N` where N > 1. | 1. Treat multiple same-period changes as a single net change: calculate proration from the original plan at period start to the final plan at period end, ignoring intermediate states. 2. Void any intermediate proration invoice line items and regenerate. 3. For same-day changes, enforce a minimum change interval of 1 minute via API to prevent ambiguous ordering. 4. Add a `proration_version` field to track recalculations and prevent double-application. |
+| **TZ-3: Plan upgrade on first day of billing cycle (zero days remaining in old period)** | Proration credit for the old plan is zero (no days remaining), but the system may incorrectly generate a $0.00 credit line item or, worse, apply a rounding artifact producing a small negative credit. Also: the new plan should be charged for the full period, not just "days remaining." | Monitor `invoice_line_items` for proration credits with `amount = 0.00` where `days_remaining = 0`. Log pattern: `event=proration_zero_days_remaining subscription_id=X`. Check that new plan charge equals full period price, not prorated. | 1. When `days_remaining = 0`, suppress the proration credit line item entirely — do not emit a $0.00 line. 2. Charge the new plan at full period price. 3. If a $0.00 credit line was already emitted on a finalized invoice, void the line item via credit note adjustment (net effect: $0.00, but removes the noise from the customer's invoice). 4. Add unit test: `proration_days_remaining=0 → no_credit_line_emitted`. |
+| **TZ-4: Plan downgrade on last day of billing cycle (one day remaining)** | Proration charge for the new plan is 1/N of the new plan price (trivially small). The credit for the old plan is (N-1)/N of the old plan price (almost the full amount). If the system incorrectly floors or rounds to zero, the customer receives no credit. If it incorrectly rounds up, the customer receives a full-period credit. | Alert: `invoice_line_items` where `days_remaining = 1` and `proration_credit_amount < expected_credit_tolerance`. Expected credit = `(old_plan_price / billing_period_days) × (billing_period_days - 1)`. Reconciliation job checks same-day downgrades for credit accuracy. | 1. Ensure proration calculation preserves fractional cents before the final rounding step (use 6 decimal places internally, round to 2 at emit time). 2. For 1-day-remaining downgrades, confirm the credit equals `(N-1)/N × old_plan_price` before invoice finalization. 3. Customer communication: for large-credit downgrades (credit > $50), proactively notify the customer of the credit applied to their account. |
+| **TZ-5: Credit card declined during prorated checkout at plan upgrade** | The plan upgrade is initiated, proration is calculated, but the payment fails. If the system transitions the subscription to the new plan before confirming payment, the customer gets the upgraded entitlements without paying. If the system holds the plan change pending payment, the customer is in a degraded state. | Monitor `subscription_state` for records where `plan_id != original_plan_id` and `last_invoice.status = payment_failed`. Alert: `billing_upgrade_payment_failed_entitlement_mismatch_count > 0`. Log: `event=plan_change_payment_failed subscription_id=X new_plan_id=Y`. | 1. Use a two-phase commit pattern: 1a) Calculate proration and create draft invoice, 1b) Attempt payment, 1c) Only on payment success, apply plan change and update entitlements. 2. On payment failure, mark the subscription `upgrade_pending_payment` and present the customer a payment retry UI. 3. Do not grant upgraded entitlements until payment is confirmed. 4. Set a 48-hour window for payment retry on upgrade invoices before reverting to original plan. 5. Alert customer success team for upgrades with failed payment exceeding 24 hours. |
+| **TZ-6: Prorating fixed fee vs metered component differently on hybrid plans** | Hybrid plans contain both a fixed monthly seat fee and a metered usage component. Proration should apply only to the fixed fee — metered charges are billed in arrears based on actual usage. Applying proration to both components charges the customer for future usage that hasn't occurred yet. | Query `invoice_line_items` for hybrid plan upgrades where `line_item_type = 'metered'` and `proration_applied = true`. Alert: `billing_metered_proration_applied_count > 0`. Metered components should never carry a `proration_applied` flag in a forward-looking context. | 1. Enforce component type check before proration: `if component.type == 'metered': skip_proration()`. 2. Void incorrect metered proration line items via credit note. 3. Recalculate invoice with correct logic: fixed component prorated, metered component at $0 until period end (usage will be billed at next cycle). 4. Add integration test: `hybrid_plan_upgrade_proration → metered_component_not_prorated`. |
+| **TZ-7: Annual plan mid-year downgrade proration (large credit amount)** | Annual plan customers who downgrade mid-year may be owed a large credit (up to 6 months of plan price difference). If the credit calculation uses monthly proration logic instead of annual, it underestimates the credit by a factor proportional to the annual discount applied. Also: large credits (> $500) should require finance team approval before issuance. | Compare `credit_note.amount` against manually computed annual proration formula for all annual plan downgrades. Alert: `credit_note_amount > 500 AND subscription.billing_interval = annual AND finance_approval_status = null`. Log: `event=large_proration_credit subscription_id=X amount=Y`. | 1. Annual plan proration formula: `credit = (annual_price / 365) × days_remaining_in_year`. Do not divide by 30 then multiply by 12. 2. Route credit notes > $500 to a finance approval queue before emitting to customer. 3. For unapproved large credits, put subscription in `downgrade_pending_approval` state — do not apply downgrade until credit is approved. 4. Send customer an email: "Your downgrade is being processed. Your account credit will be applied within 2 business days." |
+| **TZ-8: Currency rounding errors in proration calculation (sub-cent amounts)** | Proration for low-price plans or short proration windows produces sub-cent amounts that must be rounded. Accumulation of rounding errors across a large customer cohort can produce a systematic reconciliation discrepancy between the billing system's ledger and the payment gateway's settlement. | Run monthly reconciliation: sum of all proration credit amounts in billing DB vs sum of credit adjustments processed by payment gateway. Alert if delta > $0.50 per 1,000 customers. Log: `event=proration_rounding_applied subscription_id=X raw_amount=X.XXXXX rounded_amount=X.XX`. | 1. Use "round half to even" (banker's rounding) consistently for all proration calculations. 2. Store raw (6 decimal) amount and rounded (2 decimal) amount separately in `invoice_line_items`. 3. Apply rounding only once — at emit time — never during intermediate calculation steps. 4. Monthly reconciliation job: compare sum of rounding adjustments against acceptable tolerance (< 0.01% of total proration volume). Flag accounts for manual review if individual rounding delta > $0.10. |
+| **TZ-9: Plan price changed by admin while proration calculation in flight** | An administrator updates a plan's unit price (e.g., correcting a pricing error) at the same moment a customer initiates a plan change. The proration calculation begins with the old price, and between the calculation and invoice finalization, the price changes. The finalized invoice reflects an incorrect proration amount. | Use optimistic locking on `plan.version` at proration calculation start. At invoice finalization, re-fetch `plan.version` and compare. If changed, invalidate the draft invoice and recalculate. Alert: `billing_proration_plan_version_conflict_count > 0`. | 1. Implement optimistic locking: read `plan.price_version` at calculation start, pass it as a precondition to invoice finalization. If `plan.price_version` has changed at finalization time, abort and retry. 2. Admin price change UI: display a warning if subscriptions are actively undergoing plan changes for the plan being edited. 3. For any invoice finalized with a stale price: void and reissue with correct calculation. 4. Notify customer of reissued invoice with explanation. |
+| **TZ-10: Proration on plan with trial active (should trial days be prorated?)** | When a customer upgrades during a free trial, the proration window overlaps with the trial window. Charging proration on trial days effectively ends the trial early. Giving full trial credit while also charging for the new plan from trial start causes a revenue loss. The correct behavior depends on business policy, but the billing engine must enforce one behavior consistently. | Query `subscription_plan_changes` joined with `subscriptions` where `trial_end_date > change_date`. Alert: `billing_trial_active_plan_change_count > 0`. For each such record, verify proration handling matches configured trial policy. | 1. Define trial policy explicitly: Option A — Trial freezes on upgrade; customer is billed from trial end date for new plan (no proration during trial). Option B — Trial converts immediately; proration starts from change date. 2. Enforce the configured policy in proration engine. 3. Emit `event=plan_change_during_trial policy=A|B` for audit. 4. Customer communication: if trial is shortened by upgrade, send a clear email explaining the new billing start date. 5. Never silently prorate a trial without the customer's awareness. |
+| **TZ-11: Concurrent plan change requests from API and admin console** | A customer submits a plan change via the self-service API at the same time a customer success agent initiates a plan change via the admin console. Both requests pass initial validation and both are processed, resulting in two proration calculations for the same billing period. The second write wins, but the first may have already generated invoice line items. | Monitor `subscription_plan_changes` for two records with the same `subscription_id` within a 5-second window. Alert: `billing_concurrent_plan_change_detected subscription_id=X`. Log pattern: `event=plan_change_lock_conflict subscription_id=X`. | 1. Acquire a distributed lock (`subscription:{id}:plan_change_lock`, TTL 30 seconds) at the start of any plan change transaction. If lock cannot be acquired, return HTTP 409 Conflict with body: `{"error": "plan_change_in_progress", "retry_after": 5}`. 2. Admin console: display a lock indicator if a plan change is in progress via API. 3. For any duplicate plan changes that slipped through, void the second proration invoice and notify both the API caller and admin with a reconciliation record. |
+| **TZ-12: Proration on plan with included units (baseline usage in pricing)** | Some plans include a baseline allocation of metered units (e.g., "includes 1,000 API calls/month"). When prorating mid-cycle, the included units allocation must also be prorated — a customer who joins on day 15 should have 500 included calls, not 1,000. If the billing engine does not prorate the included units, customers who join late in the cycle can over-consume without being billed for overages. | Query `entitlements` joined with `subscription_plan_changes` where `plan.included_units > 0` and `proration_applied = true`. Verify that `entitlement.allocated_units = plan.included_units × (days_remaining / billing_period_days)`. Alert: `billing_included_units_not_prorated_count > 0`. | 1. Prorate included unit allocation alongside fixed fee proration: `allocated_units = floor(plan.included_units × days_remaining / billing_period_days)`. 2. Update entitlement record at plan change time with prorated allocation. 3. If customer has already consumed units beyond the prorated allocation (edge within edge), bill the overage from the change date forward using the plan's overage rate. 4. Emit `event=entitlement_prorated subscription_id=X allocated=N` for audit. |
+
+---
+
+## Proration Testing Checklist
+
+Use this checklist for pre-release sign-off on any feature that touches proration logic. Each item maps to one or more failure modes in the table above.
+
+### Timezone and Date Boundary Tests
+
+- [ ] Proration cutoff uses customer billing timezone, not UTC server time (TZ-1)
+- [ ] Plan change at 11:59 PM customer local time is not treated as next-day UTC (TZ-1)
+- [ ] Plan change at 00:00 UTC for customer in UTC-8 is not credited an extra day (TZ-1)
+- [ ] All UTC offsets from UTC-12 to UTC+14 are tested with midnight boundary changes (TZ-1)
+
+### Multiple Change Scenarios
+
+- [ ] Two plan changes on the same day produce a single net proration, not two separate prorations (TZ-2)
+- [ ] Proration for upgrade-then-downgrade on same day equals net zero if plans match (TZ-2)
+- [ ] Plan change on billing cycle day 1 produces no credit line item (TZ-3)
+- [ ] Plan change on billing cycle last day produces maximum credit for old plan (TZ-4)
+
+### Payment and Entitlement Sequencing
+
+- [ ] Plan upgrade entitlements are not granted until payment is confirmed (TZ-5)
+- [ ] Failed upgrade payment returns subscription to previous plan state (TZ-5)
+- [ ] Hybrid plan proration applies only to fixed fee components (TZ-6)
+- [ ] Metered usage components are never prorated in a forward-looking context (TZ-6)
+
+### Edge Plan and Pricing Scenarios
+
+- [ ] Annual plan proration uses 365-day formula, not 30×12 (TZ-7)
+- [ ] Large proration credits (> $500) route to finance approval queue (TZ-7)
+- [ ] Proration amounts stored at 6 decimal precision before rounding to 2 (TZ-8)
+- [ ] Rounding uses banker's rounding (round half to even) (TZ-8)
+- [ ] Proration calculation detects and rejects stale plan price via optimistic locking (TZ-9)
+
+### Trial and Concurrent Change Scenarios
+
+- [ ] Plan change during active trial follows configured trial policy (A or B), not default behavior (TZ-10)
+- [ ] Customer receives email if trial is shortened by a plan upgrade (TZ-10)
+- [ ] Concurrent plan change from API and admin console produces HTTP 409, not two invoices (TZ-11)
+- [ ] Distributed lock is acquired before plan change and released on success or failure (TZ-11)
+- [ ] Included unit allocation is prorated when plan includes baseline units (TZ-12)
+- [ ] Customer cannot over-consume prorated included units without triggering overage billing (TZ-12)
+
+### Reconciliation and Auditability
+
+- [ ] All proration events emit structured logs with `subscription_id`, `old_plan_id`, `new_plan_id`, `days_remaining`, `credit_amount`, `charge_amount`
+- [ ] Monthly reconciliation job compares proration ledger against payment gateway credits
+- [ ] Finance team receives alert for any proration credit > $200 within 1 hour of issuance
+- [ ] Proration calculation errors increment `billing_proration_calculation_errors_total` counter
