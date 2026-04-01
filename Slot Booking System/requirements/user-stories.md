@@ -1,541 +1,288 @@
-# User Stories - Slot Booking System
+# User Stories — Slot Booking System
 
-> **Platform Independence Notice**: Stories use generic terminology. 
-> - **Resource** → Futsal Court, Room, Station, etc.
-> - **Provider** → Venue Owner, Facility Manager, etc.
+> **Version:** 2.0.0 | **Format:** As a [persona], I want [goal], so that [value]
 
 ---
 
 ## User Personas
 
-| Persona | Description | Goals |
-|---------|-------------|-------|
-| **Guest** | Unregistered visitor | Browse resources, view availability |
-| **User** | Registered customer | Book slots, manage bookings |
-| **Provider** | Resource owner/manager | List resources, manage bookings, earnings |
-| **Admin** | Platform administrator | System config, user management, analytics |
+| Persona | Description | Primary Goals |
+|---------|-------------|---------------|
+| **Guest** | Unauthenticated visitor browsing the platform | Discover resources, check availability, understand pricing |
+| **Customer** | Registered end-user making reservations | Book slots, manage reservations, track payment history |
+| **Corporate User** | Employee on a corporate account | Book on behalf of company, use corporate quota |
+| **Staff** | Venue employee (instructor, receptionist) | View assigned schedule, check in customers |
+| **Venue Admin** | Owner or manager of a venue | Configure resources, manage schedules, view revenue |
+| **Corporate Admin** | Company account manager | Manage quota, approve excess bookings, view team usage |
+| **Platform Admin** | System operator | Configure system rules, handle overrides, view analytics |
 
 ---
 
-## Epic 1: User Registration & Authentication
+## Epic 1: Account Management
 
-### US-1.1: User Registration
+### US-1.1 — Customer Registration
 **As a** guest  
-**I want to** create an account with my email or phone  
-**So that** I can book slots and track my reservations
+**I want to** create an account with my email or mobile number  
+**So that** I can make bookings and receive confirmation notifications
 
 **Acceptance Criteria:**
-- [ ] Guest can register with email + password
-- [ ] Guest can register with phone + OTP
-- [ ] Email verification is required before booking
-- [ ] Password meets security requirements (8+ chars, mixed case, number)
-- [ ] Duplicate email/phone is rejected with clear message
+- Guest registers with email + password (min 10 characters, one uppercase, one digit)
+- Guest registers with mobile + OTP (6-digit, valid for 10 minutes)
+- Duplicate email or phone rejected with `DUPLICATE_ACCOUNT` error
+- Email verification link sent immediately; valid for 24 hours
+- Account inactive until email verified
 
 ---
 
-### US-1.2: Social Login
+### US-1.2 — Social Login
 **As a** guest  
-**I want to** sign up using my Google/Facebook/Apple account  
-**So that** I can register quickly without creating new credentials
+**I want to** sign in with my Google or Apple account  
+**So that** I can register without managing additional credentials
 
 **Acceptance Criteria:**
-- [ ] OAuth buttons displayed on registration page
-- [ ] Profile info pre-filled from social account
-- [ ] Account linked if email already exists
-- [ ] Privacy consent shown before social login
+- OAuth 2.0 PKCE flow for Google and Apple
+- If email already exists, accounts are merged and customer is notified
+- Profile fields pre-populated from OAuth provider
+- Privacy consent captured before first social login
 
 ---
 
-### US-1.3: User Login
-**As a** registered user  
-**I want to** log in to my account  
-**So that** I can access my bookings and profile
+### US-1.3 — Profile Management
+**As a** customer  
+**I want to** manage my profile, notification preferences, and payment methods  
+**So that** my bookings are personalised and payment is frictionless
 
 **Acceptance Criteria:**
-- [ ] Login with email/phone + password
-- [ ] Login with social accounts
-- [ ] "Remember me" option persists session
-- [ ] Failed login shows generic error (security)
-- [ ] Account lockout after 5 failed attempts
-
----
-
-### US-1.4: Password Reset
-**As a** user who forgot my password  
-**I want to** reset my password via email  
-**So that** I can regain access to my account
-
-**Acceptance Criteria:**
-- [ ] Reset link sent to registered email
-- [ ] Link expires after 1 hour
-- [ ] User must set new password meeting requirements
-- [ ] All sessions invalidated after reset
+- Customer can update name, phone, and address
+- Customer can set notification channel preferences (email/SMS/push) per event type
+- Customer can view saved payment methods (token only; no PAN stored)
+- Customer can view their no-show count and account flag status
 
 ---
 
 ## Epic 2: Resource Discovery
 
-### US-2.1: Browse Resources
-**As a** user  
-**I want to** browse available resources by category and location  
-**So that** I can find what I'm looking for
+### US-2.1 — Search Resources
+**As a** guest  
+**I want to** search for bookable resources by location, type, date, and price  
+**So that** I can find the most suitable option for my needs
 
 **Acceptance Criteria:**
-- [ ] Resources displayed in list/grid view
-- [ ] Filter by category, location, price range
-- [ ] Sort by price, rating, distance
-- [ ] Pagination/infinite scroll for large results
-- [ ] Resource cards show image, name, rating, price
+- Search by city, venue, resource type, date, time window, and price range
+- Results sorted by relevance (default), price, and distance
+- Each result shows resource name, venue, next available slot, and starting price
+- Filters: amenities, capacity, indoor/outdoor, rating
+- Results load in < 300 ms (p95)
 
 ---
 
-### US-2.2: Search Resources
-**As a** user  
-**I want to** search for resources by name or keyword  
-**So that** I can quickly find specific resources
+### US-2.2 — View Resource Detail
+**As a** guest  
+**I want to** see detailed information about a resource including photos and availability  
+**So that** I can make an informed booking decision
 
 **Acceptance Criteria:**
-- [ ] Search bar prominently displayed
-- [ ] Auto-suggest as user types
-- [ ] Search by name, description, amenities
-- [ ] Recent searches saved
-- [ ] "No results" shows suggestions
+- Resource page shows description, photos (up to 10), amenities, rules, and cancellation policy
+- Interactive availability calendar showing available, booked, and blocked slots by day
+- Pricing breakdown by time-of-day and day-of-week
+- Customer reviews and aggregate rating displayed
 
 ---
 
-### US-2.3: View Resource Details
-**As a** user  
-**I want to** view detailed information about a resource  
-**So that** I can decide whether to book it
+### US-2.3 — View Real-Time Availability
+**As a** customer  
+**I want to** see which specific time slots are available for a resource on a selected date  
+**So that** I can choose a time that fits my schedule
 
 **Acceptance Criteria:**
-- [ ] Photo gallery (multiple images)
-- [ ] Description and amenities list
-- [ ] Location with map
-- [ ] Operating hours
-- [ ] Pricing information
-- [ ] Reviews and ratings
-- [ ] Availability calendar preview
-
----
-
-### US-2.4: View Availability
-**As a** user  
-**I want to** see available time slots for a specific date  
-**So that** I can choose when to book
-
-**Acceptance Criteria:**
-- [ ] Calendar date picker
-- [ ] Available slots shown with times
-- [ ] Unavailable slots grayed out
-- [ ] Price shown per slot
-- [ ] Real-time availability updates
+- Availability grid shows 30-minute (or configured) increments from venue opening to closing
+- Slot states shown: AVAILABLE (green), BOOKED (grey), BLOCKED (red), WAITLIST_ONLY (amber)
+- Availability refreshes in real-time when another user books or cancels
+- Timezone displayed in venue local time with UTC offset shown
 
 ---
 
 ## Epic 3: Booking Management
 
-### US-3.1: Book a Slot
-**As a** user  
-**I want to** book an available slot  
-**So that** I can reserve the resource for my use
+### US-3.1 — Create a Booking
+**As a** customer  
+**I want to** reserve an available slot and pay online  
+**So that** my time is guaranteed at the chosen resource
 
 **Acceptance Criteria:**
-- [ ] Select date and time slot
-- [ ] Review booking summary (resource, time, price)
-- [ ] Add optional notes
-- [ ] Proceed to payment
-- [ ] Confirmation displayed after payment
-- [ ] Confirmation email/notification sent
+- Customer selects resource, date, and time slot
+- System validates advance booking window (BR-01); rejects with `BOOKING_WINDOW_VIOLATION` if outside
+- System locks slot for 10 minutes during checkout to prevent concurrent booking
+- Customer enters or selects saved payment method
+- On successful payment capture, booking status moves to `CONFIRMED`
+- Confirmation email and SMS sent within 30 seconds
 
 ---
 
-### US-3.2: Book Multiple Slots
-**As a** user  
-**I want to** book multiple consecutive slots in one transaction  
-**So that** I can reserve extended time
+### US-3.2 — Book Multiple Consecutive Slots
+**As a** customer  
+**I want to** book a 2-hour session across two 60-minute slots in a single transaction  
+**So that** I am charged correctly and do not risk losing one of the slots
 
 **Acceptance Criteria:**
-- [ ] Select multiple adjacent slots
-- [ ] Total price calculated correctly
-- [ ] Discount for extended booking (if applicable)
-- [ ] Single payment for all slots
+- Customer selects a start slot and desired total duration
+- System automatically selects consecutive available slots for the resource
+- All slots reserved atomically; if any slot is unavailable, the request fails
+- Single `Booking` record created with two `BookingItem` records
+- Combined price shown at checkout
 
 ---
 
-### US-3.3: View My Bookings
-**As a** user  
-**I want to** view my upcoming and past bookings  
-**So that** I can manage my schedule
+### US-3.3 — Set Up Recurring Booking
+**As a** customer  
+**I want to** book a weekly tennis court session every Saturday at 9 AM for 3 months  
+**So that** I have a guaranteed regular slot without rebooking each week
 
 **Acceptance Criteria:**
-- [ ] Tabs for upcoming/past bookings
-- [ ] Booking cards show resource, date, time, status
-- [ ] Quick actions (cancel, reschedule, view details)
-- [ ] Calendar view option
-- [ ] Download/share booking confirmation
+- Customer configures cadence (WEEKLY), day (Saturday), time (09:00), duration (60 min), and end date
+- System validates all occurrences against BR-02 and BR-06 before confirming the series
+- Conflicting occurrences identified and returned; entire series rejected if any occurrence conflicts
+- Series stored as a `RecurringRule` linked to individual `Booking` records
+- Customer can cancel individual occurrences or the entire series
+- Payment collected per occurrence on the day of the booking (or all upfront — configurable)
 
 ---
 
-### US-3.4: Cancel Booking
-**As a** user  
-**I want to** cancel my booking  
-**So that** I can free up the slot if plans change
+### US-3.4 — Cancel a Booking
+**As a** customer  
+**I want to** cancel a confirmed booking  
+**So that** I can free up the slot and receive any applicable refund
 
 **Acceptance Criteria:**
-- [ ] Cancel button on booking details
-- [ ] Cancellation policy clearly displayed
-- [ ] Refund amount shown before confirmation
-- [ ] Confirmation required before cancellation
-- [ ] Refund processed per policy
-- [ ] Cancellation notification sent
+- Customer cancels via booking detail page or mobile app
+- System computes refund amount per BR-03 (100% if > 24h; 50% if ≤ 24h; 0% for no-show)
+- Refund amount and any penalty clearly shown before confirmation
+- Cancellation confirmation email sent with refund ETA (3–5 business days)
+- Slot released to availability and waitlist promotion triggered (BR-05)
 
 ---
 
-### US-3.5: Reschedule Booking
-**As a** user  
-**I want to** reschedule my booking to a different time  
-**So that** I can adjust to schedule changes
+### US-3.5 — Reschedule a Booking
+**As a** customer  
+**I want to** move my confirmed booking to a different available slot  
+**So that** I don't lose my booking when my schedule changes
 
 **Acceptance Criteria:**
-- [ ] Reschedule option on booking details
-- [ ] Show available alternative slots
-- [ ] Price difference handled (pay more or partial refund)
-- [ ] Original slot freed immediately
-- [ ] New confirmation sent
+- Customer selects "Reschedule" on a confirmed booking
+- Availability picker shows valid slots within the same resource
+- If new slot is cheaper: partial refund issued; if more expensive: additional charge collected
+- Old slot released; new slot reserved atomically
+- Confirmation email sent for new booking time
 
 ---
 
-### US-3.6: Recurring Booking
-**As a** user  
-**I want to** set up a recurring booking (weekly/monthly)  
-**So that** I don't have to book the same slot repeatedly
+### US-3.6 — Join Waitlist
+**As a** customer  
+**I want to** join the waitlist for a fully-booked slot  
+**So that** I automatically get a booking if someone cancels
 
 **Acceptance Criteria:**
-- [ ] Recurring option during booking
-- [ ] Set frequency (daily, weekly, monthly)
-- [ ] Set end date or number of occurrences
-- [ ] View all recurring instances
-- [ ] Cancel single instance or entire series
+- "Join Waitlist" button visible on `WAITLIST_ONLY` or `BOOKED` slots
+- Customer sees current queue position
+- On promotion (BR-05), customer receives push/email/SMS with 30-minute confirmation link
+- If customer does not confirm within 30 minutes, next person in queue is promoted
+- Customer can withdraw from waitlist at any time
 
 ---
 
-## Epic 4: Payment
+## Epic 4: Staff Workflows
 
-### US-4.1: Make Payment
-**As a** user  
-**I want to** pay for my booking securely  
-**So that** my reservation is confirmed
+### US-4.1 — View Daily Schedule
+**As a** staff member  
+**I want to** see my assigned slots for today and tomorrow  
+**So that** I know which customers to expect and when
 
 **Acceptance Criteria:**
-- [ ] Multiple payment methods (card, wallet, UPI)
-- [ ] Secure payment form (PCI compliant)
-- [ ] Order summary with price breakdown
-- [ ] Payment processing indicator
-- [ ] Success/failure feedback
-- [ ] Receipt emailed
+- Staff dashboard shows chronological list of assigned slots
+- Each slot shows customer name, contact, booking details, and special notes
+- Status indicators: upcoming, in-progress, completed, no-show
+- Mobile-optimised view
 
 ---
 
-### US-4.2: Apply Promo Code
-**As a** user  
-**I want to** apply a promotional code  
-**So that** I can get a discount on my booking
+### US-4.2 — Check In Customer
+**As a** staff member  
+**I want to** mark a customer as checked in when they arrive  
+**So that** the system records attendance and prevents a no-show being recorded
 
 **Acceptance Criteria:**
-- [ ] Promo code input field
-- [ ] Validation with clear error messages
-- [ ] Discount applied and shown in summary
-- [ ] Code restrictions enforced (min amount, dates)
+- Staff taps "Check In" on a confirmed booking
+- Booking status moves to `CHECKED_IN`
+- No-show background job skips `CHECKED_IN` bookings (BR-09)
+- Check-in timestamp recorded; visible to venue admin
 
 ---
 
-### US-4.3: View Payment History
-**As a** user  
-**I want to** view my payment history  
-**So that** I can track my expenses
+## Epic 5: Venue Administration
+
+### US-5.1 — Create Resource and Schedule
+**As a** venue admin  
+**I want to** configure a new tennis court with its schedule and pricing  
+**So that** customers can start discovering and booking it
 
 **Acceptance Criteria:**
-- [ ] List of all transactions
-- [ ] Transaction details (amount, date, status)
-- [ ] Download invoice/receipt
-- [ ] Filter by date range
+- Venue admin creates a `ResourceType` (if not existing) with duration rules and overbooking settings
+- Creates a `Resource` with name, capacity, amenities, and images
+- Creates a `Schedule` defining operating hours and days
+- Creates `SlotTemplate` records for peak and off-peak pricing
+- System auto-generates slots on the rolling 90-day horizon
 
 ---
 
-## Epic 5: Notifications
-
-### US-5.1: Booking Reminders
-**As a** user  
-**I want to** receive reminders before my booking  
-**So that** I don't forget my appointments
+### US-5.2 — Apply a Block Rule
+**As a** venue admin  
+**I want to** block bookings on Court A on 2024-12-25 for annual maintenance  
+**So that** no customer can make a booking on that day
 
 **Acceptance Criteria:**
-- [ ] Reminder 24 hours before
-- [ ] Reminder 1 hour before
-- [ ] Push notification and email
-- [ ] Reminder includes booking details and location
+- Venue admin creates a `BlockRule` with start/end time, resource scope, and reason
+- Existing confirmed bookings in the block window are listed for review
+- Admin can choose to cancel affected bookings with full refund and notification
+- Blocked periods shown in the availability calendar as unavailable
 
 ---
 
-### US-5.2: Notification Preferences
-**As a** user  
-**I want to** manage my notification settings  
-**So that** I only receive relevant notifications
+### US-5.3 — View Occupancy Reports
+**As a** venue admin  
+**I want to** see weekly occupancy rates and revenue by resource  
+**So that** I can identify peak hours and optimise pricing
 
 **Acceptance Criteria:**
-- [ ] Toggle for each notification type
-- [ ] Choose channel (email, push, SMS)
-- [ ] Set quiet hours
-- [ ] Save preferences
+- Report shows occupancy percentage per resource per hour of day
+- Revenue breakdown by resource, payment method, and booking channel
+- No-show and cancellation rates per resource
+- Date range filter (up to 12 months); exportable to CSV
 
 ---
 
-## Epic 6: Reviews & Ratings
+## Epic 6: Platform Administration
 
-### US-6.1: Rate and Review
-**As a** user who completed a booking  
-**I want to** rate and review the resource  
-**So that** I can share my experience with others
+### US-6.1 — Apply Manual Override
+**As a** platform admin  
+**I want to** override the advance booking window rule for a VIP customer  
+**So that** I can honour a last-minute executive request
 
 **Acceptance Criteria:**
-- [ ] Rating prompt after booking completion
-- [ ] 1-5 star rating
-- [ ] Optional text review
-- [ ] Photo upload option
-- [ ] Review visible on resource page
+- Admin calls `POST /admin/overrides` with `booking_id`, `rule_id`, `reason`, and `approver_id`
+- Override is recorded in `AuditEvent` with full detail
+- Override applies for a single booking only (single-use)
+- Alert raised if > 5 overrides of the same rule in 30 days
 
 ---
 
-### US-6.2: View Reviews
-**As a** user  
-**I want to** read reviews from other users  
-**So that** I can make informed booking decisions
+### US-6.2 — Declare Force Majeure
+**As a** platform admin  
+**I want to** declare a force majeure event affecting all bookings at a flooded venue  
+**So that** affected customers are automatically refunded and notified
 
 **Acceptance Criteria:**
-- [ ] Reviews displayed on resource page
-- [ ] Average rating shown prominently
-- [ ] Sort by recent, highest, lowest
-- [ ] Provider responses visible
-- [ ] Mark reviews as helpful
-
----
-
-## Epic 7: Provider Management
-
-### US-7.1: Provider Registration
-**As a** resource owner  
-**I want to** register as a provider  
-**So that** I can list my resources on the platform
-
-**Acceptance Criteria:**
-- [ ] Provider registration form
-- [ ] Business verification process
-- [ ] Bank account for payouts
-- [ ] Terms acceptance required
-- [ ] Admin approval workflow
-
----
-
-### US-7.2: Add Resource
-**As a** provider  
-**I want to** add my resources to the platform  
-**So that** users can book them
-
-**Acceptance Criteria:**
-- [ ] Resource creation form
-- [ ] Upload multiple images
-- [ ] Set description and amenities
-- [ ] Set location with map picker
-- [ ] Define pricing rules
-- [ ] Set availability schedule
-
----
-
-### US-7.3: Manage Availability
-**As a** provider  
-**I want to** set and update my resource availability  
-**So that** slots are only shown when the resource is available
-
-**Acceptance Criteria:**
-- [ ] Weekly schedule template
-- [ ] Override specific dates
-- [ ] Block time for maintenance
-- [ ] Holiday schedule
-- [ ] Bulk availability updates
-
----
-
-### US-7.4: View Bookings Calendar
-**As a** provider  
-**I want to** see all my bookings in a calendar view  
-**So that** I can manage my schedule
-
-**Acceptance Criteria:**
-- [ ] Day/week/month calendar views
-- [ ] All resources in single view (color-coded)
-- [ ] Click booking for details
-- [ ] Quick actions (cancel, contact user)
-- [ ] Export calendar (iCal)
-
----
-
-### US-7.5: View Earnings
-**As a** provider  
-**I want to** view my earnings and payouts  
-**So that** I can track my revenue
-
-**Acceptance Criteria:**
-- [ ] Earnings dashboard
-- [ ] Breakdown by resource
-- [ ] Pending vs completed payouts
-- [ ] Transaction history
-- [ ] Download statements
-
----
-
-### US-7.6: Respond to Reviews
-**As a** provider  
-**I want to** respond to user reviews  
-**So that** I can address feedback publicly
-
-**Acceptance Criteria:**
-- [ ] Reply option on each review
-- [ ] One response per review
-- [ ] Response visible to all users
-- [ ] Notification when new review received
-
----
-
-## Epic 8: Admin Management
-
-### US-8.1: User Management
-**As an** admin  
-**I want to** manage user accounts  
-**So that** I can maintain platform integrity
-
-**Acceptance Criteria:**
-- [ ] View all users with filters
-- [ ] Suspend/activate accounts
-- [ ] View user activity history
-- [ ] Reset user passwords
-- [ ] Delete accounts (GDPR)
-
----
-
-### US-8.2: Provider Approval
-**As an** admin  
-**I want to** review and approve provider applications  
-**So that** only legitimate providers are on the platform
-
-**Acceptance Criteria:**
-- [ ] Queue of pending applications
-- [ ] View verification documents
-- [ ] Approve/reject with notes
-- [ ] Notification to provider
-
----
-
-### US-8.3: Platform Analytics
-**As an** admin  
-**I want to** view platform-wide analytics  
-**So that** I can monitor business performance
-
-**Acceptance Criteria:**
-- [ ] Dashboard with KPIs
-- [ ] Bookings over time
-- [ ] Revenue metrics
-- [ ] User growth
-- [ ] Top resources/providers
-- [ ] Export reports
-
----
-
-### US-8.4: Handle Disputes
-**As an** admin  
-**I want to** manage booking disputes  
-**So that** I can resolve user/provider conflicts
-
-**Acceptance Criteria:**
-- [ ] View reported disputes
-- [ ] Communication with both parties
-- [ ] Issue full/partial refunds
-- [ ] Apply penalties to violators
-- [ ] Resolution documentation
-
----
-
-## Story Map Summary
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              USER JOURNEY                                    │
-├─────────────┬─────────────┬─────────────┬─────────────┬─────────────────────┤
-│   DISCOVER  │    BOOK     │     PAY     │    USE      │      REVIEW         │
-├─────────────┼─────────────┼─────────────┼─────────────┼─────────────────────┤
-│ US-2.1      │ US-3.1      │ US-4.1      │ US-5.1      │ US-6.1              │
-│ Browse      │ Book Slot   │ Make Payment│ Reminders   │ Rate & Review       │
-├─────────────┼─────────────┼─────────────┼─────────────┼─────────────────────┤
-│ US-2.2      │ US-3.2      │ US-4.2      │ US-5.2      │ US-6.2              │
-│ Search      │ Multi-Slot  │ Promo Code  │ Preferences │ View Reviews        │
-├─────────────┼─────────────┼─────────────┼─────────────┼─────────────────────┤
-│ US-2.3      │ US-3.3      │ US-4.3      │             │                     │
-│ View Details│ My Bookings │ Pay History │             │                     │
-├─────────────┼─────────────┼─────────────┼─────────────┼─────────────────────┤
-│ US-2.4      │ US-3.4      │             │             │                     │
-│ Availability│ Cancel      │             │             │                     │
-├─────────────┼─────────────┼─────────────┼─────────────┼─────────────────────┤
-│             │ US-3.5      │             │             │                     │
-│             │ Reschedule  │             │             │                     │
-├─────────────┼─────────────┼─────────────┼─────────────┼─────────────────────┤
-│             │ US-3.6      │             │             │                     │
-│             │ Recurring   │             │             │                     │
-└─────────────┴─────────────┴─────────────┴─────────────┴─────────────────────┘
-```
-
----
-
-## Priority Matrix (MoSCoW)
-
-| Must Have | Should Have | Could Have | Won't Have (v1) |
-|-----------|-------------|------------|-----------------|
-| US-1.1, 1.3, 1.4 | US-1.2 | US-3.6 | Social features |
-| US-2.1, 2.3, 2.4 | US-2.2 | US-6.2 | Live chat |
-| US-3.1, 3.3, 3.4 | US-3.2, 3.5 | US-4.2 | Marketplace |
-| US-4.1 | US-4.3 | | |
-| US-5.1 | US-5.2 | | |
-| US-7.1, 7.2, 7.3, 7.4, 7.5 | US-7.6 | | |
-| US-8.1, 8.2, 8.3 | US-8.4 | | |
-
----
-## Implementation-Ready User Stories
-
-### Slot allocation rules in this document's context
-- Allocation decisions must be based on **resource calendar + operational policy + channel limits** before any payment action is attempted.
-- All provisional allocations require an explicit **hold record with expiry**, and expiry must be visible to clients.
-- Shared-capacity resources must use atomic decrement semantics; exclusive resources must enforce single-active-booking constraints.
-
-### Conflict resolution in this document's context
-- Competing writes must use deterministic conflict handling (optimistic version checks or transactional locks as documented here).
-- API and admin paths must converge on one canonical conflict reason taxonomy (`SLOT_TAKEN`, `STALE_VERSION`, `PROVIDER_BLOCKED`, `PAYMENT_STATE_MISMATCH`).
-- Every conflict rejection must emit structured audit telemetry including actor, correlation ID, and rule version.
-
-### Payment coupling / decoupling behavior
-- **Coupled flow**: booking moves to confirmed only after successful authorization/capture.
-- **Decoupled flow**: booking can be confirmed with `PAYMENT_PENDING`, but with a bounded grace window and auto-cancel guardrail.
-- Compensation is mandatory for split-brain outcomes (payment succeeded but booking failed, or inverse).
-
-### Cancellation and refund policy detail
-- Refund outcomes depend on lead time, policy tier, no-show status, and jurisdiction-specific fee constraints.
-- Refund processing must be idempotent and expose lifecycle states (`REQUESTED`, `INITIATED`, `SETTLED`, `FAILED`, `MANUAL_REVIEW`).
-- Cancellation side effects must include slot reallocation and downstream notification consistency.
-
-### Observability and incident playbook focus
-- Monitor: availability latency, hold expiry lag, conflict rate, payment callback success, refund aging.
-- Alerts must map to operator runbooks with first-response steps and data reconciliation queries.
-- Post-incident review must record policy gaps and required control changes for this documentation area.
-
-### Requirements-level acceptance depth
-- Define mandatory API contracts for idempotency, conflict reason codes, and deterministic retry semantics.
-- Specify legal/compliance constraints for fees, taxes, and refund timelines by market.
-- Capture explicit non-functional targets (throughput, p95 latency, reconciliation SLA, RTO/RPO).
+- Admin triggers force-majeure declaration for a venue and date range via admin console
+- All confirmed bookings in scope cancelled with `FORCE_MAJEURE` reason
+- Full refunds issued regardless of cancellation policy
+- Mass notification sent to affected customers within 15 minutes
+- Affected no-shows excluded from BR-09 rolling count

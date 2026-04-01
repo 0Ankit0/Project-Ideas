@@ -1,35 +1,40 @@
-# Requirements Document - Slot Booking System
+# Requirements Document — Slot Booking System
 
-> **Platform Independence Notice**: This document uses generic terminology. Replace domain-specific terms as needed:
-> - **Resource** → Futsal Court, Conference Room, Tennis Court, Salon Station, etc.
-> - **Slot** → Time block for booking
-> - **Provider** → Venue Owner, Facility Manager, Service Provider
+> **Version:** 2.0.0 | **Status:** Approved | **Last Updated:** 2024-01-01
 
 ---
 
 ## 1. Project Overview
 
 ### 1.1 Purpose
-A generic, extensible slot booking system that enables users to discover, book, and manage time-based reservations for various resources. The system supports multiple booking domains with minimal configuration changes.
+
+The Slot Booking System provides a production-grade, multi-domain reservation engine enabling customers to discover, reserve, and pay for time-bounded access to any bookable resource — sports courts, meeting rooms, medical appointments, salon chairs, recording studios, parking bays, and event venues — through a unified platform.
 
 ### 1.2 Scope
+
 | In Scope | Out of Scope |
 |----------|--------------|
-| User registration & authentication | Hardware integrations (turnstiles, locks) |
-| Resource & slot management | Real-time video streaming |
-| Booking lifecycle management | Inventory management |
-| Payment processing integration | Social networking features |
-| Notifications & reminders | |
-| Reporting & analytics | |
+| Resource and venue configuration | Hardware access control (smart locks, turnstiles) |
+| Slot generation and availability management | Live video streaming of sessions |
+| Online booking with payment capture | Physical inventory management |
+| Recurring booking series management | Social networking or community features |
+| Waitlist management and auto-promotion | In-app video consultation |
+| Cancellation, refund, and penalty policies | Travel and accommodation booking |
+| Staff scheduling and slot assignment | Third-party marketplace aggregation |
+| Corporate quota and bulk booking | Loyalty point programmes |
+| SMS, email, and push notifications | |
+| Admin override and manual booking | |
+| Occupancy reporting and revenue analytics | |
 
-### 1.3 Domain Adaptability Matrix
+### 1.3 Stakeholders
 
-| Feature | Futsal | Events | Appointments | Coworking |
-|---------|--------|--------|--------------|-----------|
-| Resource | Court | Venue | Professional | Desk/Room |
-| Slot Duration | 1-2 hours | Variable | 15-60 min | Hourly/Daily |
-| Capacity | Teams | Attendees | 1:1 | Seats |
-| Recurring | Weekly leagues | Series | Yes | Memberships |
+| Role | Responsibilities |
+|------|----------------|
+| **Customer** | Discover resources, make bookings, manage reservations, receive notifications |
+| **Venue Admin** | Manage resources, schedules, pricing, and staff; view reports |
+| **Staff** | View assigned slots, check in customers, mark attendance |
+| **Corporate Admin** | Manage corporate account, approve excess bookings, view team usage |
+| **Platform Admin** | System configuration, override approvals, compliance, analytics |
 
 ---
 
@@ -37,91 +42,106 @@ A generic, extensible slot booking system that enables users to discover, book, 
 
 ### 2.1 User Management
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-UM-001 | System shall allow users to register with email/phone | Must Have |
-| FR-UM-002 | System shall support social login (Google, Facebook, Apple) | Should Have |
-| FR-UM-003 | System shall maintain user profiles with contact & preferences | Must Have |
-| FR-UM-004 | System shall support role-based access (Guest, User, Provider, Admin) | Must Have |
-| FR-UM-005 | System shall allow password reset via email/SMS | Must Have |
-| FR-UM-006 | System shall support two-factor authentication | Could Have |
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-UM-001 | System shall allow customers to register with email + password or phone + OTP | Must Have | Password min 10 chars, bcrypt hashing |
+| FR-UM-002 | System shall support OAuth 2.0 social login via Google, Apple, and Facebook | Should Have | PKCE flow required |
+| FR-UM-003 | System shall maintain customer profiles with contact details, preferences, and booking history | Must Have | |
+| FR-UM-004 | System shall enforce role-based access control: Customer, Staff, Venue Admin, Corporate Admin, Platform Admin | Must Have | JWT claims |
+| FR-UM-005 | System shall support account recovery via email and SMS | Must Have | Token valid 15 minutes |
+| FR-UM-006 | System shall lock accounts after 5 consecutive failed login attempts for 30 minutes | Must Have | |
+| FR-UM-007 | System shall support multi-factor authentication for Venue Admin and Platform Admin roles | Should Have | TOTP (RFC 6238) |
+| FR-UM-008 | System shall track and expose customer no-show count and prepayment-required flag (BR-09) | Must Have | |
 
 ### 2.2 Resource Management
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-RM-001 | Providers shall create resources with name, description, images | Must Have |
-| FR-RM-002 | Resources shall have configurable attributes (capacity, amenities) | Must Have |
-| FR-RM-003 | Resources shall be organized by categories and location | Must Have |
-| FR-RM-004 | System shall support resource availability schedules | Must Have |
-| FR-RM-005 | System shall allow temporary resource blocking (maintenance) | Should Have |
-| FR-RM-006 | Resources shall have pricing rules (peak, off-peak, holidays) | Must Have |
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-RM-001 | Venue admins shall create and manage `ResourceType` templates defining duration rules, pricing, and overbooking settings | Must Have | |
+| FR-RM-002 | Venue admins shall create resources linked to a `ResourceType` with name, capacity, amenities, and images | Must Have | Max 10 images per resource |
+| FR-RM-003 | System shall support resource status lifecycle: `ACTIVE` → `MAINTENANCE` → `ACTIVE` / `DECOMMISSIONED` | Must Have | |
+| FR-RM-004 | System shall allow venue admins to apply `BlockRule` records to prevent bookings during specific time windows | Must Have | |
+| FR-RM-005 | System shall support per-resource pricing overrides for peak hours, weekends, and public holidays | Must Have | Stored in `SlotTemplate` |
+| FR-RM-006 | Customers shall search resources by venue, type, capacity, amenities, date, and price range | Must Have | Elasticsearch-backed |
+| FR-RM-007 | System shall maintain a public-facing resource page with photos, description, availability calendar, and pricing | Must Have | |
 
 ### 2.3 Slot Management
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-SM-001 | System shall generate slots based on resource availability | Must Have |
-| FR-SM-002 | Slots shall have configurable duration (15min - 24hrs) | Must Have |
-| FR-SM-003 | System shall display real-time slot availability | Must Have |
-| FR-SM-004 | System shall support buffer time between slots | Should Have |
-| FR-SM-005 | System shall handle timezone conversions | Must Have |
-| FR-SM-006 | System shall support recurring slot patterns | Should Have |
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-SM-001 | System shall auto-generate slots from `SlotTemplate` and `Schedule` on a configurable rolling horizon (default 90 days) | Must Have | Background job |
+| FR-SM-002 | Slot durations must be multiples of `ResourceType.min_duration_minutes` (BR-04) | Must Have | |
+| FR-SM-003 | System shall expose a real-time availability grid per resource, queryable by date range | Must Have | Redis-cached; 60-second TTL |
+| FR-SM-004 | System shall support buffer time between consecutive slots to allow turnaround/cleaning | Should Have | Configurable per `ResourceType` |
+| FR-SM-005 | All slot timestamps must be stored in UTC and converted to venue local time for display | Must Have | IANA timezone |
+| FR-SM-006 | Venue admins shall manually create one-off slots outside the template schedule | Should Have | |
+| FR-SM-007 | System shall transition slot status automatically: `AVAILABLE` → `BOOKED` → `AVAILABLE` (on cancellation) | Must Have | |
 
 ### 2.4 Booking Management
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-BM-001 | Users shall search available slots by date, time, location | Must Have |
-| FR-BM-002 | Users shall book available slots with confirmation | Must Have |
-| FR-BM-003 | System shall prevent double-booking (race condition handling) | Must Have |
-| FR-BM-004 | Users shall view booking history and upcoming bookings | Must Have |
-| FR-BM-005 | Users shall cancel bookings per cancellation policy | Must Have |
-| FR-BM-006 | Users shall reschedule bookings to available slots | Should Have |
-| FR-BM-007 | System shall support group/multi-slot bookings | Should Have |
-| FR-BM-008 | System shall maintain waitlist for full slots | Could Have |
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-BM-001 | Customers shall book available slots within the advance booking window (BR-01) | Must Have | |
+| FR-BM-002 | System shall prevent overlapping bookings on the same resource using distributed locks (BR-02) | Must Have | Redis + DB exclusive lock |
+| FR-BM-003 | System shall support booking of multiple slots in a single transaction (e.g., 2-hour session = 2 × 60-min slots) | Should Have | `BookingItem` records |
+| FR-BM-004 | Customers shall create recurring booking series with DAILY, WEEKLY, or MONTHLY cadence | Should Have | BR-06 applies |
+| FR-BM-005 | System shall validate all occurrences of a recurring series before committing any (BR-06) | Must Have | All-or-nothing creation |
+| FR-BM-006 | Customers shall view upcoming and past bookings with full detail and downloadable receipt | Must Have | |
+| FR-BM-007 | Customers shall cancel bookings with penalty computed per cancellation policy (BR-03) | Must Have | |
+| FR-BM-008 | System shall support rescheduling of a booking to another available slot with refund/charge delta | Should Have | |
+| FR-BM-009 | System shall record no-shows 15 minutes after slot end for unattended confirmed bookings (BR-09) | Must Have | Background job |
+| FR-BM-010 | Venue admins and platform admins shall create bookings on behalf of customers via admin API | Must Have | Audit trail required |
 
-### 2.5 Payment Processing
+### 2.5 Waitlist Management
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-PP-001 | System shall calculate booking total with taxes/fees | Must Have |
-| FR-PP-002 | System shall integrate with payment gateways | Must Have |
-| FR-PP-003 | System shall support multiple payment methods | Should Have |
-| FR-PP-004 | System shall process refunds per cancellation policy | Must Have |
-| FR-PP-005 | System shall generate invoices/receipts | Must Have |
-| FR-PP-006 | System shall support promotional codes/discounts | Should Have |
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-WL-001 | Customers shall join the waitlist for fully-booked slots | Must Have | |
+| FR-WL-002 | System shall automatically promote the first eligible waitlist entry on cancellation (BR-05) | Must Have | Event-driven |
+| FR-WL-003 | Promoted customers shall have 30 minutes to confirm and pay before the next candidate is evaluated | Must Have | |
+| FR-WL-004 | Customers shall view their position and status in the waitlist | Should Have | |
+| FR-WL-005 | Customers shall withdraw from the waitlist at any time without penalty | Must Have | |
 
-### 2.6 Notifications
+### 2.6 Payment Management
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-NF-001 | System shall send booking confirmation notifications | Must Have |
-| FR-NF-002 | System shall send reminder notifications before booking | Must Have |
-| FR-NF-003 | System shall notify on booking changes/cancellations | Must Have |
-| FR-NF-004 | System shall support email and push notifications | Must Have |
-| FR-NF-005 | System shall support SMS notifications | Should Have |
-| FR-NF-006 | Users shall configure notification preferences | Should Have |
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-PM-001 | System shall support online payment at booking time via credit/debit card and UPI/wallets | Must Have | Stripe gateway |
+| FR-PM-002 | System shall support pay-at-venue mode where allowed by venue configuration | Should Have | |
+| FR-PM-003 | System shall capture payment only after successful booking confirmation (coupled flow) | Must Have | |
+| FR-PM-004 | System shall process refunds automatically based on cancellation policy (BR-03) | Must Have | Idempotent |
+| FR-PM-005 | System shall support promo codes and corporate rate discounts at checkout | Should Have | |
+| FR-PM-006 | System shall generate PDF receipts and send to customer email on payment capture | Must Have | |
+| FR-PM-007 | System shall enforce prepayment for customers flagged under BR-09 no-show policy | Must Have | |
 
-### 2.7 Provider Dashboard
+### 2.7 Corporate Booking
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-PD-001 | Providers shall view all bookings in calendar view | Must Have |
-| FR-PD-002 | Providers shall manage resource availability | Must Have |
-| FR-PD-003 | Providers shall view earnings and reports | Must Have |
-| FR-PD-004 | Providers shall respond to booking requests (if manual) | Should Have |
-| FR-PD-005 | Providers shall export booking data | Should Have |
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-CB-001 | System shall support corporate accounts with monthly slot quotas (BR-08) | Should Have | |
+| FR-CB-002 | Corporate bookings beyond quota shall require corporate admin approval | Should Have | |
+| FR-CB-003 | Corporate admins shall view team booking usage and quota utilisation | Should Have | |
+| FR-CB-004 | Corporate accounts shall have configurable negotiated penalty rates | Could Have | |
 
-### 2.8 Admin Dashboard
+### 2.8 Notifications
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-AD-001 | Admins shall manage all users and providers | Must Have |
-| FR-AD-002 | Admins shall configure system-wide settings | Must Have |
-| FR-AD-003 | Admins shall view platform analytics | Must Have |
-| FR-AD-004 | Admins shall manage payment configurations | Must Have |
-| FR-AD-005 | Admins shall handle disputes and refunds | Should Have |
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-NT-001 | System shall send booking confirmation via email and SMS immediately after payment capture | Must Have | |
+| FR-NT-002 | System shall send reminder notifications 24 hours and 1 hour before slot start | Must Have | |
+| FR-NT-003 | System shall send cancellation and refund notifications within 2 minutes of cancellation | Must Have | |
+| FR-NT-004 | System shall send waitlist promotion alerts via push, email, and SMS simultaneously | Must Have | |
+| FR-NT-005 | Customers shall configure notification preferences (channel, timing, opt-out) | Should Have | |
+| FR-NT-006 | System shall suppress duplicate notifications within a 5-minute dedup window | Must Have | |
+
+### 2.9 Reporting and Analytics
+
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-RA-001 | Venue admins shall access occupancy rate reports by resource, date range, and time-of-day | Must Have | |
+| FR-RA-002 | System shall provide revenue reports by venue, resource type, and booking channel | Must Have | |
+| FR-RA-003 | System shall track and report no-show rates, cancellation rates, and average lead time | Should Have | |
+| FR-RA-004 | Platform admins shall access cross-venue analytics and system health dashboards | Should Have | |
 
 ---
 
@@ -131,176 +151,93 @@ A generic, extensible slot booking system that enables users to discover, book, 
 
 | ID | Requirement | Target |
 |----|-------------|--------|
-| NFR-P-001 | Page load time | < 2 seconds |
-| NFR-P-002 | API response time (95th percentile) | < 500ms |
-| NFR-P-003 | Concurrent users supported | 10,000+ |
-| NFR-P-004 | Booking transaction completion | < 3 seconds |
-| NFR-P-005 | Search results returned | < 1 second |
+| NFR-P-001 | Availability check API response time | p95 < 50 ms (Redis-cached) |
+| NFR-P-002 | Booking create API response time | p95 < 200 ms |
+| NFR-P-003 | Search API response time | p95 < 300 ms |
+| NFR-P-004 | System throughput | ≥ 1,000 bookings/minute |
+| NFR-P-005 | Concurrent active users | ≥ 10,000 |
 
-### 3.2 Scalability
-
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-S-001 | Horizontal scaling capability | Auto-scale based on load |
-| NFR-S-002 | Database read replicas | Support read scaling |
-| NFR-S-003 | Bookings per day capacity | 1,000,000+ |
-
-### 3.3 Availability & Reliability
+### 3.2 Reliability
 
 | ID | Requirement | Target |
 |----|-------------|--------|
-| NFR-A-001 | System uptime | 99.9% (8.76 hrs/year downtime) |
-| NFR-A-002 | Disaster recovery | RTO: 4 hrs, RPO: 1 hr |
-| NFR-A-003 | Zero data loss for completed bookings | 100% |
+| NFR-R-001 | System uptime | 99.9% (≤ 8.7 h downtime/year) |
+| NFR-R-002 | Recovery Time Objective (RTO) | ≤ 30 minutes |
+| NFR-R-003 | Recovery Point Objective (RPO) | ≤ 5 minutes |
+| NFR-R-004 | Data loss prevention | Zero data loss for payment records |
 
-### 3.4 Security
+### 3.3 Security
 
-| ID | Requirement | Description |
-|----|-------------|-------------|
-| NFR-SEC-001 | Data encryption in transit | TLS 1.3 |
-| NFR-SEC-002 | Data encryption at rest | AES-256 |
-| NFR-SEC-003 | PCI-DSS compliance | For payment processing |
-| NFR-SEC-004 | OWASP Top 10 protection | All web vulnerabilities |
-| NFR-SEC-005 | Rate limiting | Prevent abuse |
-| NFR-SEC-006 | Audit logging | All sensitive operations |
+| ID | Requirement | Detail |
+|----|-------------|--------|
+| NFR-S-001 | All APIs must be authenticated | JWT + API key for integrations |
+| NFR-S-002 | PII fields encrypted at rest | AES-256 |
+| NFR-S-003 | All traffic encrypted in transit | TLS 1.3 minimum |
+| NFR-S-004 | Payment data must be PCI-DSS compliant | No full PAN stored |
+| NFR-S-005 | Rate limiting on all public endpoints | 100 req/min per IP; 1000 req/min per authenticated user |
+| NFR-S-006 | OWASP Top 10 vulnerabilities addressed | Quarterly security scans |
 
-### 3.5 Usability
+### 3.4 Scalability
 
-| ID | Requirement | Description |
-|----|-------------|-------------|
-| NFR-U-001 | Mobile responsiveness | All screens |
-| NFR-U-002 | Accessibility | WCAG 2.1 AA |
-| NFR-U-003 | Internationalization | Multi-language support |
-| NFR-U-004 | Booking completion rate | > 80% (started vs completed) |
+| ID | Requirement | Detail |
+|----|-------------|--------|
+| NFR-SC-001 | Horizontal scaling of all stateless services | Kubernetes HPA |
+| NFR-SC-002 | Database read scaling | Read replicas for reporting queries |
+| NFR-SC-003 | Multi-region deployment capability | Active-passive minimum; active-active for cache |
 
-### 3.6 Maintainability
+### 3.5 Maintainability
 
-| ID | Requirement | Description |
-|----|-------------|-------------|
-| NFR-M-001 | Code coverage | > 80% unit tests |
-| NFR-M-002 | Documentation | API docs, deployment guides |
-| NFR-M-003 | Modular architecture | Microservices-ready |
-
----
-
-## 4. Constraints
-
-| Type | Constraint |
-|------|------------|
-| Technical | Must support modern browsers (last 2 versions) |
-| Technical | Mobile apps for iOS 14+ and Android 10+ |
-| Regulatory | GDPR compliance for EU users |
-| Regulatory | Local data residency requirements |
-| Business | Payment gateway availability by region |
+| ID | Requirement | Detail |
+|----|-------------|--------|
+| NFR-M-001 | Test coverage | ≥ 80% line coverage for core domain logic |
+| NFR-M-002 | API backward compatibility | Minimum 6-month deprecation window |
+| NFR-M-003 | Deployment pipeline | Zero-downtime rolling deployments |
 
 ---
 
-## 5. Assumptions
+## 4. System Constraints
 
-1. Users have internet connectivity to access the system
-2. Payment gateways provide reliable APIs
-3. Third-party notification services (email, SMS, push) are available
-4. Time-based bookings are the primary use case (not quantity-based)
-5. Single-tenant deployments can use the same codebase with configuration
+```mermaid
+flowchart LR
+    subgraph External
+        PG[Payment Gateway\nStripe]
+        SMS[SMS Provider\nTwilio]
+        EMAIL[Email Provider\nSendGrid]
+        MAPS[Geocoding API\nGoogle Maps]
+        OAUTH[OAuth Providers\nGoogle Apple Facebook]
+    end
 
----
+    subgraph Slot Booking System
+        API[API Gateway]
+        SVC[Core Services]
+        DB[(PostgreSQL)]
+        CACHE[(Redis)]
+        SEARCH[(Elasticsearch)]
+        MQ[Kafka]
+    end
 
-## 6. Dependencies
-
-| Dependency | Type | Risk |
-|------------|------|------|
-| Payment Gateway (Stripe, PayPal, etc.) | External | Medium |
-| Email Service (SendGrid, SES) | External | Low |
-| SMS Provider (Twilio, Vonage) | External | Low |
-| Push Notification Service (FCM, APNs) | External | Low |
-| Maps API (Google, Mapbox) | External | Low |
-| Authentication Provider (OAuth) | External | Low |
-
-
-## 7. Stakeholders & Personas
-
-| Role | Goals | Primary Needs |
-|------|-------|---------------|
-| Customer | Book quickly and reliably | Accurate availability, fast checkout |
-| Provider | Maximize utilization | Calendar tools, payout visibility |
-| Admin | Platform governance | Analytics, approvals, policy controls |
-| Support Agent | Resolve issues fast | Full booking history and audit trail |
-
-## 8. Observability & Auditability
-
-| Signal | Scope | Examples |
-|--------|-------|----------|
-| Metrics | Booking flow | lock contention, success rate, p95 latency |
-| Logs | API & background jobs | validation failures, refund errors |
-| Traces | End-to-end requests | search → booking → payment |
-| Audit | Sensitive actions | cancellations, refunds, provider approvals |
-
-## 9. Reliability, DR & Capacity
-
-| Requirement | Target |
-|-------------|--------|
-| RTO | ≤ 4 hours |
-| RPO | ≤ 1 hour |
-| Booking integrity | No double bookings |
-| Back-pressure handling | Graceful degradation |
-
-## 10. Acceptance Criteria
-
-- Booking confirmation within 3 seconds (p95).
-- Slot lock TTL enforced with clear expiry behavior.
-- Refunds initiated within SLA for eligible cancellations.
-- Audit logs exist for cancellations, refunds, and provider actions.
-
-## 11. Risks & Mitigations
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Double booking | Revenue loss | Atomic locks + DB constraints |
-| Payment failures | Abandoned bookings | Retry + idempotency |
-| Notification failures | No-shows | Multi-channel fallback |
-| Peak traffic | SLA breach | Autoscaling + rate limits |
-
-## 12. Glossary
-
-| Term | Definition |
-|------|------------|
-| **Resource** | A bookable entity (court, room, service, equipment) |
-| **Slot** | A specific time window when a resource can be booked |
-| **Booking** | A confirmed reservation of a slot by a user |
-| **Provider** | Entity that owns/manages resources |
-| **User** | Person who books slots |
-| **Availability** | Time periods when a resource can be booked |
-| **Buffer Time** | Gap between consecutive bookings |
+    API --> SVC
+    SVC --> DB
+    SVC --> CACHE
+    SVC --> SEARCH
+    SVC --> MQ
+    SVC --> PG
+    SVC --> SMS
+    SVC --> EMAIL
+    SVC --> MAPS
+    OAUTH --> API
+```
 
 ---
-## Implementation-Ready Requirements Document
 
-### Slot allocation rules in this document's context
-- Allocation decisions must be based on **resource calendar + operational policy + channel limits** before any payment action is attempted.
-- All provisional allocations require an explicit **hold record with expiry**, and expiry must be visible to clients.
-- Shared-capacity resources must use atomic decrement semantics; exclusive resources must enforce single-active-booking constraints.
+## 5. Acceptance Criteria Summary
 
-### Conflict resolution in this document's context
-- Competing writes must use deterministic conflict handling (optimistic version checks or transactional locks as documented here).
-- API and admin paths must converge on one canonical conflict reason taxonomy (`SLOT_TAKEN`, `STALE_VERSION`, `PROVIDER_BLOCKED`, `PAYMENT_STATE_MISMATCH`).
-- Every conflict rejection must emit structured audit telemetry including actor, correlation ID, and rule version.
-
-### Payment coupling / decoupling behavior
-- **Coupled flow**: booking moves to confirmed only after successful authorization/capture.
-- **Decoupled flow**: booking can be confirmed with `PAYMENT_PENDING`, but with a bounded grace window and auto-cancel guardrail.
-- Compensation is mandatory for split-brain outcomes (payment succeeded but booking failed, or inverse).
-
-### Cancellation and refund policy detail
-- Refund outcomes depend on lead time, policy tier, no-show status, and jurisdiction-specific fee constraints.
-- Refund processing must be idempotent and expose lifecycle states (`REQUESTED`, `INITIATED`, `SETTLED`, `FAILED`, `MANUAL_REVIEW`).
-- Cancellation side effects must include slot reallocation and downstream notification consistency.
-
-### Observability and incident playbook focus
-- Monitor: availability latency, hold expiry lag, conflict rate, payment callback success, refund aging.
-- Alerts must map to operator runbooks with first-response steps and data reconciliation queries.
-- Post-incident review must record policy gaps and required control changes for this documentation area.
-
-### Requirements-level acceptance depth
-- Define mandatory API contracts for idempotency, conflict reason codes, and deterministic retry semantics.
-- Specify legal/compliance constraints for fees, taxes, and refund timelines by market.
-- Capture explicit non-functional targets (throughput, p95 latency, reconciliation SLA, RTO/RPO).
+| Category | Pass Criteria |
+|----------|--------------|
+| Booking create | Creates in < 200 ms; rejects overlaps with HTTP 409; enforces advance window |
+| Cancellation | Computes correct refund per policy; triggers waitlist promotion within 30 s |
+| Waitlist | Promotes next customer within 60 s of cancellation; 30-min confirmation window enforced |
+| Payment | Captures on confirm; refunds idempotently; receipts delivered within 2 min |
+| No-show | Recorded 15 min after slot end; flag set at 3rd no-show in 90 days |
+| Notifications | Confirmation within 30 s; reminders delivered within ±5 min of scheduled time |
+| Reporting | Occupancy and revenue reports load in < 5 s for 12-month date range |

@@ -1,321 +1,259 @@
-# Use Case Descriptions - Slot Booking System
+# Use Case Descriptions — Slot Booking System
 
-> **Platform Independence**: Descriptions use generic terminology adaptable to any booking domain.
+Detailed pre/post conditions, main flows, and alternate flows for the primary use cases of the Slot Booking System.
 
 ---
 
-## UC-01: Register Account
+## UC-01: Create Booking
 
-| Field | Description |
-|-------|-------------|
+| Attribute | Detail |
+|-----------|--------|
 | **Use Case ID** | UC-01 |
-| **Name** | Register Account |
-| **Actor** | Guest |
-| **Description** | Guest creates a new user account to access booking features |
-| **Preconditions** | Guest is not logged in |
-| **Postconditions** | New user account created; verification email sent |
+| **Name** | Create Booking |
+| **Primary Actor** | Customer |
+| **Secondary Actors** | Payment Gateway, Notification Service, Slot Service |
+| **Trigger** | Customer selects an available slot and initiates checkout |
+| **Priority** | Must Have |
 
-### Main Flow
-1. Guest navigates to registration page
-2. Guest enters email, password, and profile information
-3. System validates input data
-4. System creates user account (inactive)
-5. System sends verification email
-6. Guest clicks verification link
-7. System activates account
-8. System redirects to login page
+**Preconditions:**
+1. Customer is authenticated (valid JWT token).
+2. Target slot is in `AVAILABLE` status.
+3. Current time is within the advance booking window (BR-01).
+4. Customer account is not suspended.
+5. If customer has `prepayment_required = true` (BR-09), payment mode must be ONLINE.
 
-### Alternative Flows
-- **3a. Social Registration**: Guest clicks social login → System fetches profile from OAuth provider → Continue from step 4
-- **3b. Phone Registration**: Guest enters phone number → System sends OTP → Guest enters OTP → Continue from step 4
+**Postconditions (Success):**
+1. `Booking` record created with status `CONFIRMED`.
+2. `BookingItem` record created for each slot.
+3. Slot `confirmed_count` incremented; slot status updated to `BOOKED` if at capacity.
+4. `PaymentRecord` created with status `CAPTURED`.
+5. `BookingCreated` and `BookingConfirmed` events published.
+6. Confirmation email and SMS sent to customer.
+7. Reminder jobs scheduled for 24h and 1h before slot start.
 
-### Exception Flows
-- **3e1. Invalid Email**: System displays error "Invalid email format"
-- **3e2. Duplicate Email**: System displays error "Account already exists"
-- **3e3. Weak Password**: System displays password requirements
+**Postconditions (Failure):**
+1. No booking or payment record created.
+2. Slot availability unchanged.
+3. Error response returned with specific rule violation code.
+
+**Main Success Flow:**
+1. Customer calls `GET /availability?resource_id={id}&date={date}` to view available slots.
+2. Customer selects a slot and calls `POST /bookings` with `slot_id`, `payment_method_id`.
+3. System acquires Redis distributed lock on `resource_id` (5-second TTL).
+4. System validates BR-01 (advance window), BR-04 (duration), BR-07 (capacity), BR-08 (corporate quota), BR-02 (overlap).
+5. System creates `Booking` in `PENDING_PAYMENT` state and a provisional slot hold.
+6. System calls Payment Gateway to capture payment.
+7. Payment Gateway confirms capture.
+8. System transitions `Booking` to `CONFIRMED` and publishes events.
+9. System releases Redis lock.
+10. Returns HTTP 201 with booking detail.
+
+**Alternate Flow A — Slot Already Taken (BR-02):**
+- At step 4, overlap check fails.
+- System releases Redis lock.
+- Returns HTTP 409 `SLOT_CONFLICT`.
+- System redirects customer to availability picker with up-to-date slot grid.
+
+**Alternate Flow B — Payment Failure:**
+- At step 6, payment gateway returns decline.
+- System cancels the provisional hold.
+- Booking transitions to `PAYMENT_FAILED`.
+- Returns HTTP 402 with `PAYMENT_DECLINED` code.
+- Slot availability restored.
+
+**Alternate Flow C — Corporate Quota Exceeded (BR-08):**
+- At step 4, quota check fails.
+- Booking transitions to `PENDING_CORPORATE_APPROVAL`.
+- Corporate admin notified.
+- Returns HTTP 202 Accepted with pending-approval message.
 
 ---
 
-## UC-02: Login
+## UC-02: Cancel Booking
 
-| Field | Description |
-|-------|-------------|
+| Attribute | Detail |
+|-----------|--------|
 | **Use Case ID** | UC-02 |
-| **Name** | Login |
-| **Actor** | User, Provider, Admin |
-| **Description** | User authenticates to access their account |
-| **Preconditions** | User has a verified account |
-| **Postconditions** | User session created; user redirected to dashboard |
-
-### Main Flow
-1. User navigates to login page
-2. User enters email/phone and password
-3. System validates credentials
-4. System creates session
-5. System redirects to appropriate dashboard based on role
-
-### Alternative Flows
-- **2a. Social Login**: User clicks social login button → OAuth flow → Continue from step 4
-- **2b. Remember Me**: System creates persistent session token
-
-### Exception Flows
-- **3e1. Invalid Credentials**: System displays error "Invalid email or password"
-- **3e2. Account Locked**: System displays "Account locked. Try again in 30 minutes"
-- **3e3. Account Not Verified**: System prompts to resend verification email
-
----
-
-## UC-03: Book Slot
-
-| Field | Description |
-|-------|-------------|
-| **Use Case ID** | UC-03 |
-| **Name** | Book Slot |
-| **Actor** | User |
-| **Description** | User reserves an available time slot for a resource |
-| **Preconditions** | User is logged in; slot is available |
-| **Postconditions** | Booking created; payment processed; confirmation sent |
-
-### Main Flow
-1. User views resource details page
-2. User selects date from calendar
-3. System displays available slots
-4. User selects desired slot(s)
-5. System displays booking summary with price
-6. User confirms booking details
-7. System redirects to payment (UC-04)
-8. User completes payment
-9. System creates booking record
-10. System sends confirmation notification
-11. System displays booking confirmation
-
-### Alternative Flows
-- **4a. Multiple Slots**: User selects multiple consecutive slots → System calculates total → Continue from step 5
-- **6a. Add Notes**: User adds special instructions → Continue from step 7
-- **6b. Apply Promo**: User enters promo code → System validates and applies discount → Continue from step 7
-
-### Exception Flows
-- **4e1. Slot No Longer Available**: System displays "Slot was just booked" → Return to step 3
-- **8e1. Payment Failed**: System displays error → User retries or cancels
-- **9e1. Booking Conflict**: System performs double-check → Refund if conflict → Display error
-
-### Business Rules
-- Minimum booking notice: 1 hour before slot
-- Maximum advance booking: 30 days
-- Buffer time between bookings: configurable per resource
-
----
-
-## UC-04: Make Payment
-
-| Field | Description |
-|-------|-------------|
-| **Use Case ID** | UC-04 |
-| **Name** | Make Payment |
-| **Actor** | User |
-| **Description** | User pays for a booking or service |
-| **Preconditions** | Valid booking in progress |
-| **Postconditions** | Payment processed; receipt generated |
-
-### Main Flow
-1. System displays payment form with order summary
-2. User selects payment method
-3. User enters payment details
-4. System validates payment information
-5. System processes payment with gateway
-6. System receives confirmation from gateway
-7. System marks booking as paid
-8. System generates and sends receipt
-
-### Alternative Flows
-- **2a. Saved Card**: User selects saved payment method → Skip step 3
-- **2b. Wallet Pay**: User selects digital wallet → Redirect to wallet app → Return with confirmation
-
-### Exception Flows
-- **5e1. Payment Declined**: System displays "Payment declined" → User enters different method
-- **5e2. Gateway Timeout**: System displays "Payment processing" → Retry or get status
-- **6e1. Fraudulent Activity**: System blocks payment → Notifies admin
-
----
-
-## UC-05: Cancel Booking
-
-| Field | Description |
-|-------|-------------|
-| **Use Case ID** | UC-05 |
 | **Name** | Cancel Booking |
-| **Actor** | User |
-| **Description** | User cancels an existing booking |
-| **Preconditions** | User has an active booking; within cancellation window |
-| **Postconditions** | Booking cancelled; refund processed per policy |
+| **Primary Actor** | Customer |
+| **Secondary Actors** | Refund Service, Waitlist Service, Notification Service |
+| **Trigger** | Customer requests cancellation of a confirmed booking |
+| **Priority** | Must Have |
 
-### Main Flow
-1. User navigates to My Bookings
-2. User selects booking to cancel
-3. System displays booking details and cancellation policy
-4. System shows refund amount based on policy
-5. User confirms cancellation
-6. System cancels booking
-7. System processes refund (if applicable)
-8. System releases slot to availability
-9. System sends cancellation confirmation
+**Preconditions:**
+1. Booking exists in `CONFIRMED` status.
+2. Customer is the booking owner or an admin actor.
+3. Slot start time has not yet passed.
 
-### Alternative Flows
-- **4a. No Refund**: Outside refund window → System displays "No refund applicable"
-- **5a. Cancel with Reason**: User provides cancellation reason (optional)
+**Postconditions (Success):**
+1. Booking status transitions to `CANCELLED`.
+2. Refund initiated per cancellation policy (BR-03).
+3. Slot `confirmed_count` decremented; slot status reverts to `AVAILABLE` or `WAITLIST_ONLY`.
+4. `BookingCancelled` event published.
+5. Waitlist auto-promotion triggered (BR-05).
+6. Cancellation email with refund amount sent to customer.
 
-### Exception Flows
-- **3e1. Past Booking**: Cannot cancel past bookings
-- **3e2. Already Cancelled**: Booking already cancelled
-- **7e1. Refund Failed**: Log for manual processing → Notify admin
+**Main Success Flow:**
+1. Customer calls `DELETE /bookings/{booking_id}`.
+2. System validates ownership and current booking status.
+3. System calculates lead time and determines refund amount per BR-03.
+4. System updates `Booking.status = CANCELLED` and records cancellation reason.
+5. System decrements slot `confirmed_count`.
+6. System initiates refund via Payment Gateway.
+7. System publishes `BookingCancelled` event.
+8. Waitlist Service consumes event and evaluates promotion (BR-05).
+9. Notification Service sends cancellation confirmation.
+10. Returns HTTP 200 with `{refund_amount, penalty_amount, refund_eta}`.
 
-### Business Rules
-```
-Cancellation Policy:
-- >48 hours before: 100% refund
-- 24-48 hours before: 50% refund
-- <24 hours before: No refund
-```
+**Alternate Flow A — Within Same-Day Window (BR-03):**
+- At step 3, lead time < 24h.
+- Refund = 50% of `booking.final_amount`.
+- Response includes `penalty_amount` field with 50% value.
+
+**Alternate Flow B — Admin-Forced Cancellation:**
+- Admin calls `DELETE /admin/bookings/{id}` with `reason = FORCE_MAJEURE`.
+- Refund = 100% regardless of policy.
+- AuditEvent written with `event_type = ADMIN_CANCELLATION`.
 
 ---
 
-## UC-06: Manage Resource (Provider)
+## UC-03: Auto-Promote Waitlist
 
-| Field | Description |
-|-------|-------------|
+| Attribute | Detail |
+|-----------|--------|
+| **Use Case ID** | UC-03 |
+| **Name** | Auto-Promote Waitlist |
+| **Primary Actor** | Background Job / Waitlist Service |
+| **Trigger** | `BookingCancelled` event consumed by Waitlist Service |
+| **Priority** | Must Have |
+
+**Preconditions:**
+1. A `BookingCancelled` event has been published for a slot that has waiting `WaitlistEntry` records.
+2. The slot's start time is in the future.
+
+**Postconditions (Success):**
+1. First eligible `WaitlistEntry` promoted: status = `PROMOTED`.
+2. Provisional `Booking` created in `WAITLIST_PROMOTED` state with 30-minute expiry.
+3. `WaitlistPromoted` event published.
+4. Customer notified via push + email + SMS with confirmation link.
+
+**Postconditions (No Eligible Candidate):**
+1. No promotion occurs.
+2. Slot reverts to `AVAILABLE`.
+
+**Main Success Flow:**
+1. Waitlist Service consumes `BookingCancelled` event.
+2. Queries `WaitlistEntry` for `slot_id`, ordered by `priority ASC, joined_at ASC`.
+3. Evaluates first entry: checks customer account status, no suspension, BR-09 compliance.
+4. Creates provisional booking with `expires_at = NOW() + 30 min`.
+5. Updates `WaitlistEntry.status = PROMOTED` and sets `expires_at`.
+6. Publishes `WaitlistPromoted` event.
+7. Notification Service sends promotion alert.
+8. Customer calls `POST /bookings/{id}/confirm` with payment within 30 minutes.
+9. Booking transitions to `CONFIRMED` on payment capture.
+
+**Alternate Flow A — Customer Does Not Respond:**
+- At T+30 minutes, expiry job runs.
+- Provisional booking transitions to `EXPIRED`.
+- `WaitlistEntry.status = EXPIRED`.
+- Process repeats from step 2 with next candidate.
+
+**Alternate Flow B — Customer Declines:**
+- Customer calls `DELETE /bookings/{id}` on the provisional booking.
+- `WaitlistEntry.status = WITHDRAWN`.
+- Process repeats from step 2 with next candidate.
+
+---
+
+## UC-04: Setup Recurring Booking
+
+| Attribute | Detail |
+|-----------|--------|
+| **Use Case ID** | UC-04 |
+| **Name** | Setup Recurring Booking |
+| **Primary Actor** | Customer |
+| **Trigger** | Customer configures a recurring series for a resource |
+| **Priority** | Should Have |
+
+**Preconditions:**
+1. Customer is authenticated.
+2. Resource is active and has available slots matching the requested cadence.
+
+**Postconditions (Success):**
+1. `RecurringRule` record created.
+2. Individual `Booking` and `BookingItem` records created for each occurrence.
+3. Each occurrence validated against BR-02, BR-04, BR-06.
+4. First occurrence payment captured or payment schedule created.
+5. `BookingCreated` events published for each occurrence.
+
+**Main Success Flow:**
+1. Customer calls `POST /recurring-bookings` with `resource_id`, `cadence`, `start_date`, `end_date`, `time`, `duration`.
+2. System generates the list of occurrence dates using the `RecurringRule`.
+3. For each occurrence, system validates BR-01, BR-02, BR-04, BR-06 in a dry-run transaction.
+4. If all occurrences pass validation, system commits the entire series.
+5. Returns HTTP 201 with `series_id` and list of booking IDs.
+
+**Alternate Flow — Conflict Detected:**
+- At step 3, one or more occurrences fail BR-02.
+- System rolls back all (nothing committed).
+- Returns HTTP 409 with array of conflicting dates and reason codes.
+- Customer must adjust dates or cadence and retry.
+
+---
+
+## UC-05: Apply Rule Override
+
+| Attribute | Detail |
+|-----------|--------|
+| **Use Case ID** | UC-05 |
+| **Name** | Apply Rule Override |
+| **Primary Actor** | Platform Admin |
+| **Trigger** | Admin needs to bypass an enforceable business rule for a specific booking |
+| **Priority** | Must Have |
+
+**Preconditions:**
+1. Admin is authenticated with `PLATFORM_ADMIN` role.
+2. Admin holds the specific override permission for the target rule.
+
+**Postconditions (Success):**
+1. Override applied; booking proceeds bypassing the specified rule check.
+2. `AuditEvent` written with full override detail.
+3. Override count tracked; alert raised if threshold exceeded.
+
+**Main Success Flow:**
+1. Admin calls `POST /admin/overrides` with `booking_id`, `rule_id`, `reason`, `approver_id`.
+2. System validates admin has required override permission.
+3. System stores override record in `AuditEvent`.
+4. System marks the booking with `rule_override = true` and the overridden rule ID.
+5. Booking allowed to proceed through normal flow with the specified rule disabled for this booking.
+6. Returns HTTP 200 with override confirmation.
+
+**Alternate Flow — Insufficient Permission:**
+- Admin does not hold the override permission.
+- Returns HTTP 403 with `OVERRIDE_PERMISSION_DENIED`.
+- Attempted override written to security audit log.
+
+---
+
+## UC-06: View Occupancy Reports
+
+| Attribute | Detail |
+|-----------|--------|
 | **Use Case ID** | UC-06 |
-| **Name** | Manage Resource |
-| **Actor** | Provider |
-| **Description** | Provider creates or updates resource listing |
-| **Preconditions** | Provider is logged in and verified |
-| **Postconditions** | Resource created/updated and available for booking |
+| **Name** | View Occupancy Reports |
+| **Primary Actor** | Venue Admin |
+| **Trigger** | Admin navigates to the Reports section of the admin console |
+| **Priority** | Should Have |
 
-### Main Flow (Create)
-1. Provider navigates to resource management
-2. Provider clicks "Add Resource"
-3. System displays resource form
-4. Provider enters basic information (name, description, category)
-5. Provider uploads images
-6. Provider sets location (address, map pin)
-7. Provider defines capacity and amenities
-8. Provider sets pricing rules
-9. Provider configures availability schedule
-10. Provider submits for review
-11. System validates and saves resource
-12. Resource becomes visible to users
+**Preconditions:**
+1. Venue Admin is authenticated.
+2. At least one resource exists for the venue with historical booking data.
 
-### Alternative Flow (Update)
-1. Provider selects existing resource
-2. System displays current details
-3. Provider modifies fields
-4. System saves changes
-5. System notifies if approval needed for major changes
+**Postconditions:**
+1. Report rendered with occupancy %, revenue, no-show rate, and cancellation rate for the selected date range.
 
-### Exception Flows
-- **4e1. Duplicate Name**: Warning for similar existing resource
-- **5e1. Invalid Image**: Image doesn't meet requirements
-- **11e1. Validation Error**: Display specific field errors
-
----
-
-## UC-07: View Availability & Manage Schedule (Provider)
-
-| Field | Description |
-|-------|-------------|
-| **Use Case ID** | UC-07 |
-| **Name** | Manage Availability |
-| **Actor** | Provider |
-| **Description** | Provider sets and updates resource availability |
-| **Preconditions** | Provider has at least one resource |
-| **Postconditions** | Availability updated; affects slot generation |
-
-### Main Flow
-1. Provider selects resource
-2. System displays current availability calendar
-3. Provider defines weekly recurring schedule
-4. Provider sets slot duration and buffer time
-5. Provider adds special dates (holidays, events)
-6. Provider blocks maintenance periods
-7. System generates slots based on rules
-8. System saves availability
-
-### Alternative Flows
-- **3a. Copy Schedule**: Copy settings from another resource
-- **5a. Bulk Update**: Apply changes to date range
-
----
-
-## UC-08: Handle Dispute (Admin)
-
-| Field | Description |
-|-------|-------------|
-| **Use Case ID** | UC-08 |
-| **Name** | Handle Dispute |
-| **Actor** | Admin |
-| **Description** | Admin resolves a conflict between user and provider |
-| **Preconditions** | Dispute raised by user or provider |
-| **Postconditions** | Dispute resolved; actions taken |
-
-### Main Flow
-1. Admin views dispute queue
-2. Admin selects dispute to review
-3. System displays dispute details and conversation
-4. Admin reviews evidence from both parties
-5. Admin attempts mediation (optional)
-6. Admin makes decision
-7. Admin issues refund or penalty as needed
-8. Admin documents resolution
-9. System notifies both parties
-10. System closes dispute
-
-### Alternative Flows
-- **5a. Request More Info**: Admin asks for additional evidence
-- **6a. Escalate**: Admin escalates to senior admin
-
----
-
-## Use Case Relationship Matrix
-
-| Use Case | Extends | Includes |
-|----------|---------|----------|
-| UC-01 Register | - | Send Verification Email |
-| UC-02 Login | Social Login | Create Session |
-| UC-03 Book Slot | Apply Promo Code | UC-04 Make Payment |
-| UC-04 Make Payment | Use Saved Card | Generate Receipt |
-| UC-05 Cancel Booking | - | Process Refund |
-| UC-06 Manage Resource | - | Upload Images, Set Location |
-| UC-07 Manage Availability | - | Generate Slots |
-| UC-08 Handle Dispute | - | Issue Refund, Apply Penalty |
-
----
-## Implementation-Ready Use Case Descriptions
-
-### Slot allocation rules in this document's context
-- Allocation decisions must be based on **resource calendar + operational policy + channel limits** before any payment action is attempted.
-- All provisional allocations require an explicit **hold record with expiry**, and expiry must be visible to clients.
-- Shared-capacity resources must use atomic decrement semantics; exclusive resources must enforce single-active-booking constraints.
-
-### Conflict resolution in this document's context
-- Competing writes must use deterministic conflict handling (optimistic version checks or transactional locks as documented here).
-- API and admin paths must converge on one canonical conflict reason taxonomy (`SLOT_TAKEN`, `STALE_VERSION`, `PROVIDER_BLOCKED`, `PAYMENT_STATE_MISMATCH`).
-- Every conflict rejection must emit structured audit telemetry including actor, correlation ID, and rule version.
-
-### Payment coupling / decoupling behavior
-- **Coupled flow**: booking moves to confirmed only after successful authorization/capture.
-- **Decoupled flow**: booking can be confirmed with `PAYMENT_PENDING`, but with a bounded grace window and auto-cancel guardrail.
-- Compensation is mandatory for split-brain outcomes (payment succeeded but booking failed, or inverse).
-
-### Cancellation and refund policy detail
-- Refund outcomes depend on lead time, policy tier, no-show status, and jurisdiction-specific fee constraints.
-- Refund processing must be idempotent and expose lifecycle states (`REQUESTED`, `INITIATED`, `SETTLED`, `FAILED`, `MANUAL_REVIEW`).
-- Cancellation side effects must include slot reallocation and downstream notification consistency.
-
-### Observability and incident playbook focus
-- Monitor: availability latency, hold expiry lag, conflict rate, payment callback success, refund aging.
-- Alerts must map to operator runbooks with first-response steps and data reconciliation queries.
-- Post-incident review must record policy gaps and required control changes for this documentation area.
-
-### Analysis deliverables needed for implementation
-- Actor-to-policy mapping (who can override, who can cancel, who can force-refund).
-- Event semantics (`HoldCreated`, `BookingConfirmed`, `PaymentFailed`, `RefundSettled`) with producer/consumer contracts.
-- Failure scenario catalog with expected user-visible outcomes and operator responsibilities.
+**Main Success Flow:**
+1. Venue Admin calls `GET /reports/occupancy?venue_id={id}&from={date}&to={date}`.
+2. System queries the read replica and pre-aggregated `reporting_facts` table.
+3. Returns occupancy by resource, by hour-of-day heatmap, revenue breakdown, and trend data.
+4. Admin can export results to CSV via `GET /reports/occupancy/export`.
