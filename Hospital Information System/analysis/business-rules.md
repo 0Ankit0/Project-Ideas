@@ -36,7 +36,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 Business rules in a Hospital Information System (HIS) represent the authoritative, codified expression of clinical policy, regulatory obligation, and institutional governance. These rules govern how the system responds to every significant event — from patient registration and scheduling through medication dispensing, surgical procedures, and final billing. Unlike software constraints that enforce data integrity alone, clinical business rules encode patient safety obligations derived from evidence-based medicine, accreditation standards (Joint Commission, NABH), and federal regulations including HIPAA Privacy and Security Rules (45 CFR Part 164), HL7 FHIR R4 interoperability requirements, and Centers for Medicare & Medicaid Services (CMS) Conditions of Participation. Each rule in this document has a direct regulatory or clinical safety lineage and is subject to periodic review by the Clinical Informatics & Compliance Team.
 
@@ -822,7 +822,7 @@ Rules generating more than 10 overrides per month trigger a mandatory clinical p
 
 ---
 
-## 5. Traceability Table
+## Traceability Table
 
 | BR-ID | Rule Name | Related Use Case | Functional Requirement | Enforcer Service | Compliance Standard |
 |---|---|---|---|---|---|

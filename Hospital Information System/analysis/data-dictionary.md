@@ -21,7 +21,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This data dictionary is the authoritative reference for all persistent data structures within the Hospital Information System (HIS). It documents every canonical entity, attribute, constraint, index, and inter-table relationship used across clinical, administrative, and financial domains. The dictionary is aligned to **HL7 FHIR R4** resource definitions, ensuring that data models are interoperable with external health information exchanges (HIE), regional patient registries, and federal reporting programs such as CMS Quality Payment Program (QPP) and ONC Certified Health IT. Where FHIR resource profiles deviate from the internal relational model, mapping notes are maintained in the integration specification document.
 
@@ -31,7 +31,7 @@ Data stewardship is governed by the Health Informatics & Data Architecture Team 
 
 ---
 
-## 2. Core Entities
+## Core Entities
 
 ### 1. Patient
 
@@ -699,7 +699,7 @@ The following data quality rules are enforced at the database, application, and 
 
 ---
 
-## 5. Retention and Archival Policy
+## Retention and Archival Policy
 
 All data retention periods comply with HIPAA minimum retention requirements (6 years from creation or last effective date), applicable state law (whichever is longer), and CMS Conditions of Participation. Records subject to an active legal hold are frozen in the `ONLINE` tier regardless of scheduled archival. Data archived to the `ARCHIVE` tier is stored in compressed, encrypted cold storage (S3 Glacier or equivalent) and remains queryable via the data warehouse read replica within 4 hours of retrieval request.
 
@@ -727,7 +727,7 @@ All data retention periods comply with HIPAA minimum retention requirements (6 y
 
 ---
 
-## 6. Terminology and Code Systems
+## Terminology and Code Systems
 
 The HIS integrates the following external code systems and standards. All reference tables are refreshed on the schedules indicated. Version currency is validated by the nightly `reference_data_freshness_check` job; out-of-date reference data triggers a P2 alert to the Health Informatics team.
 

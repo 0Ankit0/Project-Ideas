@@ -27,7 +27,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 The Hospital Information System (HIS) adopts an **event-driven architecture (EDA)** as the primary integration pattern across all clinical, administrative, and financial microservices. Rather than relying on synchronous HTTP calls between bounded contexts — which introduces tight coupling, availability dependencies, and cascading failures — the HIS emits domain events whenever significant state transitions occur. These events serve as the authoritative record of what happened, when it happened, and who caused it. Downstream services subscribe to the events they need, process them independently, and maintain their own read models, enabling each service to evolve and scale without coordination ceremonies.
 
@@ -774,7 +774,7 @@ All SLOs are measured end-to-end: from the moment `occurred_at` is stamped in th
 
 ---
 
-## 6. Replay and Recovery Procedures
+## Replay and Recovery Procedures
 
 ### 6.1 Offset Reset Procedures
 
@@ -895,7 +895,7 @@ The reconciliation report must be reviewed by the owning service team and attach
 
 ---
 
-## 7. Schema Versioning Strategy
+## Schema Versioning Strategy
 
 ### 7.1 Semantic Versioning for Schemas
 
