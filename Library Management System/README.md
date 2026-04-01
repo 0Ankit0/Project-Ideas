@@ -1,119 +1,169 @@
-# Library Management System - Complete Design Documentation
+# Library Management System
 
-> Multi-branch library operations platform covering catalog management, patron services, circulation, acquisitions, inventory, and optional digital lending.
+> A multi-branch library operations platform delivering unified catalog management, physical and digital circulation, patron self-service, acquisitions workflows, inter-library loans, and analytics across an unlimited number of branch locations.
+
+The system is designed around five core bounded contexts — **Catalog**, **Circulation**, **Identity**, **Acquisitions**, and **Billing** — each independently deployable and integrated through versioned domain events. Branch managers operate within a single pane of glass while system administrators configure global policies that cascade to every branch.
+
+---
 
 ## Documentation Structure
 
 ```text
 Library Management System/
+├── README.md                              ← You are here
+│
 ├── requirements/
-│   ├── requirements-document.md
-│   └── user-stories.md
+│   ├── requirements-document.md          ← Functional and non-functional requirements
+│   └── user-stories.md                   ← Epics and user stories by role
+│
 ├── analysis/
-│   ├── use-case-diagram.md
-│   ├── use-case-descriptions.md
-│   ├── system-context-diagram.md
-│   ├── activity-diagram.md
-│   ├── bpmn-swimlane-diagram.md
-│   ├── data-dictionary.md
-│   ├── business-rules.md
-│   └── event-catalog.md
+│   ├── use-case-diagram.md               ← UML use-case diagram (all actors)
+│   ├── use-case-descriptions.md          ← Detailed use-case specifications
+│   ├── system-context-diagram.md         ← External actors and system boundaries
+│   ├── activity-diagram.md               ← Key workflow activity diagrams
+│   ├── bpmn-swimlane-diagram.md          ← BPMN 2.0 process flows
+│   ├── data-dictionary.md                ← Canonical field definitions
+│   ├── business-rules.md                 ← Normative policy rules (BR-01…BR-15+)
+│   └── event-catalog.md                  ← Domain event definitions and schemas
+│
 ├── high-level-design/
-│   ├── system-sequence-diagram.md
-│   ├── domain-model.md
-│   ├── data-flow-diagram.md
-│   ├── architecture-diagram.md
-│   └── c4-context-container.md
+│   ├── architecture-diagram.md           ← Service topology and integration overview
+│   ├── c4-context-container.md           ← C4 Level 1 & Level 2 diagrams
+│   ├── domain-model.md                   ← Aggregate, entity, and value-object map
+│   ├── data-flow-diagram.md              ← Data flows between services
+│   └── system-sequence-diagram.md        ← Cross-service sequence for core flows
+│
 ├── detailed-design/
-│   ├── class-diagram.md
-│   ├── sequence-diagram.md
-│   ├── state-machine-diagram.md
-│   ├── erd-database-schema.md
-│   ├── component-diagram.md
-│   ├── api-design.md
-│   └── c4-component.md
+│   ├── api-design.md                     ← REST API contracts (OpenAPI-aligned)
+│   ├── c4-component.md                   ← C4 Level 3 component diagrams
+│   ├── class-diagram.md                  ← UML class diagram for core domain
+│   ├── component-diagram.md              ← Internal component dependencies
+│   ├── erd-database-schema.md            ← Entity-relationship diagram + DDL notes
+│   ├── sequence-diagram.md               ← Detailed intra-service sequences
+│   └── state-machine-diagram.md          ← Copy, loan, reservation, and fine FSMs
+│
 ├── infrastructure/
-│   ├── deployment-diagram.md
-│   ├── network-infrastructure.md
-│   └── cloud-architecture.md
+│   ├── cloud-architecture.md             ← Cloud provider layout and managed services
+│   ├── deployment-diagram.md             ← Kubernetes / container deployment model
+│   └── network-infrastructure.md         ← VPC, subnets, DNS, TLS, and firewall rules
+│
 ├── edge-cases/
-│   ├── README.md
-│   ├── catalog-and-metadata.md
-│   ├── circulation-and-overdues.md
-│   ├── reservations-and-waitlists.md
-│   ├── acquisitions-and-inventory.md
-│   ├── digital-lending-and-access.md
-│   ├── api-and-ui.md
-│   ├── security-and-compliance.md
-│   └── operations.md
+│   ├── README.md                         ← Edge-case index and triage guide
+│   ├── catalog-and-metadata.md           ← ISBN conflicts, merge, and import edge cases
+│   ├── circulation-and-overdues.md       ← Overdue, lost, damaged, and recall scenarios
+│   ├── reservations-and-waitlists.md     ← Hold expiry, no-show, and priority edge cases
+│   ├── acquisitions-and-inventory.md     ← PO conflicts, budget overrun, and receiving gaps
+│   ├── digital-lending-and-access.md     ← DRM failure, token expiry, and format edge cases
+│   ├── api-and-ui.md                     ← Concurrency, idempotency, and UI error edge cases
+│   ├── security-and-compliance.md        ← PII, GDPR, audit trail, and access-control gaps
+│   └── operations.md                     ← Failover, migration, and runbook edge cases
+│
 └── implementation/
-    ├── code-guidelines.md
-    ├── c4-code-diagram.md
-    └── implementation-playbook.md
+    ├── code-guidelines.md                ← Coding standards, patterns, and review checklist
+    ├── c4-code-diagram.md                ← C4 Level 4 code-level diagrams
+    └── implementation-playbook.md        ← Phased delivery plan, milestones, and DoD criteria
 ```
+
+---
 
 ## Key Features
 
-- Multi-branch library support with branch-aware inventory, transfers, and staff operations.
-- Unified cataloging for bibliographic records, items/copies, subjects, and classification metadata.
-- Full circulation workflows for issue, return, renew, overdue handling, and exceptions.
-- Reservations and hold queues with branch pickup, waitlist rules, and notification flows.
-- Patron membership management with borrowing eligibility, fines, waivers, and audit history.
-- Acquisitions, vendor management, stock intake, audits, and lost/damaged item handling.
-- Optional digital lending integration for e-books, audiobooks, and licensed resource access.
+### Catalog Management
+- **ISBN lookup and enrichment** via Open Library and Google Books APIs; automatic metadata population on ISBN scan.
+- **Bulk import** from MARC 21 / MARCXML feeds, CSV manifests, and vendor EDI files with conflict resolution.
+- Dewey Decimal and LC classification support; custom subject tagging and cross-reference linking.
+- Duplicate detection by ISBN, ISSN, and OCLC number with staff-guided merge workflow.
+
+### Physical Circulation
+- **Checkout and return** at any branch counter or self-service kiosk; barcode and RFID scan support.
+- **Loan period rules** by material type: Books (21 days), DVDs (7 days), Periodicals (3 days), Reference (in-library only).
+- **Renewal** up to two times per loan unless a reservation is active on the copy; online, kiosk, and staff-initiated.
+- Overdue detection on nightly batch and real-time on return; fine accrual per material-type rate.
+
+### Digital Lending
+- **EPUB and PDF delivery** with Adobe DRM and LCP (Readium) token issuance.
+- Simultaneous digital loan cap (3 titles per member); 14-day auto-return with zero staff intervention.
+- Integration with OverDrive / Libby and Hoopla for consortia digital collections.
+- Offline reading window enforced by DRM token TTL; token revocation on early return or account suspension.
+
+### Reservations and Waitlists
+- Branch-aware hold queue; member selects preferred pickup branch and is notified when copy is transferred.
+- FIFO queue with priority escalation for Scholar-tier members and accessibility-accommodation flags.
+- **Hold shelf period**: 7 days from notification; auto-cancellation and next-patron allocation on expiry.
+- Waitlist position visibility in the member self-service portal with estimated availability dates.
+
+### Overdue Fines and Penalties
+- Fine rates: Books \$0.25/day, DVDs \$1.00/day; capped at 3× item replacement cost.
+- 1-day grace period for standard books; no grace for high-demand or recalled items.
+- **Borrowing block** triggered when outstanding balance exceeds \$25; block lifted on payment or approved waiver.
+- Lost-item declaration and replacement-cost billing after 45 consecutive days overdue.
+
+### Acquisition Workflow
+- Purchase request origination by any staff member; approval chain enforced above \$500.
+- Vendor catalogue integration; automated PO generation, receipt confirmation, and accession numbering.
+- Budget ledger per branch and per fund code; real-time spend vs. allocation dashboard.
+- Donation intake, condition assessment, and selective accessioning workflow.
+
+### Member Self-Service Portal
+- Catalogue search with faceted filtering (format, branch, availability, subject, language).
+- Account dashboard: active loans with due dates, reservation queue positions, fine balance, and borrowing history.
+- Online renewal, hold placement and cancellation, fine payment via integrated payment gateway.
+- Notification preferences: email, SMS, and push; configurable per event type (due reminder, hold ready, fine notice).
+
+### Inter-Library Loans
+- ILL eligibility restricted to Premium and Scholar membership tiers; processing fee applied per request.
+- Integration with OCLC WorldShare and Z39.50 for external catalogue search and ILL request routing.
+- Tracking of ILL item from request through transit, loan, return, and shipping-back stages.
+- SLA monitoring for lender fulfilment; escalation workflow for unresolved requests beyond 14 days.
+
+### Analytics and Reporting
+- Branch-level circulation reports: checkouts, returns, renewals, overdues, and fines by period.
+- Collection utilisation heatmap: items never checked out, turnover rate, and demand gap analysis.
+- Acquisition spend reports by fund, vendor, and subject area with budget vs. actuals.
+- Membership analytics: active vs. lapsed members, demographic distribution, and tier conversion rates.
+- Exportable to CSV, PDF, and Power BI / Tableau via OData feed.
+
+---
 
 ## Primary Roles
 
-| Role | Responsibilities |
-|------|------------------|
-| Patron | Search catalog, manage holds, borrow/renew items, view account history |
-| Librarian / Circulation Staff | Issue and return items, manage holds, collect fines, handle exceptions |
-| Cataloging Staff | Maintain bibliographic records, classify items, merge duplicates, manage metadata quality |
-| Acquisitions Staff | Manage suppliers, purchase requests, receiving, and accession workflows |
-| Branch Manager | Monitor branch operations, inventory health, transfer queues, and performance metrics |
-| Admin | Configure policies, roles, integrations, notifications, and audit access |
+| Role | Key Responsibilities |
+|---|---|
+| **Member** | Search catalogue, place and manage holds, borrow and renew items, pay fines, manage notification preferences, request ILL |
+| **Librarian** | Issue and return items at the counter, process kiosk exceptions, collect fines, apply waivers, handle damaged/lost declarations |
+| **Cataloging Staff** | Create and edit bibliographic records, classify items, resolve ISBN conflicts, run bulk import jobs, merge duplicate records |
+| **Acquisitions Manager** | Manage vendor relationships, approve purchase orders above \$500, monitor budget ledgers, oversee donation intake |
+| **Branch Manager** | Monitor branch KPIs, manage transfer queues, run branch-level reports, configure branch pickup windows and hold policies |
+| **System Administrator** | Configure global policies, manage membership tiers and fine schedules, integrate external services, maintain audit logs and role assignments |
+
+---
 
 ## Getting Started
 
-1. Read `requirements/requirements-document.md` for the complete system scope.
-2. Review `analysis/use-case-descriptions.md` for end-to-end patron and staff workflows.
-3. Study `high-level-design/architecture-diagram.md` and `high-level-design/c4-context-container.md` for service boundaries.
-4. Use `detailed-design/api-design.md` and `detailed-design/erd-database-schema.md` for implementation planning.
-5. Review `edge-cases/` before finalizing policy, circulation, and inventory workflows.
-6. Execute from `implementation/implementation-playbook.md` when moving from design to delivery.
+1. **Understand the scope** — Read [`requirements/requirements-document.md`](requirements/requirements-document.md) for the complete list of functional and non-functional requirements, including performance SLOs and compliance obligations.
+
+2. **Trace the workflows** — Review [`analysis/use-case-descriptions.md`](analysis/use-case-descriptions.md) for step-by-step flows covering all six roles, then study [`analysis/bpmn-swimlane-diagram.md`](analysis/bpmn-swimlane-diagram.md) for the BPMN-level process maps.
+
+3. **Learn the business rules** — Read [`analysis/business-rules.md`](analysis/business-rules.md) for all normative policy rules (BR-01 through BR-15+) governing loans, fines, reservations, digital lending, acquisitions, and ILL.
+
+4. **Understand the architecture** — Study [`high-level-design/architecture-diagram.md`](high-level-design/architecture-diagram.md) and [`high-level-design/c4-context-container.md`](high-level-design/c4-context-container.md) to understand service boundaries, integration points, and the event bus topology.
+
+5. **Plan the data model** — Use [`detailed-design/erd-database-schema.md`](detailed-design/erd-database-schema.md) alongside [`detailed-design/api-design.md`](detailed-design/api-design.md) to map database constraints to API contracts before writing any DDL or controller code.
+
+6. **Review edge cases** — Browse [`edge-cases/`](edge-cases/) before finalising any circulation, reservation, or digital-lending logic; each file identifies known failure modes, expected system behaviour, and recommended mitigations.
+
+7. **Begin delivery** — Follow [`implementation/implementation-playbook.md`](implementation/implementation-playbook.md) for the phased sprint plan, Definition of Done criteria per phase, and integration test harness setup instructions.
+
+---
 
 ## Documentation Status
 
-- ✅ Requirements complete
-- ✅ Analysis complete
-- ✅ High-level design complete
-- ✅ Detailed design complete
-- ✅ Infrastructure complete
-- ✅ Edge cases complete
-- ✅ Implementation complete
-
-## Borrowing & Reservation Lifecycle, Consistency, Penalties, and Exception Patterns
-
-### Artifact focus: Program-level circulation blueprint
-
-This section is intentionally tailored for this specific document so implementation teams can convert architecture and analysis into build-ready tasks.
-
-### Implementation directives for this artifact
-- Define the canonical bounded contexts (`Catalog`, `Circulation`, `Identity`, `Billing`, `Notifications`) and their ownership boundaries.
-- List cross-context contracts that must be versioned (`LoanCreated`, `HoldAllocated`, `FineAssessed`) before implementation starts.
-- Set non-functional baselines: checkout/return latency, reconciliation SLOs, and security audit retention expectations.
-
-### Lifecycle controls that must be reflected here
-- Borrowing must always enforce policy pre-checks, deterministic copy selection, and atomic loan/copy updates.
-- Reservation behavior must define queue ordering, allocation eligibility re-checks, and pickup expiry/no-show outcomes.
-- Fine and penalty flows must define accrual formula, cap behavior, and lost/damage adjudication paths.
-- Exception handling must define idempotency, conflict semantics, outbox reliability, and operator recovery procedures.
-
-### Traceability requirements
-- Every major rule in this document should map to at least one API contract, domain event, or database constraint.
-- Include policy decision codes and audit expectations wherever staff override or monetary adjustment is possible.
-
-### Definition of done for this artifact
-- Content is specific to this artifact type and not a generic duplicate.
-- Rules are testable (unit/integration/contract) and reference concrete data/events/errors.
-- Diagram semantics (if present) are consistent with textual constraints and lifecycle behavior.
+| Section | Status | Notes |
+|---|---|---|
+| ✅ Requirements | Complete | Functional + NFR with acceptance criteria |
+| ✅ Analysis | Complete | Use cases, BPMN, data dictionary, event catalog, business rules |
+| ✅ High-Level Design | Complete | Architecture, C4 L1/L2, domain model, DFD, system sequences |
+| ✅ Detailed Design | Complete | API contracts, ERD, class diagram, state machines, C4 L3 |
+| ✅ Infrastructure | Complete | Cloud architecture, Kubernetes deployment, network topology |
+| ✅ Edge Cases | Complete | 8 domain-specific edge-case files with mitigations |
+| ✅ Implementation | Complete | Code guidelines, C4 L4, phased playbook |

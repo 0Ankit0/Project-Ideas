@@ -1,35 +1,95 @@
-# Edge Cases - Operations
+# Edge Cases — Operations
 
-| Scenario | Impact | Mitigation |
-|----------|--------|------------|
-| Background jobs lag, delaying overdue notices or hold notifications | Patron communication becomes unreliable | Monitor queue depth, freshness, and retry rates |
-| Branch loses connectivity during checkout | Staff cannot serve patrons | Provide degraded offline transaction buffering or documented fallback process |
-| Search cluster outage occurs | Discovery slows or fails | Fallback to database-backed minimal search for staff-critical flows |
-| Clock skew across services affects due dates and fines | Policy errors accumulate | Standardize time sources and centralize deadline calculations |
-| Bulk import or reindex floods reporting systems | Operational instability | Use backpressure, staged rollouts, and observable reprocessing workflows |
+This document catalogues infrastructure and operational failure modes for the Library Management System, deployed as Spring Boot microservices on AWS EKS. Each entry details a realistic failure scenario drawn from the production stack (PostgreSQL RDS Multi-AZ, Elasticsearch 8.x, Redis 7.x ElastiCache, Kafka MSK, S3, and SendGrid), quantifies its patron and staff impact, describes how it is detected, and specifies the concrete mitigation and recovery path. Engineering and on-call teams should treat this document as a living runbook supplement, cross-referenced with PagerDuty playbooks and Grafana dashboards.
 
-## Borrowing & Reservation Lifecycle, Consistency, Penalties, and Exception Patterns
+---
 
-### Artifact focus: Operational failure and recovery scenarios
+## Failure Mode Reference Table
 
-This section is intentionally tailored for this specific document so implementation teams can convert architecture and analysis into build-ready tasks.
+| Failure Mode | Impact | Detection | Mitigation / Recovery |
+|---|---|---|---|
+| **Database failover during checkout** — RDS primary fails mid-transaction; automatic Multi-AZ failover takes ~30 seconds | In-flight `POST /loans` requests fail with connection errors; the JDBC connection pool drains against a dead endpoint; patrons see 500 errors at the self-checkout kiosk and staff POS | CloudWatch `RDS/FailoverEvents` alarm fires within 60 seconds; HikariCP `hikaricp_connections_pending` metric spikes; Spring Boot health endpoint returns `DOWN` for the `db` component | HikariCP is configured with `connectionTimeout=5000`, `maxLifetime=120000`, and `initializationFailTimeout=-1`; the application retries failed transactions up to 3 times with exponential backoff (1 s, 2 s, 4 s) via Spring Retry; the JDBC URL includes `failoverReadOnly=false&autoReconnect=true`; in-flight transactions that were not yet committed are rolled back by the new primary and must be resubmitted; the loan request is idempotent on `(member_id, copy_id, checkout_timestamp_day)` to prevent duplicate loans on client retry |
+| **Redis cache eviction during peak load** — ElastiCache cluster (allkeys-lru policy) evicts session and availability-cache keys under memory pressure during a busy Saturday morning | Session lookups miss cache, forcing round-trips to PostgreSQL; `GET /catalog/availability` latency rises from ~15 ms to ~180 ms; sustained load may cause HikariCP pool exhaustion on the read replica | Prometheus `redis_evicted_keys_total` counter rate > 100/minute triggers a Grafana alert; ElastiCache CloudWatch `Evictions` and `CurrItems` metrics spike; API p99 latency breach alert fires in PagerDuty | Short-term: ElastiCache cluster node scaling via AWS console (vertical scale or adding a replica shard); medium-term: review and lower TTLs on low-value keys, segregate session store to a dedicated ElastiCache instance with `noeviction` policy, and use separate key namespaces (`session:`, `avail:`, `catalog:`) to allow targeted flush; the catalog availability cache is regenerated lazily on next read; active sessions are refreshed from PostgreSQL and re-cached transparently |
+| **ISBN API rate limiting** — OpenLibrary API returns HTTP 429 during a bulk catalog import of 200 items | Import job stalls; partially enriched catalog records are written to PostgreSQL in an inconsistent state (some with full metadata, some with title-only stubs) | The `catalog-service` logs `HTTP 429` from OpenLibrary; import job Prometheus metric `catalog_import_isbn_errors_total` increments; Grafana alert fires if > 5 errors in 60 seconds | The bulk import pipeline uses an adaptive rate-limiter (Resilience4j `RateLimiter`, 40 req/min, aligned with OpenLibrary's documented limit); on 429, the job pauses for the `Retry-After` header duration and retries with jitter; each import record is checkpointed in a `catalog_import_jobs` table with status `PENDING / ENRICHED / FAILED`; a staff-triggerable re-run endpoint `POST /admin/catalog/import/{jobId}/retry` reprocesses only `FAILED` records without duplicating `ENRICHED` ones; fallback: import with ISBN-only stub and schedule a background enrichment sweep at 02:00 UTC |
+| **Elasticsearch index rebuild during search queries** — A re-indexing operation causes search queries to slow to 5+ seconds or return partial results | Patrons experience slow or degraded catalog search; staff OPAC terminal becomes unresponsive under load; `GET /catalog/search` p99 breaches SLO (target < 500 ms) | Grafana `elasticsearch_index_search_slowlog_total` metric and ES slow-query log (`threshold.query.warn: 2s`); API gateway p99 latency alarm (CloudWatch); search error rate alert in PagerDuty | Re-indexing is always performed using the blue-green alias pattern: a new index `catalog_v{n+1}` is built while `catalog_alias` continues serving `catalog_v{n}`; the alias is atomically swapped only after the new index passes a document-count validation (within 0.1% of source); ES cluster is configured with dedicated coordinating nodes to isolate indexing I/O from search I/O; if an in-progress re-index is causing degradation, abort with `DELETE /_tasks/{taskId}` and reschedule during the 01:00–03:00 UTC maintenance window |
+| **Notification service downtime** — SendGrid API outage; hold-ready and overdue notifications are not delivered for up to 2 hours | Patrons miss hold pickup windows, leading to hold expiry and re-queuing; overdue patrons are not warned, accumulating fines they were unaware of; staff receive escalated complaints | SendGrid status page webhook triggers a CloudWatch custom metric `sendgrid_api_healthy = 0`; the `notification-service` Kafka consumer stops producing `notification.delivered` events; Prometheus `notifications_failed_total` rate alert fires | Outbound notification events are produced to Kafka topic `notifications.outbound` with `acks=all`; the `notification-service` consumer retries delivery with exponential backoff (max 6 attempts over 2 hours) before writing to a `notifications_dlq` topic; a fallback SMS channel (Twilio) is activated for hold-ready notifications when SendGrid failure duration > 15 minutes, controlled by a LaunchDarkly feature flag `use-sms-fallback`; once SendGrid recovers, an operator re-processes the DLQ via `POST /admin/notifications/replay-dlq` |
+| **Kafka consumer lag** — The `notification-service-group` consumer falls behind; members receive checkout confirmation emails 30 minutes late | Patron experience degrades; high-volume days (e.g., school book drives) generate complaints; staff cannot confirm whether notifications were sent | Kafka `consumer_lag` metric (via Prometheus JMX exporter) for `notification-service-group` exceeds 5,000 messages; CloudWatch MSK metric `MaxOffsetLag` alarm fires; Grafana consumer-lag dashboard shows sustained growth | HPA scales `notification-service` pods when CPU > 70% (up to 6 replicas); each pod consumes from a dedicated partition (topic has 6 partitions, matching max consumer count); if lag persists after scaling, the team can temporarily increase partition count and rebalance; Kafka message timestamps are preserved so the notification service emits events with correct `sentAt` metadata regardless of delivery delay; for SLA-sensitive hold notifications, a parallel synchronous path (direct SendGrid call) is used at loan creation, with Kafka serving as the async confirmation audit trail |
+| **Database connection pool exhaustion** — A peak checkout rush depletes HikariCP's pool (maxPoolSize=20 per pod × N pods); new requests queue beyond `connectionTimeout` | `POST /loans` returns HTTP 503; staff checkout terminals display "service unavailable"; kiosk self-checkout fails; queued requests time out after 5 seconds | HikariCP `hikaricp_connections_pending` > 5 for > 30 seconds fires a Prometheus alert; `hikaricp_connections_timeout_total` rate increases; API error rate alert fires in PagerDuty | Short-term: HPA adds `circulation-service` pods (CPU-based, but also triggered by custom metric `connections_pending_avg`); read-heavy requests (`GET /catalog`, `GET /loans/{id}`) are routed to the RDS read replica via a secondary HikariCP pool, reducing write-primary contention by ~60%; medium-term: review query performance (add missing indexes on `loans.member_id`, `loans.copy_id`) and enable connection multiplexing via PgBouncer in transaction mode sitting in front of RDS; circuit breaker (Resilience4j) opens after 50% of connection attempts fail within a 10-second window, returning fast 503s instead of queuing |
+| **Scheduled overdue job conflict** — Two instances of the overdue detection job run simultaneously (e.g., after a pod restart during the 01:00 UTC window), processing the same loans twice | Duplicate overdue events are published to Kafka; patrons receive duplicate fine accrual notifications; `fines` table may accumulate duplicate rows if the insert is not idempotent | PostgreSQL unique constraint on `(loan_id, accrual_date)` in the `fines` table causes the second run to log constraint violation errors; Prometheus `overdue_job_duplicate_run_total` counter increments; PagerDuty alert fires on duplicate fine insertions | The overdue job acquires a Redis distributed lock using `SETNX overdue_job_lock {pod_id} EX 3600` before executing; if the lock is already held, the pod exits immediately without processing; lock TTL (3600 s) ensures release even if the pod crashes mid-job; as a secondary guard, fine insertion uses `INSERT ... ON CONFLICT (loan_id, accrual_date) DO NOTHING` to make the write idempotent; lock acquisition and release are recorded in `scheduler_audit_log` for post-incident traceability |
+| **S3 digital content unavailability** — A regional S3 outage causes EPUB and PDF download endpoints to fail for all patrons | `GET /digital-loans/{id}/download` returns HTTP 502; patrons cannot access e-books mid-session; OverDrive DRM token issuance may also fail if the license manifest is stored on S3 | S3 `5xxError` rate CloudWatch alarm fires; `digital-service` health check (`/actuator/health`) transitions to `OUT_OF_SERVICE`; Grafana S3 error-rate panel alerts | Pre-signed S3 URLs are cached in Redis with a 55-minute TTL (URL validity is 60 minutes); patrons who already have a URL can continue downloading for up to 55 minutes after the outage begins; OverDrive DRM manifests are cached in ElastiCache for the loan duration; for outage duration > 1 hour, the platform activates an S3 cross-region replication failover: the `digital-service` config flag `s3.region.failover=us-west-2` is toggled via AWS SSM Parameter Store, which is picked up by Spring Cloud Config on next refresh (30-second poll interval); incident communications are sent to affected patrons via the notification service |
+| **K8s pod OOM kill during bulk import** — The `circulation-service` pod (memory limit: 512 Mi) is OOM-killed mid-way through a bulk loan import of 500 records | Import partially completes; some loans are created, others are not; staff see an incomplete import report; patrons whose loans were not created may attempt to borrow items that the system still marks as available | K8s `OOMKilled` event appears in `kubectl describe pod`; Prometheus `kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}` fires a PagerDuty alert; import job status in `bulk_import_jobs` table shows `IN_PROGRESS` without a `completed_at` timestamp after 10 minutes | Bulk import is implemented as a chunked, resumable job: records are processed in batches of 25, and each batch is committed independently; the `bulk_import_jobs` table tracks `last_processed_offset` so the job can resume from the last successful batch after pod restart; the import endpoint enforces a request size limit (max 100 records per API call) to constrain working-set memory; for large imports, staff use a CSV upload flow that enqueues records to a Kafka topic `bulk-import.loans`, allowing the consumer to process at a controlled rate; pod memory limit is reviewed quarterly and can be temporarily raised to 768 Mi via a Helm values override during planned bulk operations |
+| **Clock skew between services** — NTP drift causes `fine-service` and `circulation-service` to use different effective timestamps when computing due dates and fine amounts | Fine amounts are miscalculated by minutes to hours; a patron may be charged a fine for a book not yet overdue, or a genuine overdue may not accrue; audit logs show timestamp inconsistencies across services | Prometheus `node_timex_offset_seconds` metric on each EKS node; CloudWatch agent monitors NTP sync status; cross-service timestamp discrepancy alert fires when `fine-service` accrual timestamp differs from `circulation-service` due-date timestamp by > 60 seconds in event payloads | All services read wall-clock time from a shared `TimeProvider` bean injected via Spring context, backed by `java.time.Clock.systemUTC()`; due-date and overdue determination use the `due_date` stored in PostgreSQL (set at checkout time) rather than recalculating from the current timestamp; fine accrual events include the authoritative `loanDueDate` from the `loans` table, not the consumer's local clock; EKS nodes are configured to sync against AWS Time Sync Service (169.254.169.123) with `chrony`; SRE runbook includes a manual NTP re-sync procedure and a fine-correction script that recalculates affected fines using the PostgreSQL-stored timestamps |
+| **Backup restoration data inconsistency** — The most recent automated RDS snapshot is 2 hours old; loans, fines, and holds created since the snapshot do not exist in the restored database | Active loans appear as available copies; fines accrued since the snapshot are lost; holds that completed and triggered notifications have no corresponding loan record; patron accounts show incorrect balances | Detected during post-restore validation: the reconciliation script `scripts/validate-restore.sql` compares `loans.count`, `fines.total`, and `holds.count` against the last Kafka event offsets checkpointed in `event_checkpoint` table; discrepancy > 0 rows triggers a P1 incident | RDS Point-in-Time Recovery (PITR) allows restoration to any 5-minute window within the last 35 days; runbook instructs on-call engineers to prefer PITR over snapshot restore whenever possible, reducing data loss to < 5 minutes; post-restore, the Kafka `loans.created`, `fines.accrued`, and `holds.updated` topics are replayed from the checkpoint offset to reconstruct missing records (Kafka retention: 7 days); a reconciliation report is generated and reviewed by a senior engineer before the restored database is promoted to production; patron-facing impact is communicated via the status page and affected accounts are flagged for manual review |
 
-### Implementation directives for this artifact
-- Document backlog surge handling for allocator/fine jobs and safe throttling settings.
-- Provide replay and backfill strategy after prolonged message bus outage.
-- Define operator-only emergency controls and post-incident audit expectations.
+---
 
-### Lifecycle controls that must be reflected here
-- Borrowing must always enforce policy pre-checks, deterministic copy selection, and atomic loan/copy updates.
-- Reservation behavior must define queue ordering, allocation eligibility re-checks, and pickup expiry/no-show outcomes.
-- Fine and penalty flows must define accrual formula, cap behavior, and lost/damage adjudication paths.
-- Exception handling must define idempotency, conflict semantics, outbox reliability, and operator recovery procedures.
+## Database Resilience and Failover
 
-### Traceability requirements
-- Every major rule in this document should map to at least one API contract, domain event, or database constraint.
-- Include policy decision codes and audit expectations wherever staff override or monetary adjustment is possible.
+The Library Management System runs on an RDS PostgreSQL 15 Multi-AZ instance pair. The standby replica receives synchronous replication from the primary, and AWS orchestrates automatic failover within approximately 30 seconds when the primary becomes unhealthy. During this window, new JDBC connections are refused and existing connections are dropped.
 
-### Definition of done for this artifact
-- Content is specific to this artifact type and not a generic duplicate.
-- Rules are testable (unit/integration/contract) and reference concrete data/events/errors.
-- Diagram semantics (if present) are consistent with textual constraints and lifecycle behavior.
+All services use HikariCP as the connection pool with `maxPoolSize=20` per pod. The following retry configuration is applied via Spring Boot's `spring.datasource` and Spring Retry:
+
+```yaml
+spring:
+  datasource:
+    hikari:
+      connection-timeout: 5000
+      max-lifetime: 120000
+      keepalive-time: 60000
+  retry:
+    max-attempts: 3
+    backoff:
+      initial-interval: 1000
+      multiplier: 2.0
+      max-interval: 4000
+```
+
+When failover occurs, PostgreSQL's write-ahead log (WAL) ensures the standby has received all committed transactions up to the point of primary failure. However, transactions that were in-flight (not yet committed) at the moment of failure are not replicated and are rolled back by the new primary. Application code must never assume a transaction survived a connection error; all mutating endpoints (`POST /loans`, `PUT /loans/{id}/return`, `POST /fines/pay`) are designed to be safely retried. The loan creation endpoint uses a `(member_id, copy_id, checkout_date)` unique constraint to prevent duplicate loan rows on client retry. The JDBC connection URL includes `socketTimeout=30&connectTimeout=10` to ensure hung sockets are released promptly during failover.
+
+---
+
+## Distributed Job Scheduling and Idempotency
+
+Four nightly scheduled jobs run on the `circulation-service` pods:
+
+| Job | Schedule (UTC) | Description |
+|---|---|---|
+| Overdue detection | 01:00 | Scans `loans` for `due_date < NOW()` and publishes `loan.overdue` events; inserts fine records |
+| Hold expiry | 01:15 | Marks holds with `pickup_deadline < NOW()` as `EXPIRED`; releases the reserved copy |
+| Digital auto-return | 01:30 | Expires `digital_loans` where `loan_end_date < NOW()`; revokes OverDrive DRM token |
+| Fine accrual | 01:45 | Calculates daily fine increments for all open overdue loans up to the per-item cap |
+
+Each job acquires a distributed lock before executing to prevent duplicate runs when multiple `circulation-service` pods are active (typically 2–3 during off-peak hours):
+
+```
+SETNX scheduler:{job_name}_lock {pod_id}  EX 3600
+```
+
+If the `SETNX` command returns `0` (lock already held), the pod logs a warning and exits without processing. The TTL of 3600 seconds ensures the lock is released even if the owning pod crashes before explicitly releasing it. Lock acquisition, execution start, execution end, and records-processed count are all written to the `scheduler_audit_log` table with millisecond timestamps for post-incident analysis.
+
+Idempotency is enforced at the data layer: fine insertion uses `INSERT ... ON CONFLICT (loan_id, accrual_date) DO NOTHING`, hold expiry uses `UPDATE ... WHERE status = 'AVAILABLE_FOR_PICKUP'` (idempotent state transition), and digital auto-return checks `loan_end_date < NOW()` before issuing the DRM revocation call. Each job also records its `last_successful_run_at` in the `scheduler_audit_log`; if a job is manually re-triggered by an operator, it reads this timestamp and skips records whose `updated_at` predates the last successful run, ensuring re-runs are safe and do not reprocess already-handled records.
+
+---
+
+## Observability and Alerting
+
+The monitoring stack combines Prometheus (metrics scraping), Grafana (dashboards and alerting), and AWS CloudWatch (infrastructure alarms and MSK/RDS native metrics).
+
+**Prometheus metrics** are exposed by each Spring Boot service at `/actuator/prometheus` and scraped every 15 seconds. Key metric families include:
+- `http_server_requests_seconds` — API latency histograms per endpoint and status code
+- `hikaricp_connections_*` — pool size, pending, timeout counts per datasource
+- `kafka_consumer_fetch_manager_records_lag` — per-partition consumer lag
+- `elasticsearch_*` — index size, search latency, indexing throughput (via ES Prometheus exporter)
+- `redis_evicted_keys_total`, `redis_connected_clients` — cache health
+
+**SLO targets** enforced via Grafana alerting rules:
+
+| SLO | Target | Alert Threshold | PagerDuty Severity |
+|---|---|---|---|
+| API p99 latency (all endpoints) | < 500 ms | > 750 ms for 5 minutes | P2 |
+| Checkout success rate | > 99.9% | < 99.5% over 10 minutes | P1 |
+| Notification delivery time | < 5 minutes | > 10 minutes median lag | P2 |
+| Search p95 latency | < 800 ms | > 2 s for 3 minutes | P2 |
+| Fine calculation accuracy | 0 duplicate fines/day | Any duplicate fine detected | P1 |
+
+**On-call runbooks** are maintained in Confluence under `LMS > Runbooks > On-Call` and are linked from each PagerDuty alert via the `runbook_url` annotation in Prometheus alerting rules. The PagerDuty escalation path is: L1 on-call engineer (15-minute acknowledgement SLA) → L2 senior engineer (30 minutes) → Engineering Manager (60 minutes). For P1 incidents (checkout outage, database failover, data inconsistency), the incident commander opens a war-room Slack channel (`#lms-incident-{date}`) and posts updates every 15 minutes to the status page.

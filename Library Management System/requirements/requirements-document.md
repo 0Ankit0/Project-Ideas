@@ -1,167 +1,286 @@
-# Requirements Document - Library Management System
+# Requirements Document — Library Management System
+
+**Version:** 1.0  
+**Status:** Approved  
+**Last Updated:** 2025-07-14  
+**Document Owner:** Product Management  
+
+---
+
+## Table of Contents
+
+1. [Project Overview](#1-project-overview)
+2. [Functional Requirements](#2-functional-requirements)
+   - 2.1 Catalog Management (FR-001 – FR-012)
+   - 2.2 Circulation (FR-013 – FR-025)
+   - 2.3 Digital Lending (FR-026 – FR-033)
+   - 2.4 Reservations and Fines (FR-034 – FR-044)
+   - 2.5 Acquisitions (FR-045 – FR-053)
+   - 2.6 Reporting and Analytics (FR-054 – FR-065)
+3. [Non-Functional Requirements](#3-non-functional-requirements)
+4. [Constraints and Assumptions](#4-constraints-and-assumptions)
+5. [Success Metrics](#5-success-metrics)
+
+---
 
 ## 1. Project Overview
 
 ### 1.1 Purpose
-Build a comprehensive library management platform for a multi-branch public or institutional library that supports patron services, circulation, cataloging, acquisitions, branch operations, compliance, and optional digital lending in a single system.
+
+The Library Management System (LMS) is a multi-branch, cloud-native platform that consolidates patron services, physical and digital circulation, cataloging, acquisitions, and branch operations into a single authoritative system. It replaces fragmented spreadsheet-based and legacy standalone systems, providing real-time inventory visibility, configurable lending policies, and self-service patron capabilities across all library branches.
 
 ### 1.2 Scope
 
 | In Scope | Out of Scope |
 |----------|--------------|
-| Physical catalog and copy/item tracking | Full university ERP or SIS replacement |
-| Patron account lifecycle and membership rules | Original content creation or publishing workflows |
-| Search, issue, return, renew, hold, and waitlist flows | General retail commerce platform |
-| Fines, waivers, fee events, and payment reconciliation hooks | Full accounting ledger replacement |
-| Acquisitions, receiving, accession, and inventory audits | Large-scale archival preservation systems |
-| Multi-branch operations and transfers | Advanced research repository management |
-| Optional digital lending and license controls | Broad learning management workflows |
+| Physical catalog with bibliographic records and copy/item tracking | Full university ERP or student information system replacement |
+| Patron account lifecycle, membership tiers, and borrowing eligibility | Original content creation, publishing, or editorial workflows |
+| Search, checkout, return, renewal, hold, and waitlist flows | General retail commerce or point-of-sale platform |
+| Fines, waivers, fee events, and payment gateway integration hooks | Full double-entry accounting ledger |
+| Acquisitions, vendor management, receiving, and budget tracking | Large-scale archival preservation or digitization workflows |
+| Multi-branch operations, item transfers, and shelf audits | Advanced research repository or institutional repository management |
+| Digital lending with DRM token issuance and license enforcement | Broad learning management system (LMS) workflows |
+| Inter-library loan (ILL) initiation and tracking | ILL fulfillment network operations (handled by consortium partner) |
+| Role-based access control with branch-scoped permissions | HR or payroll system for library staff |
+| Notifications via email, SMS, and in-app channels | Custom mobile application development |
 
 ### 1.3 Operating Model
-- The system assumes multiple branches share a central catalog while holding branch-specific copies/items.
-- Patrons may borrow across branches according to policy and can optionally access licensed digital materials.
-- Staff access is segmented by role, branch scope, and operational privileges.
+
+The system operates under a shared-catalog, distributed-inventory model:
+
+- **Shared Catalog:** All branches share a single bibliographic database. Metadata updates made by cataloging staff are immediately visible system-wide.
+- **Branch Inventory:** Each physical copy is owned by and assigned to a specific branch. Copies may be transferred between branches through a formal transfer workflow.
+- **Cross-Branch Borrowing:** Patrons may borrow items from any branch, subject to configurable cross-branch lending policies. Hold requests route items to the patron's preferred pickup branch.
+- **Digital Materials:** Licensed digital titles (e-books, audiobooks, PDFs) are system-wide resources governed by concurrent-loan license counts, not branch inventory.
+- **Policy Configuration:** Circulation rules, fine schedules, hold expiry windows, and borrowing limits are configurable per patron type, material type, and branch. Central administrators set system-wide defaults; branch managers may apply branch-level overrides within defined bounds.
 
 ### 1.4 Primary Actors
 
-| Actor | Goals |
-|-------|-------|
-| Patron | Discover materials, borrow or reserve them, manage account status, and receive updates |
-| Librarian / Circulation Staff | Serve patrons, execute circulation, manage queues, and resolve exceptions |
-| Cataloging Staff | Maintain data quality, classifications, authority records, and deduplication |
-| Acquisitions Staff | Procure resources, manage vendors, receive materials, and track budgets or stock intake |
-| Branch Manager | Monitor circulation, inventory, transfer health, and branch-level compliance |
-| Admin | Define policies, roles, integrations, retention, and system configuration |
+| Actor | Role Description | Key Goals |
+|-------|-----------------|-----------|
+| **Member (Patron)** | Registered library member with active borrowing privileges | Discover and borrow physical and digital materials; manage account, fines, and holds via self-service |
+| **Librarian / Circulation Staff** | Front-desk staff responsible for day-to-day patron service | Execute checkouts, returns, renewals; process fines; resolve exceptions; manage hold pickups |
+| **Cataloging Staff** | Staff responsible for bibliographic data quality | Create and maintain catalog records; classify materials; import metadata; resolve duplicates |
+| **Acquisitions Manager** | Staff responsible for procurement and budget | Submit and approve purchase requests; manage vendor relationships; receive new stock; track budget expenditure |
+| **Branch Manager** | Operational lead for a specific branch | Monitor branch circulation, overdue trends, inventory gaps, and staff activity |
+| **System Administrator** | Technical operator with full system access | Configure policies, roles, integrations, retention schedules, and system-wide settings |
+
+---
 
 ## 2. Functional Requirements
 
-### 2.1 Identity, Membership, and Access Control
+> **Priority Definitions**
+> - **Must Have** — Required for go-live. System is not acceptable without this feature.
+> - **Should Have** — High business value; included in the first major release unless constrained by time.
+> - **Nice to Have** — Desirable enhancement; included in a subsequent release if capacity allows.
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-IAM-001 | System shall support patron, staff, and administrator accounts with role-based access control | Must Have |
-| FR-IAM-002 | System shall maintain membership status, expiry, borrowing eligibility, and branch affiliation for patrons | Must Have |
-| FR-IAM-003 | System shall support branch-scoped staff permissions and centrally managed admin roles | Must Have |
-| FR-IAM-004 | System shall audit privileged actions, policy changes, waivers, and inventory adjustments | Must Have |
+---
 
-### 2.2 Catalog and Discovery
+### 2.1 Catalog Management
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-CAT-001 | System shall manage bibliographic records for books and other media with ISBN/identifier support where applicable | Must Have |
-| FR-CAT-002 | System shall support multiple copies/items per title with branch-specific status, barcode/RFID, and shelf location | Must Have |
-| FR-CAT-003 | System shall provide search and filtering by title, author, subject, identifier, format, language, availability, and branch | Must Have |
-| FR-CAT-004 | System shall support subject tagging, classification metadata, and duplicate-record merge workflows | Must Have |
-| FR-CAT-005 | System shall expose availability and hold-queue information to patrons and staff in near real time | Must Have |
+| ID | Requirement | Priority | Acceptance Criteria |
+|----|-------------|----------|---------------------|
+| FR-001 | The system shall allow cataloging staff to create bibliographic records by entering or scanning an ISBN-10 or ISBN-13, auto-populating title, author(s), publisher, publication year, edition, language, and cover image from the OpenLibrary and Google Books APIs. | Must Have | Given a valid ISBN-13 is submitted, the system queries OpenLibrary and Google Books within 3 seconds and pre-fills all available metadata fields. Given the ISBN is not found in either source, the form remains open with a warning and allows manual entry. Given a duplicate ISBN already exists in the catalog, the system presents the existing record and prompts for merge or copy addition rather than creating a new bibliographic record. |
+| FR-002 | The system shall support bulk import of bibliographic records via MARC 21 and CSV file upload, with per-record validation, error reporting, and a dry-run preview mode before committing. | Must Have | Given a MARC 21 file is uploaded, the system parses all records, validates required fields (title, author, ISBN where present), and presents a summary showing total records, valid count, and error list with row references before the user confirms import. Given a CSV file exceeds 50,000 rows, the system processes it as a background job and notifies the user by email upon completion. Given validation errors exist, no records are committed until the user acknowledges or corrects errors. |
+| FR-003 | The system shall enrich existing catalog records with additional metadata (subjects, summaries, genre tags, table of contents) fetched from OpenLibrary, Google Books, and optionally WorldCat, triggerable on demand or as a scheduled batch job. | Should Have | Given a cataloging staff member requests enrichment for a specific record, the system fetches and displays proposed field additions for approval before applying. Given a scheduled batch enrichment job runs, it updates only fields that are currently empty and logs a change summary. Given no enrichment data is found for a record, the record is marked "enrichment attempted" with a timestamp to prevent repeated failed lookups. |
+| FR-004 | The system shall support Dewey Decimal Classification (DDC) and Library of Congress Classification (LCC) assignment for each bibliographic record, with suggestion assistance based on subject headings. | Must Have | Given a subject heading is entered for a new record, the system suggests the three most probable DDC classes and one LCC class. Given a class is manually assigned, it is stored and indexed for browse and facet filtering. Given a record is exported to MARC 21, the DDC and LCC fields are mapped to the correct MARC field codes (082 and 050 respectively). |
+| FR-005 | The system shall maintain an authority-controlled list of authors and publishers, linking each bibliographic record to normalized authority records to prevent duplicate entries and support consistent name searches. | Must Have | Given a new author name is entered, the system performs a fuzzy match against existing authority records and presents candidates. Given an authority record is merged with a duplicate, all linked bibliographic records are automatically updated. Given an author's name is changed in the authority record, the search index reflects the update within 60 seconds. |
+| FR-006 | The system shall track individual physical copies (items) linked to bibliographic records, each identified by a unique barcode and optionally an RFID tag, with fields for branch assignment, shelf location, material type, condition, and acquisition date. | Must Have | Given a copy is created, it receives a unique system-generated barcode and is assigned to a branch and shelf location. Given an RFID tag is scanned, the system resolves it to the correct copy record within 500 ms. Given a copy's branch assignment is changed, the change is recorded with a timestamp, operator identity, and reason code. |
+| FR-007 | The system shall support cataloging of digital resources (e-books, audiobooks, PDFs) with fields for file format, DRM type, license count, license expiry date, and platform provider. | Should Have | Given a digital title is cataloged, the license count field determines the maximum concurrent loans permitted. Given a digital resource's license expires, it is automatically flagged as unavailable and the acquisitions team is notified for renewal. Given a patron searches for a digital title, its format and platform are displayed alongside availability. |
+| FR-008 | The system shall provide full-text keyword search across title, author, subject, ISBN, publisher, and series fields, returning results within 500 ms at the 95th percentile under normal load. | Must Have | Given a keyword search is submitted, results are returned within 500 ms for 95% of requests under a load of 500 concurrent users. Given a search matches multiple fields, results are ranked by relevance score with exact matches ranked highest. Given no results are found, the system suggests alternative spellings and related subject terms. |
+| FR-009 | The system shall support faceted filtering on search results by format (book, DVD, audiobook, e-book, periodical), language, Dewey class range, publication year range, branch, and availability status. | Must Have | Given a user applies multiple facets, results update without a full page reload and the active filter set is displayed persistently. Given the availability facet is selected, only titles with at least one copy in "Available" status are shown. Given a branch facet is selected, only copies held at that branch are counted toward availability. |
+| FR-010 | The system shall display real-time copy availability for each title in search results and on item detail pages, showing total copies, copies available, copies on loan, and the current hold queue depth. | Must Have | Given a patron views a title detail page, the availability count reflects the current state within 60 seconds of any checkout, return, or hold event. Given all copies are on loan, the hold queue depth is shown and the patron is offered the option to join the queue. Given a title has copies at multiple branches, availability is broken down per branch. |
+| FR-011 | The system shall allow cataloging staff to flag, merge, and resolve duplicate bibliographic records, preserving all linked copies, circulation history, and active holds from both source records on the surviving record. | Must Have | Given two records are selected for merge, the system presents a field-by-field comparison and allows the operator to choose the authoritative value for each conflicting field. Given a merge is confirmed, all copies, loans, holds, and fine records linked to the discarded record are re-parented to the surviving record atomically. Given a merge operation fails mid-execution, the system rolls back to the pre-merge state without data loss. |
+| FR-012 | The system shall support collection-level organization including series, multi-volume sets, and periodical issues, linking individual items to their parent series or periodical title record. | Should Have | Given a series record is created, individual volumes can be linked to it and browsed together. Given a patron searches by series name, all volumes in the series are returned. Given a periodical title is cataloged, individual issues are tracked as items with volume and issue number metadata. |
 
-### 2.3 Circulation and Patron Services
+---
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-CIR-001 | Staff shall issue items to eligible patrons using barcode/RFID or account lookup | Must Have |
-| FR-CIR-002 | System shall support returns, renewals, due-date calculation, and overdue tracking | Must Have |
-| FR-CIR-003 | System shall support exception states for lost, damaged, missing, claimed-returned, and in-repair items | Must Have |
-| FR-CIR-004 | System shall enforce policy-based borrowing limits by patron type, item type, and branch rules | Must Have |
-| FR-CIR-005 | System shall maintain complete circulation history and patron-facing account views | Must Have |
+### 2.2 Circulation
 
-### 2.4 Reservations, Holds, and Notifications
+| ID | Requirement | Priority | Acceptance Criteria |
+|----|-------------|----------|---------------------|
+| FR-013 | The system shall enable circulation staff to check out an item to a patron by scanning the item barcode or entering the barcode manually, with automatic patron lookup by library card number, name, or phone number. | Must Have | Given a valid item barcode and patron card are scanned, the checkout completes and a due date is calculated within 2 seconds. Given the item is in "On Hold" status for a different patron, the system blocks checkout and shows the hold details. Given the patron account is expired, blocked for fines, or has reached their borrowing limit, the system displays the specific block reason and prevents checkout without a staff override. |
+| FR-014 | The system shall enforce patron-type and material-type borrowing limits, loan period rules, and branch-level policy overrides at checkout time, surfacing policy decision details to the operator. | Must Have | Given a patron has reached their maximum concurrent loan count for their membership tier, checkout is blocked with a clear message stating the limit and current count. Given the material type is "Reference" or "Reserve," the system applies a shortened loan period configurable per material type. Given a branch-level policy overrides a system-wide rule, the branch-level rule takes precedence and is logged as a policy override event. |
+| FR-015 | The system shall process item returns by barcode scan, update the copy status to "Available" or "In Transit" (if the return branch differs from the owning branch), trigger any waiting hold allocations, and print or display a receipt. | Must Have | Given an item is returned at its owning branch with no active holds, its status changes to "Available" within 5 seconds. Given an item is returned at a branch that is not the owning branch, its status changes to "In Transit" and a transfer notification is generated. Given an active hold exists for the returned item, the system allocates the copy to the first eligible patron in the hold queue and triggers a pickup notification. |
+| FR-016 | The system shall allow patrons to renew eligible loans via the OPAC self-service portal and allow staff to renew on behalf of a patron at the desk or by phone, subject to renewal policy limits. | Must Have | Given a patron renews a loan online with no active holds on the title, the due date is extended by the standard loan period and a confirmation is shown. Given a title has active holds queued, self-service renewal is blocked and the patron is informed. Given a patron has already renewed the item the maximum number of times (configurable per material type), further renewal is blocked. |
+| FR-017 | The system shall automatically detect and flag overdue loans on a nightly batch run and in real time during return processing, calculating accrued fines at the moment of return based on the applicable fine rate. | Must Have | Given an item is overdue by one or more days, the patron's account displays the accrued fine in real time based on the daily rate. Given a nightly overdue batch runs, all overdue loans are flagged and patron notification records are created. Given a fine exceeds the replacement cost of the item, the fine is capped at the replacement cost and the item is flagged for possible lost-item processing. |
+| FR-018 | The system shall support marking items as Lost, Damaged, Missing, Claimed Returned, or In-Repair, each with a required reason note and operator identity, automatically updating the copy availability and triggering appropriate fine or billing events. | Must Have | Given a copy is marked "Lost" by staff, the patron's account is charged a replacement fee based on the item's catalog replacement cost within 5 seconds. Given a copy is marked "Claimed Returned," the loan is suspended from active overdue calculation pending investigation and an audit note is created. Given a copy is marked "Damaged" upon return, a damage surcharge is calculated and the copy is placed in "Awaiting Inspection" status. |
+| FR-019 | The system shall support a recall workflow where staff can recall a checked-out item needed by another patron or branch, sending a recall notice to the current borrower with a shortened return deadline. | Should Have | Given a recall is initiated, the borrower receives a notification within 15 minutes via their preferred channel stating the new return deadline. Given the borrower returns the recalled item before the deadline, no recall fee is applied. Given the recall deadline passes without return, the system applies the recall overdue rate and escalates the overdue flag. |
+| FR-020 | The system shall maintain a complete, immutable circulation history for each copy and each patron account, retaining transaction records (checkout, return, renewal, exception) for a minimum of 7 years for audit purposes. | Must Have | Given a circulation transaction is recorded, it cannot be deleted or modified after the fact; corrections are added as amendment records. Given a patron requests their own circulation history, the OPAC displays loans from the current session only; full historical data is accessible to authorized staff only with a logged justification. Given a copy is deaccessioned, its circulation history is retained in archived form and remains searchable by staff. |
+| FR-021 | The system shall allow authorized staff to perform a supervised override of a circulation policy block (e.g., expired membership, exceeded limit), recording the overriding staff member's identity, the block reason bypassed, and the business justification. | Must Have | Given a staff member overrides a block, the transaction record contains the staff ID, the specific policy code overridden, the justification text, and a timestamp. Given the override exceeds a configurable threshold (e.g., fine balance over $50 overridden), a secondary supervisor approval step is required before the checkout proceeds. Given override audit records are generated, they are included in the daily exception report sent to branch managers. |
+| FR-022 | The system shall calculate due dates accurately according to branch open-day calendars, excluding holidays and configured closed days, so that due dates never fall on days when the branch is closed. | Must Have | Given a checkout occurs on a Thursday and the standard loan period is 14 days with Saturday and Sunday closures, the due date is calculated to the next open day at or after the 14-day window. Given a branch holiday is added to the calendar, due dates for existing loans that fall on the holiday are recalculated. Given a loan is renewed, the new due date is calculated from the date of renewal, not the original due date. |
+| FR-023 | The system shall track and display the current loan status for every copy in real time, including: Available, On Loan (with due date), Overdue, On Hold for Patron, In Transit, Lost, Damaged, Missing, In Repair, and Withdrawn. | Must Have | Given a copy's status changes for any reason, the catalog availability display reflects the new status within 60 seconds. Given a staff member views a copy record, all status transitions with timestamps and operator identities are visible in the item history. Given a patron searches the catalog, the availability display is accurate to the last status-change event. |
+| FR-024 | The system shall generate and print or email end-of-transaction receipts for checkouts, returns, renewals, and fine payments, containing item title, barcode, due date or amount paid, and branch name. | Should Have | Given a checkout completes, the system offers receipt printing via connected receipt printer or email to the patron's registered address. Given a patron opts for email receipts as a preference, the system emails the receipt within 60 seconds of the transaction. Given a return receipt is generated, it lists all items returned in the session and any fines triggered. |
+| FR-025 | The system shall support self-service checkout via the patron OPAC using a virtual library card barcode and compatible barcode scanner or webcam, following the same policy enforcement rules as staff-assisted checkout. | Nice to Have | Given a patron initiates self-checkout, the same policy pre-checks (fine balance, borrowing limit, item status) are applied as in staff-assisted checkout. Given a self-checkout is blocked by a policy rule, the patron is instructed to see a librarian with the specific reason displayed. Given self-checkout completes, the loan is recorded identically to a staff-assisted checkout and is visible in the patron's account immediately. |
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-HLD-001 | Patrons and staff shall place holds on eligible titles or specific items according to policy | Must Have |
-| FR-HLD-002 | System shall manage hold queues with pickup branch, expiration, and priority rules | Must Have |
-| FR-HLD-003 | System shall notify patrons when holds are available, expiring, overdue, or blocked by account restrictions | Must Have |
-| FR-HLD-004 | System shall support waitlist transitions during return, transfer, or cancellation events | Must Have |
+---
 
-### 2.5 Fines, Fees, and Financial Events
+### 2.3 Digital Lending
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-FIN-001 | System shall calculate overdue fines and replacement charges according to configurable policies | Must Have |
-| FR-FIN-002 | Staff shall be able to record payments, waivers, adjustments, and dispute notes with audit history | Must Have |
-| FR-FIN-003 | System shall block borrowing when account thresholds or policy restrictions are exceeded | Must Have |
-| FR-FIN-004 | System shall provide exportable financial-event reports for reconciliation | Should Have |
+| ID | Requirement | Priority | Acceptance Criteria |
+|----|-------------|----------|---------------------|
+| FR-026 | The system shall allow patrons to borrow digital titles (EPUB, PDF, audiobook) from the library's catalog, with format availability and license count displayed before checkout. | Should Have | Given a digital title has available licenses, a patron can initiate a digital loan from the catalog detail page. Given all licenses are in use, the patron is shown the hold queue depth and offered the option to join the waitlist. Given a patron borrows a digital title, they receive a download link or platform redirect within 30 seconds. |
+| FR-027 | The system shall issue time-limited DRM tokens or access credentials for borrowed digital titles, with a default loan window of 14 days, after which access is automatically revoked without patron action. | Should Have | Given a digital loan is issued, the DRM token or access link expires exactly 14 days after issuance (configurable per material type). Given the loan expires, the patron can no longer open or download the file and the license count is decremented. Given a patron returns a digital title early, the DRM token is revoked immediately and the license count is returned to the available pool. |
+| FR-028 | The system shall enforce simultaneous loan limits for digital titles based on the license model (one-copy-one-user, metered access, or simultaneous unlimited), blocking loans that would exceed the licensed concurrent user count. | Should Have | Given a title uses the one-copy-one-user model and all licenses are in use, no additional patrons can borrow it until a loan expires or is returned. Given a title uses metered access, each loan decrements the remaining circulation count and a warning is shown when fewer than 10% of licensed circulations remain. Given a title uses simultaneous unlimited licensing, any number of patrons may borrow it concurrently. |
+| FR-029 | The system shall integrate with OverDrive/Libby and optionally with Hoopla and cloudLibrary platforms, syncing catalog availability, patron authentication, and loan events bidirectionally. | Should Have | Given a patron authenticates via the library OPAC, they are passed to the OverDrive/Libby platform with single sign-on without re-entering credentials. Given a loan event occurs on the OverDrive platform, the system receives a webhook event and updates the patron's LMS account within 5 minutes. Given the OverDrive integration is unavailable, the catalog still displays digital titles with a degraded availability message rather than hiding them. |
+| FR-030 | The system shall support patron device registration, allowing up to 6 registered devices per patron account, with the ability to de-register a device from the OPAC or staff portal. | Should Have | Given a patron registers a device, it appears in their account settings with a device name and registration date. Given a patron de-registers a device, any active DRM tokens bound to that device are revoked within 15 minutes. Given a patron attempts to register a 7th device, the system blocks registration and prompts the patron to de-register an existing device first. |
+| FR-031 | The system shall automatically notify patrons 3 days before a digital loan expires, providing a one-click renewal option if no holds are queued, and an early return option at any time. | Should Have | Given a digital loan is 3 days from expiry and no holds are queued, the patron receives a notification with a renewal link that extends the loan for the standard period from the date of renewal. Given a digital loan is 3 days from expiry and holds are queued, the notification informs the patron that renewal is not available and the loan will expire as scheduled. Given a patron initiates an early return, the loan is closed and the license is released within 60 seconds. |
+| FR-032 | The system shall display a patron's active digital loans, loan expiry countdowns, download history, and waitlist positions in the OPAC account dashboard. | Should Have | Given a patron views their account dashboard, all active digital loans are listed with title, format, expiry date, and a countdown in days. Given a digital loan expires, it moves to the loan history section with the return date recorded. Given a patron is on a digital title waitlist, their queue position is displayed and updated in real time as loans expire or are returned. |
+| FR-033 | The system shall support audiobook lending with chapter-level progress tracking stored server-side, allowing patrons to resume playback from any registered device. | Nice to Have | Given a patron plays an audiobook on one device and opens it on another registered device, playback resumes from the last saved chapter and timestamp. Given a loan expires, the progress record is anonymized and retained for 30 days before deletion. Given a patron manually resets their progress, the previous progress marker is overwritten immediately. |
 
-### 2.6 Acquisitions, Inventory, and Branch Operations
+---
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-INV-001 | Staff shall create purchase requests, purchase orders, receiving records, and accession entries | Must Have |
-| FR-INV-002 | System shall support vendor records, expected delivery tracking, and receiving discrepancies | Must Have |
-| FR-INV-003 | Branches shall execute transfers, shelf audits, and stock counts with discrepancy logging | Must Have |
-| FR-INV-004 | System shall support write-off and repair workflows for lost or damaged materials | Must Have |
-| FR-INV-005 | Branch managers shall monitor utilization, stock gaps, and transfer turnaround metrics | Should Have |
+### 2.4 Reservations and Fines
 
-### 2.7 Digital Lending and Resource Access
+| ID | Requirement | Priority | Acceptance Criteria |
+|----|-------------|----------|---------------------|
+| FR-034 | The system shall allow patrons to place holds on any title in the catalog, specifying a preferred pickup branch, from the OPAC or by requesting assistance from a staff member. | Must Have | Given a patron places a hold on a title with available copies at a non-preferred branch, the system routes the item for transfer to the patron's preferred pickup branch. Given a patron places a hold on a title with no available copies, they are added to the hold queue in first-come-first-served order by hold placement timestamp. Given a patron has already placed a hold on the same title, the system prevents a duplicate hold from being created. |
+| FR-035 | The system shall manage hold queues with deterministic ordering (FIFO by placement time), support for priority overrides by authorized staff, and automatic queue advancement when a copy is returned or transferred. | Must Have | Given a returned copy matches a queued hold, the system assigns the copy to the first eligible patron in the queue within 5 seconds of the return transaction. Given a patron in the queue is no longer eligible (expired account, exceeded fines), the system skips them, logs the skip reason, and advances to the next eligible patron. Given a staff member applies a priority override, the event is recorded with the staff identity, reason, and the queue position change. |
+| FR-036 | The system shall send a hold-ready notification to the patron when their held item becomes available for pickup, using the patron's preferred notification channel (email, SMS, or in-app), with the pickup branch and hold expiry date included. | Must Have | Given a hold becomes available, the notification is delivered within 15 minutes of the hold allocation event. Given the patron's preferred notification channel is unavailable (e.g., invalid email), the system falls back to the secondary channel and logs the delivery failure. Given the notification is sent, the hold expiry countdown begins from the notification timestamp, not the item return timestamp. |
+| FR-037 | The system shall enforce a configurable hold pickup window (default: 7 calendar days), automatically canceling uncollected holds after the expiry window and sending a cancellation notification to the patron. | Must Have | Given a hold notification is sent and 7 days elapse without pickup, the system cancels the hold, returns the copy to "Available" status, and sends a cancellation notice to the patron. Given a patron's hold is canceled due to expiry, their position in the queue is not reinstated; they must place a new hold to rejoin the queue. Given a branch is closed on the hold expiry date, the expiry is extended by the number of closed days. |
+| FR-038 | The system shall allow patrons to suspend a hold for a specified date range (vacation hold), pausing their queue advancement without losing their position, for up to 60 consecutive days. | Should Have | Given a patron suspends a hold for 14 days, their queue position is preserved but copies that become available during the suspension window are allocated to the next unsuspended patron. Given the suspension period ends, the patron's hold re-activates automatically and resumes advancing in the queue. Given a patron suspends a hold while a copy is already allocated and awaiting pickup, the suspension has no effect on the active allocation. |
+| FR-039 | The system shall calculate overdue fines on a per-day basis using a configurable fine rate table indexed by material type (e.g., book: $0.25/day, DVD: $1.00/day, reference: $1.00/day), accruing from the day after the due date. | Must Have | Given an item is returned 5 days overdue and the fine rate for its material type is $0.25/day, the fine charged is $1.25. Given a fine exceeds the item's replacement cost as stored in the catalog record, the fine is capped at the replacement cost. Given a fine accrues over a weekend when the branch is closed, weekend days still count toward fine accrual unless the branch policy explicitly exempts them. |
+| FR-040 | The system shall support fine payment recording for both in-person cash/card transactions recorded by staff and online payments processed through an integrated payment gateway, with a payment receipt generated for each transaction. | Must Have | Given a staff member records a cash payment, the fine balance is reduced immediately and a receipt record is created with the staff identity, amount, and payment method. Given an online payment is processed through the payment gateway, the fine balance is updated within 30 seconds of payment confirmation and the patron receives an email receipt. Given a partial payment is recorded, the remaining balance is clearly displayed on the patron's account. |
+| FR-041 | The system shall allow authorized staff to waive a fine partially or fully, requiring a reason code selection from a predefined list and a free-text justification, with all waiver details logged immutably. | Must Have | Given a full waiver is applied, the fine balance is zeroed and the waiver record stores the staff identity, reason code, justification text, and timestamp. Given a partial waiver is applied, the remaining balance is updated and both the waiver and the original fine remain visible in the patron's transaction history. Given a waiver exceeds a configurable threshold (e.g., over $25.00), a second staff member must confirm the waiver before it is applied. |
+| FR-042 | The system shall block a patron from checking out new items when their total outstanding fine balance exceeds the configured block threshold (default: $10.00) or when they have an unreturned item that has been declared lost. | Must Have | Given a patron's fine balance reaches $10.01, all checkout attempts (self-service and staff-assisted) are blocked until the balance is reduced below the threshold. Given a patron has a lost item charge on their account, checkout is blocked regardless of the fine amount until the charge is resolved. Given the block threshold is reached during an active checkout session, the in-progress transaction is halted and the patron is notified. |
+| FR-043 | The system shall support an inter-library loan (ILL) initiation workflow where patrons or staff can request an item not held in the library's collection, generating a structured ILL request for submission to a consortium or partner library. | Should Have | Given a patron searches for a title with no holdings in the catalog, the OPAC displays a "Request via Inter-Library Loan" option. Given an ILL request is submitted, it enters a staff review queue with the patron's contact details, the requested item's bibliographic information, and the request date. Given an ILL request is approved by staff, the patron receives a notification and an estimated arrival timeline is recorded. |
+| FR-044 | The system shall apply a replacement charge to a patron's account when an item is declared lost, calculated as the item's replacement cost stored in the catalog record, and reverse the charge if the item is subsequently returned within a configurable recovery window (default: 90 days). | Must Have | Given an item is declared lost, the replacement charge equal to the catalog replacement cost is applied to the patron's account within 5 seconds. Given the item is recovered and returned within 90 days of the lost declaration, the replacement charge is reversed and the item's status is updated to its pre-lost state. Given the item is returned after the 90-day recovery window, the charge reversal requires staff authorization and the reversal is logged as an exception. |
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-DIG-001 | System shall optionally integrate with digital content providers for e-books or audiobooks | Should Have |
-| FR-DIG-002 | System shall enforce license counts, access windows, and concurrent-use limits | Should Have |
-| FR-DIG-003 | Patrons shall see digital entitlements and loan expirations in their account view | Should Have |
+---
 
-### 2.8 Reporting, Administration, and Operations
+### 2.5 Acquisitions
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-OPS-001 | System shall provide dashboards for circulation volume, overdue counts, hold queues, inventory exceptions, and branch performance | Must Have |
-| FR-OPS-002 | Administrators shall configure circulation policies, holidays, branch calendars, patron categories, and notification templates | Must Have |
-| FR-OPS-003 | System shall support exportable audit trails, inventory reports, and patron-service summaries | Must Have |
-| FR-OPS-004 | System shall provide event logs and operational observability for integrations and background jobs | Must Have |
+| ID | Requirement | Priority | Acceptance Criteria |
+|----|-------------|----------|---------------------|
+| FR-045 | The system shall allow any staff member to submit a purchase request for a new title or additional copies of an existing title, including a bibliographic description, estimated cost, preferred vendor, and business justification. | Must Have | Given a purchase request is submitted, it is assigned a unique request ID and enters the acquisitions review queue with "Pending Approval" status. Given a purchase request duplicates an existing catalog title with available copies, the system warns the submitter before allowing the request to proceed. Given a purchase request is for a digital license, the request form includes additional fields for license model, concurrent user count, and license term. |
+| FR-046 | The system shall enforce a two-level approval workflow for purchase requests exceeding $500 (line-item total), requiring initial acquisitions staff approval followed by branch manager or director approval, with email notification at each step. | Must Have | Given a purchase request totals $600, it is routed to acquisitions staff for initial review; upon approval it is escalated automatically to the branch manager for final approval. Given a purchase request totals $400, it requires only acquisitions staff approval before a purchase order is generated. Given an approver rejects a request, the submitter is notified with the rejection reason and the request is closed with a "Rejected" status. |
+| FR-047 | The system shall maintain a vendor registry with contact information, payment terms, discount agreements, preferred formats, and historical order and delivery performance metrics. | Must Have | Given a new vendor is added, all required fields (name, contact email, payment terms) must be completed before the vendor can be associated with a purchase order. Given a vendor record is updated, the change history is retained with the editor's identity and timestamp. Given a vendor's delivery performance is viewed, it shows average days from order to receipt and the percentage of orders received complete and on time. |
+| FR-048 | The system shall generate purchase orders from approved purchase requests, allow line-item grouping by vendor, and export purchase orders in PDF and EDI formats for transmission to vendors. | Must Have | Given an approved purchase request is selected, the system generates a draft purchase order pre-populated with vendor details, item description, quantity, and unit price. Given multiple approved requests are for the same vendor, the system offers to consolidate them into a single purchase order. Given a purchase order is finalized, it is assigned a sequential PO number and locked from further editing; amendments require a change-order workflow. |
+| FR-049 | The system shall support receiving inspection workflows, allowing staff to record items received against each purchase order line, note condition issues or missing items, and trigger automatic cataloging or accession for received items in good condition. | Must Have | Given items are received and marked against the PO, the received quantity and condition notes are recorded for each line item. Given received items are in acceptable condition, the system prompts staff to proceed to cataloging or accession for each new title. Given items are received damaged or short, a discrepancy report is generated and the vendor is flagged for follow-up. |
+| FR-050 | The system shall track acquisition budgets by fund code, department, and fiscal year, displaying real-time committed spend (approved POs not yet received), encumbered spend (POs in transit), and actual spend (received and invoiced items). | Must Have | Given a purchase order is approved, its total value is added to the committed spend for the associated fund code. Given items are received and invoiced, the committed amount is released and the actual spend is incremented by the invoiced amount. Given a fund code's committed plus actual spend reaches 90% of its budget, the system sends an alert to the acquisitions manager and branch manager. |
+| FR-051 | The system shall allow acquisitions staff to cancel a purchase order or individual line items, recording the cancellation reason, reverting any budget commitments, and notifying the vendor via a cancellation notice document. | Should Have | Given a PO line item is canceled before delivery, the committed budget amount for that line is released immediately. Given a full PO is canceled, all line item commitments are released and a cancellation document is generated for vendor notification. Given a PO is canceled after partial receipt, only the undelivered line items' commitments are released. |
+| FR-052 | The system shall track serial (periodical) subscriptions separately from one-time acquisitions, including subscription start and end dates, renewal dates, issue frequency, and automatic renewal reminders 60 days before expiry. | Should Have | Given a serial subscription record exists with a renewal date, the system sends a renewal reminder to acquisitions staff 60 days before expiry. Given a subscription renewal is recorded, the subscription end date and budget commitment are updated. Given a subscription lapses without renewal, the associated periodical catalog record is flagged as "Subscription Lapsed." |
+| FR-053 | The system shall provide an acquisitions dashboard showing pending requests by status, active POs by vendor, budget utilization by fund code, and items awaiting receiving, with drill-down capability to individual records. | Must Have | Given an acquisitions manager views the dashboard, all open POs with their current status, vendor, and value are listed. Given a budget fund code is at risk (over 90% utilized), it is visually highlighted in the budget utilization panel. Given the dashboard is filtered by date range, all metrics update to reflect only transactions within the selected period. |
+
+---
+
+### 2.6 Reporting and Analytics
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|----|-------------|----------|---------------------|
+| FR-054 | The system shall generate a Circulation Statistics Report showing total checkouts, returns, renewals, and active loans by branch, material type, patron category, and date range. | Must Have | Given a date range and branch filter are selected, the report returns accurate transaction counts within 10 seconds. Given the report is exported to CSV or PDF, all displayed data is included with column headers and filter parameters noted at the top of the document. Given circulation data for a closed branch is requested, the report includes historical data with a notation that the branch is closed. |
+| FR-055 | The system shall generate an Overdue Items Report listing all loans past their due date, filterable by branch, days overdue, patron category, and material type, with patron contact information included for staff use. | Must Have | Given the overdue report is generated, it includes the patron name, item title, barcode, due date, days overdue, and accrued fine amount for each record. Given the report is filtered to items overdue by more than 30 days, only those records are shown and the total replacement value at risk is displayed as a summary figure. Given the report is exported, patron contact information (phone, email) is included only in the staff-access export and redacted from shared versions. |
+| FR-056 | The system shall generate a Fine Collection Report showing total fines assessed, total collected, total waived, and outstanding balance by branch, date range, and staff member, with a breakdown by fine reason. | Must Have | Given the report is generated for a specific branch and date range, the summary shows total assessed, collected, waived, and net outstanding figures. Given the waived-by-staff breakdown is viewed, each staff member's total waived amount and number of waivers for the period is listed. Given the report is compared to a payment gateway settlement report, the collected amounts are reconcilable by transaction ID. |
+| FR-057 | The system shall generate an Acquisitions Budget Report showing budget allocation, committed spend, encumbered spend, and actual spend per fund code and fiscal year, with a projected year-end spend based on current run rate. | Must Have | Given a fund code and fiscal year are selected, the report shows the budget amount, total committed, total encumbered, total actual, and the remaining available balance. Given a fund code is overspent (actual exceeds budget), it is highlighted in red. Given the projected year-end is calculated, it is based on the monthly average actual spend rate for the current fiscal year. |
+| FR-058 | The system shall generate a Popular Items Report ranking titles by total checkout count over a configurable period, filterable by material type, subject, branch, and patron category, to inform collection development decisions. | Should Have | Given the report is run for the past 12 months, titles are ranked by checkout count with the top 50 displayed by default. Given a branch filter is applied, rankings reflect checkout activity only at the selected branch. Given a title appears in the top 10 with a hold queue depth greater than 5, the system highlights it as a candidate for additional copy acquisition. |
+| FR-059 | The system shall generate a Member Activity Report for individual patron accounts, showing loan history, fine history, hold history, and account status changes, accessible to the patron for their own data and to authorized staff with logged access. | Must Have | Given a patron requests their own activity report from the OPAC, the system generates it covering the current library card session only in compliance with reading history privacy policy. Given an authorized staff member accesses a patron's full history for investigative purposes, the access is logged with the staff identity, the patron ID accessed, and the stated reason. Given a patron's account is closed, their activity report is anonymized after the mandatory retention period. |
+| FR-060 | The system shall generate a Branch Performance Report showing circulation volume, hold fulfillment rate, average overdue rate, transfer volume, and inventory accuracy for each branch, with month-over-month trend comparisons. | Must Have | Given a branch manager views their branch performance report, all metrics cover the current and previous three calendar months. Given the hold fulfillment rate for a branch drops below 85%, it is flagged with a warning indicator. Given a branch's inventory accuracy drops below 95%, the metric is highlighted and a link to the most recent audit discrepancy report is provided. |
+| FR-061 | The system shall generate a Catalog Growth Report showing new bibliographic records added, new copies accessioned, withdrawals, and net collection size by branch and material type over a configurable period. | Should Have | Given the report covers the past fiscal year, it shows the beginning collection count, additions, withdrawals, and ending collection count for each branch. Given a material type is selected, only titles and copies of that type are counted. Given the report is exported to CSV, each row represents a single branch and material type combination with all metrics as columns. |
+| FR-062 | The system shall generate a Hold Queue Report showing all active holds by title, queue depth, estimated wait time per queue position, and hold age (days since placement), filterable by branch and material type. | Should Have | Given the hold queue report is generated, each title with active holds shows the queue depth, the date of the oldest hold, and the calculated average wait days based on the title's historical loan-to-return cycle time. Given a title's hold queue depth exceeds 10 and the estimated wait is over 60 days, it is flagged as a potential acquisition target. Given holds for a specific patron are requested by authorized staff, all active holds for that patron are listed with queue positions. |
+| FR-063 | The system shall generate a Digital Lending Report showing digital title checkouts, active loans, license utilization percentage, titles with exhausted licenses, and waitlist depth by platform and title. | Should Have | Given the report is generated for a date range, it shows each digital title's total loans, current active loans, license count, and utilization rate (active loans divided by license count). Given a title's license utilization exceeds 80%, it is highlighted as a candidate for license expansion. Given a platform filter is applied, only digital titles from that platform are included. |
+| FR-064 | The system shall generate an Inter-Library Loan Report showing total ILL requests submitted, fulfilled, and rejected; average fulfillment time in days; and top-requested titles not held in the local collection. | Should Have | Given the ILL report is generated for a date range, each row represents a single ILL request with its status, requesting patron ID (anonymized for export), requested title, partner library, and resolution date. Given the top-requested titles not in the collection are listed, they are ranked by request frequency and presented as collection development recommendations. Given the report is filtered by partner library, only ILL transactions with that specific partner are shown. |
+| FR-065 | The system shall generate a Staff Activity and Audit Report showing circulation transactions processed per staff member, override events, fine waivers, and policy exceptions by staff identity, branch, and date range, for supervisory and compliance review. | Must Have | Given the report is filtered to a specific staff member and date range, all checkouts, returns, overrides, waivers, and exceptions attributed to that staff member are listed. Given the report is generated for branch manager review, each staff member's override frequency and total waived fine amounts are summarized. Given an anomaly threshold is exceeded (e.g., more than 10 overrides in a single day by one staff member), the record is visually flagged in the report. |
+
+---
 
 ## 3. Non-Functional Requirements
 
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-P-001 | Search response time | < 500 ms p95 |
-| NFR-P-002 | Checkout or return transaction completion | < 2 seconds p95 |
-| NFR-P-003 | Availability update propagation | < 60 seconds |
-| NFR-A-001 | Service availability | 99.9% monthly |
-| NFR-S-001 | Concurrent active users | 10,000+ |
-| NFR-S-002 | Supported catalog size | 5M+ bibliographic records |
-| NFR-SEC-001 | Encryption | TLS 1.3 in transit, AES-256 at rest |
-| NFR-SEC-002 | Audit coverage | 100% privileged actions logged |
-| NFR-PRV-001 | Patron privacy | No unauthorized disclosure of reading history |
-| NFR-UX-001 | Accessibility | WCAG 2.1 AA for key patron and staff workflows |
+### 3.1 Performance
+
+| ID | Requirement | Priority | Target / Acceptance Criteria |
+|----|-------------|----------|------------------------------|
+| NFR-001 | Catalog search response time | Must Have | p95 latency ≤ 500 ms under 500 concurrent active users; p99 ≤ 1,500 ms |
+| NFR-002 | Checkout and return transaction time | Must Have | p95 end-to-end transaction time ≤ 2,000 ms from barcode scan to loan record written |
+| NFR-003 | Availability display staleness | Must Have | Catalog availability reflects the most recent checkout, return, or hold event within 60 seconds |
+| NFR-004 | Report generation time | Should Have | Standard reports (FR-054 to FR-065) complete within 30 seconds for date ranges up to 12 months; longer ranges execute as background jobs with email notification |
+| NFR-005 | Notification delivery latency | Should Have | Hold-ready and overdue notifications dispatched within 15 minutes of the triggering event; email delivery confirmed within 5 minutes of dispatch under normal mail infrastructure load |
+
+### 3.2 Availability and Reliability
+
+| ID | Requirement | Priority | Target / Acceptance Criteria |
+|----|-------------|----------|------------------------------|
+| NFR-006 | Service availability | Must Have | 99.9% monthly uptime for all patron-facing and circulation workflows, measured by synthetic availability monitoring |
+| NFR-007 | Planned maintenance window | Must Have | Maintenance windows scheduled outside peak hours (09:00–21:00 local branch time); branches notified at least 48 hours in advance |
+| NFR-008 | Recovery time objective (RTO) | Must Have | Full service restoration within 4 hours of any single-component failure |
+| NFR-009 | Recovery point objective (RPO) | Must Have | Maximum data loss of 15 minutes in the event of a catastrophic failure; database backups taken every 15 minutes with point-in-time recovery enabled |
+| NFR-010 | Background job reliability | Must Have | Scheduled batch jobs (overdue detection, hold expiry, notification dispatch) complete within their scheduled window with ≥ 99.5% success rate; failures trigger automated alerts to operations |
+
+### 3.3 Scalability
+
+| ID | Requirement | Priority | Target / Acceptance Criteria |
+|----|-------------|----------|------------------------------|
+| NFR-011 | Concurrent user support | Must Have | System sustains 10,000 concurrent active users (OPAC and staff combined) without degradation below NFR-001 and NFR-002 targets |
+| NFR-012 | Catalog size | Must Have | Search and availability queries perform within NFR-001 targets with a catalog of 5,000,000 bibliographic records and 15,000,000 physical copies |
+| NFR-013 | Horizontal scalability | Must Have | Application tier scales horizontally by adding instances with no code changes; auto-scaling triggers when CPU utilization exceeds 70% |
+| NFR-014 | Database write throughput | Should Have | The system supports up to 500 concurrent circulation write operations per second without transaction queuing |
+
+### 3.4 Security
+
+| ID | Requirement | Priority | Target / Acceptance Criteria |
+|----|-------------|----------|------------------------------|
+| NFR-015 | Transport encryption | Must Have | All client–server and service-to-service communication uses TLS 1.3; TLS 1.1 and below are refused |
+| NFR-016 | Data encryption at rest | Must Have | All persistent patron data, circulation records, and financial records are encrypted at rest using AES-256 |
+| NFR-017 | Authentication | Must Have | All staff and admin accounts use multi-factor authentication (MFA); patron accounts support optional MFA |
+| NFR-018 | Session management | Must Have | Staff sessions expire after 30 minutes of inactivity; patron sessions expire after 60 minutes; session tokens are invalidated on logout |
+| NFR-019 | Audit log coverage | Must Have | 100% of privileged actions (fine waivers, policy overrides, account deletions, role changes, data exports) are recorded in an immutable audit log |
+| NFR-020 | Vulnerability management | Must Have | No critical or high-severity CVEs in production dependencies; automated dependency scanning runs on every deployment pipeline execution |
+
+### 3.5 Privacy and Compliance
+
+| ID | Requirement | Priority | Target / Acceptance Criteria |
+|----|-------------|----------|------------------------------|
+| NFR-021 | Reading history privacy | Must Have | Patron borrowing history beyond the current active session is not disclosed to any party without the patron's explicit consent or a lawful court order; staff access requires a logged justification |
+| NFR-022 | Data retention and deletion | Must Have | Patron personal data is purged or anonymized within 30 days of account closure in compliance with applicable data protection regulations; financial records are retained for 7 years per accounting requirements |
+| NFR-023 | Export control | Must Have | Data exports containing patron personal information require role-level authorization and are logged with the exporting user's identity, the data scope, and timestamp |
+
+### 3.6 Accessibility and Usability
+
+| ID | Requirement | Priority | Target / Acceptance Criteria |
+|----|-------------|----------|------------------------------|
+| NFR-024 | Web accessibility | Must Have | OPAC and staff portal meet WCAG 2.1 Level AA conformance for all core workflows (search, checkout, account management); verified by automated tooling and manual screen-reader testing |
+| NFR-025 | Mobile responsiveness | Should Have | OPAC is fully functional on mobile devices with viewports from 360 px width; all primary patron actions (search, hold, renew, view account) are usable without horizontal scrolling |
+| NFR-026 | Internationalization | Should Have | UI supports UTF-8 throughout; catalog records support multilingual titles and author names; the patron-facing OPAC is localizable to additional languages via configuration |
+
+---
 
 ## 4. Constraints and Assumptions
 
-- The implementation must support a shared catalog with branch-specific inventory.
-- Barcode support is assumed; RFID integration should remain optional.
-- Digital lending is optional but should be structurally supported in the design.
-- Financial handling may integrate with external payment systems rather than becoming a full accounting system.
-- Policy engines must remain configurable because borrowing rules differ across branches and patron categories.
+### 4.1 Technical Constraints
+
+- The system must support a shared bibliographic catalog with branch-specific physical inventory; single-branch deployments are a supported subset of this model.
+- Barcode-based item identification is mandatory; RFID integration is optional and must not block deployment of barcode-only branches.
+- All integration points (payment gateway, digital lending platforms, notification services) must use documented APIs; no direct database integration with third-party systems is permitted.
+- The system must be deployable in a cloud environment (AWS, Azure, or GCP) and support containerized deployment via Kubernetes.
+- The system must operate correctly in environments where branch internet connectivity is intermittent; a local cache or offline-capable mode for basic circulation is a post-go-live enhancement.
+
+### 4.2 Policy and Business Constraints
+
+- Circulation policies (loan periods, fine rates, borrowing limits) must be configurable by authorized administrators without requiring a software deployment.
+- The system must not replace an external payment gateway; it records payment events and integrates with an external processor for card transactions.
+- Digital lending integration is optional at go-live; the system must be architecturally ready to activate it without a schema migration for branches that add it later.
+- ILL request initiation is in scope; ILL fulfillment network management (OCLC WorldShare ILL, RapidILL) is out of scope and handled by a consortium partner system.
+
+### 4.3 Assumptions
+
+- All branches will have reliable wired internet connectivity at circulation desks (minimum 10 Mbps); patron self-service kiosks may use Wi-Fi.
+- Existing bibliographic data can be exported from the legacy system in MARC 21 format for initial bulk import.
+- Each branch will designate at least one staff member as the local system administrator responsible for configuration and first-line support.
+- The library's legal team will provide the data retention policy durations that supersede the system defaults stated in this document.
+- Patron notification preferences (email, SMS, in-app) are collected at account registration; accounts without a registered phone number default to email-only notifications.
+
+---
 
 ## 5. Success Metrics
 
-- 95% of standard issue and return transactions complete without manual override.
-- 100% of cataloged items remain traceable by branch, status, and last transaction.
-- 100% of fine waivers and inventory write-offs are auditable.
-- Hold queue movement is visible and correct for all returned or canceled items.
-- Branch managers can identify overdue risk, missing stock, and transfer bottlenecks from one dashboard.
-
-## Borrowing & Reservation Lifecycle, Consistency, Penalties, and Exception Patterns
-
-### Artifact focus: Normative product requirements
-
-This section is intentionally tailored for this specific document so implementation teams can convert architecture and analysis into build-ready tasks.
-
-### Implementation directives for this artifact
-- Translate lifecycle and penalty logic into MUST/SHOULD requirements with measurable acceptance criteria.
-- Attach compliance and audit obligations to each high-risk requirement.
-- State compatibility constraints for multi-branch and consortium lending scenarios.
-
-### Lifecycle controls that must be reflected here
-- Borrowing must always enforce policy pre-checks, deterministic copy selection, and atomic loan/copy updates.
-- Reservation behavior must define queue ordering, allocation eligibility re-checks, and pickup expiry/no-show outcomes.
-- Fine and penalty flows must define accrual formula, cap behavior, and lost/damage adjudication paths.
-- Exception handling must define idempotency, conflict semantics, outbox reliability, and operator recovery procedures.
-
-### Traceability requirements
-- Every major rule in this document should map to at least one API contract, domain event, or database constraint.
-- Include policy decision codes and audit expectations wherever staff override or monetary adjustment is possible.
-
-### Definition of done for this artifact
-- Content is specific to this artifact type and not a generic duplicate.
-- Rules are testable (unit/integration/contract) and reference concrete data/events/errors.
-- Diagram semantics (if present) are consistent with textual constraints and lifecycle behavior.
+| Metric | Target | Measurement Method |
+|--------|--------|--------------------|
+| Checkout transaction success rate (without manual override) | ≥ 95% | Ratio of clean checkouts to total checkout attempts, excluding intentional overrides |
+| Catalog item traceability | 100% | Every copy in the catalog has a current status, branch assignment, and last-transaction record |
+| Hold queue accuracy | 100% | Every returned or canceled copy with an active hold is allocated to the correct next-eligible patron within 5 seconds |
+| Fine audit completeness | 100% | Every fine waiver and write-off has a corresponding immutable audit record with staff identity and reason |
+| Overdue detection latency | ≤ 24 hours | All overdue loans identified and flagged by the nightly batch run, with patron notifications dispatched by 08:00 the following morning |
+| Availability display accuracy | ≥ 99% | Catalog availability matches actual item status for 99% of items at any point in time, validated by periodic spot-check audits |
+| Acquisitions budget accuracy | 100% | Budget committed, encumbered, and actual figures in the system match the finance team's records within ±$1 (rounding tolerance) at month-end |
+| Digital lending license compliance | 100% | The number of concurrent active digital loans never exceeds the licensed limit for any title, verified by automated monitoring |
+| System availability | ≥ 99.9% | Monthly uptime calculated from synthetic monitoring with 1-minute intervals across all patron-facing endpoints |
+| Staff onboarding time | ≤ 4 hours | New circulation staff can independently process checkouts, returns, fines, and holds after a 4-hour guided training session |

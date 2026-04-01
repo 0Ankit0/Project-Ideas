@@ -1,35 +1,81 @@
-# Edge Cases - Acquisitions and Inventory
+# Edge Cases — Acquisitions and Inventory
 
-| Scenario | Impact | Mitigation |
-|----------|--------|------------|
-| Vendor ships fewer items than ordered | Receiving mismatch | Record discrepancy and partial receipt states |
-| Received items are damaged | Copy availability and financial records diverge | Capture damaged-on-receipt workflow and supplier follow-up |
-| Inter-branch transfer never arrives | Inventory appears lost | Use dispatch, in-transit, received, and exception states with alerts |
-| Shelf audit finds ghost items in system | Trust in inventory drops | Support discrepancy reconciliation with manager approval |
-| Repair workflow lasts longer than expected | Holds and availability become misleading | Keep repair status visible and exclude from circulation eligibility |
+The acquisitions and inventory domain covers the full lifecycle of bringing physical items into the collection: selecting titles, raising purchase orders, managing budgets, receiving shipments, inspecting items, attaching barcodes and RFID tags, and finally making copies available for circulation. Each step involves financial commitments, vendor relationships, and physical handling that can diverge from the ideal path. The edge cases below document every significant failure mode, its downstream impact across budget, catalog, and circulation subsystems, how the system detects the condition, and the concrete mitigation or recovery procedure that operators and automated processes must follow.
 
-## Borrowing & Reservation Lifecycle, Consistency, Penalties, and Exception Patterns
+---
 
-### Artifact focus: Acquisition/inventory edge handling
+## Failure Mode Reference
 
-This section is intentionally tailored for this specific document so implementation teams can convert architecture and analysis into build-ready tasks.
+| Failure Mode | Impact | Detection | Mitigation / Recovery |
+|---|---|---|---|
+| **Vendor fulfillment partial shipment** — Ordered 10 copies, vendor ships only 6 | Four `PurchaseOrderLine` items remain unaccounted for; encumbered budget stays locked; holds queued against expected copies cannot be fulfilled on schedule | `POST /purchase-orders/{id}/receive` records `received_qty = 6` against `ordered_qty = 10`; system transitions PO to `PARTIALLY_RECEIVED` and emits `PurchaseOrderPartiallyReceived` event | Create `ReceivedItem` records for the 6 arrived copies and immediately route them through inspection. Raise a vendor follow-up task with a configurable deadline (default 14 days). If the outstanding 4 copies are not shipped within the deadline, the Acquisitions Manager may split the PO line: close the fulfilled portion, release encumbrance for the 4 missing units, and optionally re-order from an alternate vendor. Notify patrons on hold that availability is delayed. |
+| **Budget exceeded mid-order** — Budget was available at approval time but depleted before the order was sent to the vendor | PO submission would cause `BudgetLine.available_balance` to go negative; downstream purchases are blocked; vendor relationship may be affected if PO is cancelled after issuance | The system performs an optimistic-lock check at `APPROVED → SUBMITTED` transition: it re-reads `BudgetLine.available_balance` and compares it against the PO total. If `available_balance < po_total`, the transition is rejected and a `BudgetInsufficient` error (HTTP 422) is returned | Block PO submission and emit `PurchaseOrderSubmissionFailed` with reason `BUDGET_EXHAUSTED`. Notify the Acquisitions Manager with a budget variance report. Operator options: (a) reduce order quantity to fit remaining balance, (b) request an emergency budget supplement via the admin interface, (c) defer the PO to the next fiscal period. The system must not partially encumber; the entire PO either encumbers or is held. |
+| **Item arrives damaged** — Received copy has physical damage noted during inspection | Damaged copy must not enter circulation; vendor credit or replacement is required; if this was the only copy ordered, holds remain unfulfilled | During `POST /purchase-orders/{id}/receive`, the operator sets `condition = DAMAGED` on the `ReceivedItem` record. The system withholds the copy from the `AVAILABLE` pool and emits `ItemReceivedDamaged` | Automatically create a `VendorCreditRequest` linked to the `ReceivedItem` and the originating `PurchaseOrderLine`. Set copy status to `QUARANTINED`. If the vendor confirms a replacement shipment, the credit request transitions to `REPLACEMENT_PENDING`; if a monetary credit is issued instead, the credit is applied to the vendor's account balance and the `BudgetLine` is adjusted. Quarantined copies are excluded from hold fulfillment until status is resolved. |
+| **Duplicate order detection** — Same ISBN ordered twice from the same vendor within 30 days | Overstocking and unnecessary budget encumbrance; duplicate physical processing effort; patron-visible copy count becomes misleading | On `POST /purchase-orders`, the system queries open and recently closed `PurchaseOrderLine` records for the same `isbn` and `vendor_id` within a 30-day rolling window. A match triggers a `DuplicateOrderWarning` response (HTTP 200 with `warnings[]` array) rather than a hard block | Surface the warning in the UI with details of the existing order (PO number, quantity, status). Require an explicit `force_duplicate: true` flag in the request body to proceed. Log the override in the audit trail with the approving user's ID. If the duplicate was unintentional, cancel the new draft PO before approval to avoid double encumbrance. |
+| **Budget year rollover** — Fiscal year ends with open purchase orders; encumbered amounts must roll over | Encumbered funds become stranded if the old `BudgetLine` is closed; vendor invoices arriving in the new year would have no budget line to charge against | A scheduled job runs on the last business day of the fiscal year, identifying all POs in `APPROVED`, `SUBMITTED`, or `PARTIALLY_RECEIVED` status whose `budget_line_id` references the expiring fiscal year | For each open PO, the System Administrator chooses one of three rollover strategies per `BudgetLine`: **carry forward** (clone the encumbered amount into the new-year `BudgetLine` and re-link the PO), **expire** (cancel the PO, release encumbrance, and notify the Acquisitions Manager), or **convert** (close the old PO and raise a new PO in the new fiscal year with the same lines). The `fiscal_year` entity transitions from `ACTIVE` to `CLOSED` only after all linked POs are resolved. Emit `FiscalYearRolledOver` with a summary of affected POs. |
+| **Vendor discontinues item** — Vendor marks ordered item as out of print after PO is issued | PO line can never be fulfilled; encumbered budget is permanently locked unless explicitly released; patrons on hold are waiting for an item that will not arrive | Vendor EDI feed or manual catalog update sets `VendorCatalog.availability = OUT_OF_PRINT` for the ISBN. A background reconciliation job cross-references all open `PurchaseOrderLine` records against `VendorCatalog` and emits `VendorItemDiscontinued` for each match | Notify the Acquisitions Manager with a list of affected PO lines. Operator must either: (a) substitute with an alternative edition (update `PurchaseOrderLine.isbn` after confirming with the vendor and re-running duplicate detection), or (b) cancel the line, release encumbrance, and optionally re-open a new PO against a different vendor. Patrons on hold for the original ISBN must be notified; if an alternative edition is substituted, staff review hold compatibility before transferring the queue. |
+| **Invoice amount mismatch** — Vendor invoice total differs from PO total by more than $5 | Paying the wrong amount causes either an underpayment (vendor dispute) or overpayment (financial loss); three-way match fails; payment cannot be released | On `POST /purchase-orders/{id}/invoice`, the system compares `invoice.total` against `sum(PurchaseOrderLine.unit_price * ordered_qty)`. A discrepancy exceeding the configured tolerance (default $5.00, configurable per `vendor_id`) raises a `InvoiceMismatch` error (HTTP 409) | Block payment release and emit `InvoiceMatchFailed` with `po_total`, `invoice_total`, and `delta`. Route to the Acquisitions Manager for manual review. Resolution paths: (a) request a corrected invoice from the vendor, (b) approve the variance if it is within policy (requires Branch Manager sign-off for delta > $50), or (c) issue a partial payment for the PO amount and dispute the remainder. All resolution actions are recorded in the audit log with the approver's ID and justification. |
+| **Item cataloged before received** — Staff creates catalog record for an item whose physical copy has not yet arrived | Copy status `ON_ORDER` is correctly set, but if the cataloging system defaults to `AVAILABLE`, the item appears loanable before it physically exists; holds may be fulfilled against a ghost copy | The catalog creation API checks `PurchaseOrderLine.status` for the ISBN. If status is not `FULLY_RECEIVED` or `PARTIALLY_RECEIVED`, the copy is created with status `ON_ORDER` regardless of the operator's input. The constraint is enforced at the database level via a trigger on `copy.status` | Pre-cataloging is a supported workflow (it allows metadata to be prepared ahead of arrival), but the `ON_ORDER` status lock must be enforced. When `POST /purchase-orders/{id}/receive` records the physical arrival of the copy and links it to the catalog record via barcode, the copy status automatically transitions to `IN_PROCESSING` and then to `AVAILABLE` after RFID/barcode attachment is confirmed. Patrons may place holds against `ON_ORDER` copies but loans are not permitted until status is `AVAILABLE`. |
+| **RFID/barcode printing failure** — Received batch of 50 books; label printer jams at item 23 | Items 23–50 have `ReceivedItem` records but no attached barcode or RFID tag; they cannot be checked out; they may be shelved without a scannable identity | The receiving workflow creates `ReceivedItem` records with `label_status = PENDING` and transitions them to `LABEL_PRINTED` only after the printer confirms successful print via callback. A batch print job tracks per-item status; any item remaining in `PENDING` after the batch completes raises a `LabelPrintFailed` alert | The system generates a reprint queue containing all items with `label_status = PENDING` or `LABEL_FAILED` from the affected batch, identified by `purchase_order_id` and `batch_sequence >= 23`. Staff clear the jam, reload the printer, and trigger `POST /received-items/reprint-batch` with the queue. Reprinted labels use the same barcode and RFID values already assigned; no new identifiers are generated. Items remain in `IN_PROCESSING` status and are excluded from the `AVAILABLE` pool until `label_status = PRINTED` is confirmed. |
+| **Acquisition for already-overstocked title** — Requesting 5 more copies of a title with 20 existing copies and only 2 active loans | Budget is encumbered for copies that are unlikely to circulate; storage capacity is wasted; copy-to-demand ratio worsens | On `POST /purchase-orders`, the system computes the title's `circulation_ratio = active_loans / total_copies` and compares it against a configurable threshold (default: flag if `circulation_ratio < 0.15` and `requested_qty` would increase `total_copies` beyond a configured ceiling) | Surface a `LowDemandWarning` in the response body. The warning includes `current_copies`, `active_loans`, `circulation_ratio`, and the projected ratio after the new acquisition. Require an explicit `override_reason` field (free text, minimum 20 characters) to proceed. The override and reason are stored in the `PurchaseOrder` record and included in the next Collection Development report. Branch Managers receive a weekly digest of overridden low-demand orders. |
+| **Inter-library loan substituted for purchase** — Item requested via ILL while an acquisition order for the same title is also open | Patron receives the item via ILL before the purchased copy arrives; the purchased copy may arrive to no immediate demand; ILL fees are incurred unnecessarily | On `POST /ill-requests`, the system checks open `PurchaseOrderLine` records for the same ISBN. If a PO line in `APPROVED`, `SUBMITTED`, or `PARTIALLY_RECEIVED` status exists, a `PendingAcquisitionConflict` warning is returned | Present the conflict to the ILL librarian with the expected arrival date of the purchased copy. If the PO copy is due within 7 days, recommend waiting and auto-cancel the ILL request draft. If the PO arrival is uncertain (e.g., status `PARTIALLY_RECEIVED` with the ISBN still outstanding), allow the ILL to proceed. When the purchased copy subsequently arrives and the same patron has a hold, the system checks whether the ILL loan is still active; if so, the hold is deferred to the next patron in queue rather than double-fulfilling the request. |
 
-### Implementation directives for this artifact
-- Define behavior for duplicate barcodes, supplier short-shipments, and receiving mismatches.
-- Specify quarantine workflow for newly received damaged copies before circulation eligibility.
-- Cover retroactive metadata corrections and their impact on outstanding holds.
+---
 
-### Lifecycle controls that must be reflected here
-- Borrowing must always enforce policy pre-checks, deterministic copy selection, and atomic loan/copy updates.
-- Reservation behavior must define queue ordering, allocation eligibility re-checks, and pickup expiry/no-show outcomes.
-- Fine and penalty flows must define accrual formula, cap behavior, and lost/damage adjudication paths.
-- Exception handling must define idempotency, conflict semantics, outbox reliability, and operator recovery procedures.
+## Purchase Order Approval Workflow
 
-### Traceability requirements
-- Every major rule in this document should map to at least one API contract, domain event, or database constraint.
-- Include policy decision codes and audit expectations wherever staff override or monetary adjustment is possible.
+Purchase orders pass through a tiered approval chain defined in business rule **BR-07**. The approval tier is determined by the total value of the `PurchaseOrder` at the time of submission.
 
-### Definition of done for this artifact
-- Content is specific to this artifact type and not a generic duplicate.
-- Rules are testable (unit/integration/contract) and reference concrete data/events/errors.
-- Diagram semantics (if present) are consistent with textual constraints and lifecycle behavior.
+| Tier | Amount Range | Approver Role | Transition |
+|---|---|---|---|
+| 1 | ≤ $500 | Auto-approved by system | `DRAFT → APPROVED` immediately on submission |
+| 2 | $501 – $2,000 | Acquisitions Manager | Manual review via `POST /purchase-orders/{id}/approve` |
+| 3 | $2,001 – $10,000 | Branch Manager | Manual review; Acquisitions Manager recommendation required |
+| 4 | > $10,000 | System Administrator | Manual review; Branch Manager sign-off required as prerequisite |
+
+When an approver calls `POST /purchase-orders/{id}/approve`, the system emits **`PurchaseOrderApproved`** containing `po_id`, `approved_by`, `approved_at`, and the encumbered `budget_amount`. Downstream consumers (budget service, vendor notification service) react to this event to lock funds and queue the order for transmission. If the approver rejects the order, the system emits **`PurchaseOrderRejected`** with a mandatory `rejection_reason` string; the PO transitions to `DRAFT` so the requestor can amend and resubmit.
+
+Budget allocation uses an **optimistic lock pattern** to prevent race conditions when multiple POs are approved concurrently. At submission time, the system snapshots `BudgetLine.available_balance` and stores it as `PurchaseOrder.budget_snapshot`. At the moment of approval (or auto-approval), the system re-reads the live `BudgetLine.available_balance` and compares it to the PO total. If the live balance is less than the PO total — meaning another PO consumed the funds between submission and approval — the approval is rejected with `BUDGET_EXHAUSTED` and the PO returns to `PENDING_APPROVAL` with a notification to the requestor. This ensures no PO approval can overdraw a budget line, even under concurrent load.
+
+---
+
+## Budget Encumbrance and Fiscal Year Rollover
+
+**Encumbrance** is the mechanism by which funds are committed to open purchase orders before the vendor invoice is paid. When a PO is approved, `BudgetLine.encumbered_amount` increases by the PO total and `BudgetLine.available_balance` decreases by the same amount. The funds are not yet spent — they are reserved. When the invoice is paid, `encumbered_amount` decreases and `spent_amount` increases by the invoice total. If the invoice amount is less than the PO total (e.g., because only 6 of 10 copies shipped), the difference is released back to `available_balance`.
+
+The `BudgetLine` entity tracks four monetary fields: `allocated_amount` (the total budget granted), `encumbered_amount` (committed to open POs), `spent_amount` (paid invoices), and `available_balance` (allocated minus encumbered minus spent). The `fiscal_year` entity holds the calendar boundaries (`start_date`, `end_date`) and a `status` field that transitions through `PLANNED → ACTIVE → CLOSING → CLOSED`.
+
+At fiscal year end, any PO that remains open presents a rollover decision. The system supports three strategies, configured per `BudgetLine` by the System Administrator:
+
+- **Carry forward**: The encumbered amount is cloned into a new `BudgetLine` for the incoming fiscal year, and the open PO is re-linked to the new line. The old `BudgetLine` is closed with a zero balance. This is the default for multi-year procurement contracts.
+- **Expire**: The PO is cancelled, the encumbrance is released back to the old `BudgetLine` before it closes, and the Acquisitions Manager is notified. No funds carry into the new year. Use this for discretionary one-time purchases that are no longer needed.
+- **Convert**: The original PO is closed as `CANCELLED` and a new PO with identical lines is created in `DRAFT` status under the new fiscal year's `BudgetLine`. The requestor must re-submit and re-approve the new PO. This preserves vendor relationships while giving the new year's budget a clean start.
+
+The `fiscal_year` entity does not transition to `CLOSED` until all linked `BudgetLine` records have `encumbered_amount = 0`, enforced by a database constraint. This prevents silent data loss if a rollover job fails partway through.
+
+---
+
+## Receiving and Inspection Workflow
+
+The purchase order state machine governs the lifecycle of a PO from creation through payment:
+
+```
+DRAFT → PENDING_APPROVAL → APPROVED → SUBMITTED → PARTIALLY_RECEIVED → FULLY_RECEIVED → INVOICED → PAID
+                                                                       ↘ CANCELLED (at any pre-PAID stage)
+```
+
+`POST /purchase-orders/{id}/receive` is the entry point for recording physical receipt of goods. The endpoint accepts an array of `ReceivedItem` objects, each containing `purchase_order_line_id`, `quantity`, `condition` (`GOOD` | `DAMAGED` | `WRONG_ITEM`), and `barcode`. The system advances the PO to `PARTIALLY_RECEIVED` if `sum(received_qty) < sum(ordered_qty)` across all lines, or to `FULLY_RECEIVED` if all lines are satisfied.
+
+The **three-way match** is enforced before any invoice can be marked `PAID`:
+
+1. **PO quantity** — the quantity recorded on `PurchaseOrderLine.ordered_qty` at the time the PO was approved.
+2. **Received quantity** — the total `ReceivedItem.quantity` records linked to the PO, excluding items with `condition = DAMAGED` or `WRONG_ITEM` unless replacements have been confirmed.
+3. **Invoice quantity** — the quantity billed on the vendor's invoice as recorded in `VendorInvoice.line_items`.
+
+All three values must reconcile within the configured tolerance before `POST /purchase-orders/{id}/pay` is permitted. If the invoice quantity exceeds the received quantity, the system blocks payment with `INVOICE_EXCEEDS_RECEIPT`. If the invoice quantity is less than the received quantity, the system flags an underbilling warning and requires Acquisitions Manager acknowledgment before payment.
+
+**Damage reporting** follows a distinct sub-workflow. When `ReceivedItem.condition = DAMAGED`, the system automatically creates a `VendorCreditRequest` with status `OPEN` and links it to the affected `ReceivedItem` and `PurchaseOrderLine`. The vendor is notified via their configured communication channel (EDI 867 or email). The vendor may respond with:
+
+- **Replacement**: A new shipment is dispatched. The `VendorCreditRequest` transitions to `REPLACEMENT_PENDING`. On receipt of the replacement, the original damaged item is dispositioned (discarded or retained for parts) and the replacement is processed through the normal inspection workflow.
+- **Credit memo**: The vendor issues a credit note. The `VendorCreditRequest` transitions to `CREDIT_RECEIVED`, and the credit amount is applied to the vendor's account balance, reducing the effective cost on the `PurchaseOrderLine`. The `BudgetLine.encumbered_amount` is adjusted to reflect the lower actual cost.
+- **Dispute**: If the vendor does not respond within 21 days, the `VendorCreditRequest` escalates to `DISPUTED` and is flagged for the Acquisitions Manager's attention in the outstanding claims report.

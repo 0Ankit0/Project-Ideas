@@ -1,35 +1,86 @@
-# Edge Cases - Security and Compliance
+# Edge Cases — Security and Compliance
 
-| Scenario | Impact | Mitigation |
-|----------|--------|------------|
-| Patron reading history exposed to unauthorized staff | Major privacy violation | Limit access by role and mask history unless operationally justified |
-| Waivers or fee adjustments performed without traceability | Audit failure | Require reason capture and immutable audit logging |
-| Shared staff credentials used at branch desks | Accountability loss | Enforce individual logins, session timeout, and privileged-action attribution |
-| Export contains personally identifiable patron data beyond purpose | Privacy and compliance risk | Use scoped exports, data minimization, and approval workflows |
-| API keys for digital or payment providers leak | Third-party account compromise | Rotate secrets and isolate integration credentials by environment |
+The Library Management System handles sensitive personal data (names, addresses, reading histories, fine records) and enforces financial transactions. Security failures in this domain carry regulatory consequences under GDPR and local data-protection law, reputational harm, and direct financial loss. This document catalogues the most consequential failure modes, their detection signals, and the concrete mitigations that must be implemented before the system accepts production traffic. Every row maps to at least one API contract, JWT claim check, audit event, or database constraint referenced elsewhere in the architecture.
 
-## Borrowing & Reservation Lifecycle, Consistency, Penalties, and Exception Patterns
+---
 
-### Artifact focus: Security/compliance exception model
+## Failure Mode Reference Table
 
-This section is intentionally tailored for this specific document so implementation teams can convert architecture and analysis into build-ready tasks.
+| Failure Mode | Impact | Detection | Mitigation / Recovery |
+|---|---|---|---|
+| **PII data in API responses** — Reading history exposed in `GET /members/{id}` to an unauthorized caller | Regulatory breach under GDPR Art. 5(1)(f); potential fine and mandatory supervisory-authority notification within 72 hours | API gateway access log shows a caller whose JWT `sub` does not match the path parameter `{id}` and whose `roles` claim does not include `CIRCULATION_STAFF`, `LIBRARIAN`, `BRANCH_MANAGER`, or `SYSTEM_ADMIN` | Response serialization layer applies a field-level visibility filter keyed on the caller's `roles` claim before writing the response body. Fields `loanHistory`, `readingHistory`, `fineHistory`, `email`, `phone`, and `address` are stripped from the response unless the caller is the resource owner (`sub == memberId`) or holds a staff role with branch-scope authorization. Automated integration test suite asserts a `403 Forbidden` for every cross-member read path. Alert fires when any `2xx` response to a cross-member request is detected in the gateway log. |
+| **Unauthorized access to another member's loans** — Member A queries `/members/{memberB_id}/loans` | Privacy violation; exposure of borrowing behaviour and personal schedule patterns | JWT middleware extracts `sub`; route guard compares it to the `{memberId}` path segment. Mismatch by a caller without a staff role generates a `403` and writes an `UNAUTHORIZED_ACCESS_ATTEMPT` event to `audit_events` | Enforce resource-ownership guard as a reusable middleware applied to all member-scoped routes. Do not rely on the caller to supply the correct ID. Log the attempt with caller IP, `sub`, target `memberId`, timestamp, and request path. After three attempts within five minutes from the same `sub`, issue a `MEMBER_SECURITY_ALERT` domain event and lock the session pending re-authentication. |
+| **Staff privilege escalation** — Circulation staff attempts to access admin-only endpoints | Unauthorized configuration changes, data exports, or override approvals that bypass the four-eyes principle | Role-based route guard rejects any request to paths under `/admin/**`, `/config/**`, or `/reports/financial/**` when the JWT `roles` array contains only `CIRCULATION_STAFF` or `ACQUISITIONS_STAFF`. Rejected attempts emit `PRIVILEGE_ESCALATION_ATTEMPT` to `audit_events` | Implement a centralized authorization policy engine (e.g., OPA or a Spring Security `@PreAuthorize` expression) that evaluates `roles` against a permission matrix at request time — not at login time. Permissions are never cached in the JWT payload beyond the token's `exp`. On detection of three escalation attempts from the same `sub` within one hour, disable the account and notify the `BRANCH_MANAGER` and `SYSTEM_ADMIN` via the notification service. |
+| **Digital content piracy detection** — Member shares a DRM token with a third party | License agreement violation; financial liability to the digital content provider; potential platform suspension | DRM tokens are issued with a device fingerprint (user-agent hash + IP subnet) embedded in the token claims. The content delivery service validates the fingerprint on every streaming or download request. Concurrent use from a second distinct fingerprint within the same token's validity window triggers a `DRM_TOKEN_REUSE` event | On first fingerprint mismatch, revoke the token immediately, terminate the active session, and require re-authentication. Write a `DRM_ABUSE_DETECTED` record to `audit_events` with the original device fingerprint, the offending fingerprint, and the content item ID. After two confirmed violations within 90 days, escalate to `BRANCH_MANAGER` for account review under policy code `MEMBER_FINE_BLOCK`. Digital lending quotas are reduced for the affected account pending review. |
+| **GDPR deletion request with active loans** — Member invokes right to erasure; has 3 active loans and an outstanding fine | Failure to action a valid erasure request within 30 days violates GDPR Art. 17; premature erasure destroys financial accountability records | The data-subject-request (DSR) workflow checks `active_loans` count and `outstanding_fines` balance before proceeding. A non-zero value in either field blocks immediate erasure and triggers a `DSR_BLOCKED_ACTIVE_OBLIGATIONS` event | Respond to the member within 72 hours acknowledging receipt and explaining that erasure will proceed once all loans are returned and all fines are settled. Record the request with a `PENDING` status and a deadline timestamp (Day 0 + 30 days). Once obligations clear, execute the two-phase erasure: (1) anonymize PII fields (`name → ANON_{uuid}`, `email → null`, `phone → null`, `address → null`) and purge `readingHistory`; (2) retain `loanHistory` and `fineHistory` as anonymized statistical records with no linkage to natural-person identity for the mandatory 7-year financial retention window. Issue a `DSR_COMPLETED` confirmation email before the account record is nullified. Append a `DATA_ERASURE_COMPLETED` entry to `audit_events`. |
+| **Brute force login attempt** — 500 failed login attempts from a single IP within 10 minutes | Account takeover; denial-of-service against the authentication service; enumeration of valid member IDs | The API gateway rate-limiter tracks `POST /auth/login` failures per source IP using a sliding-window counter with a 10-minute TTL in Redis. A counter exceeding 50 failures within the window triggers an alert; exceeding 200 triggers an automatic block | At 50 failures: return `429 Too Many Requests` with `Retry-After: 300` and emit a `BRUTE_FORCE_THRESHOLD_WARNING` event. At 200 failures: add the source IP to the gateway blocklist (TTL: 24 hours), emit `BRUTE_FORCE_IP_BLOCKED`, and notify the on-call security channel. Ensure login failure responses are time-constant (no early-exit path that leaks member-ID existence). CAPTCHA challenge is inserted after 5 consecutive failures from the same `sub` regardless of IP. All thresholds are configurable via the system configuration API (requires `SYSTEM_ADMIN` role). |
+| **JWT token theft and replay** — Stolen token used from a different IP or device | Attacker acts as the victim member or staff member for the lifetime of the token, accessing loans, fines, and personal data | The token service embeds a `deviceHint` claim (first two octets of the issuing IP + user-agent hash). The resource servers compare this hint against the incoming request on every call. A mismatch does not block the request but emits a `TOKEN_CONTEXT_MISMATCH` event for SIEM correlation. Token reuse after logout is detected via a revocation list stored in Redis, keyed by `jti` | Access tokens have a maximum lifespan of 15 minutes (`exp`). Refresh tokens are single-use and rotated on every exchange; the previous refresh token is immediately added to the revocation list. On logout, the current `jti` is added to the revocation list (TTL matching remaining token lifetime). If a revoked `jti` is presented, return `401 Unauthorized`, emit `REVOKED_TOKEN_REPLAY`, and lock the refresh-token family to force full re-authentication. The revocation list is checked on every authenticated request. |
+| **Staff account compromise** — Former employee's account used after offboarding | Unauthorized data access, fine waivers, or configuration changes by a non-employee; potential insider-threat liability | The HR integration publishes a `STAFF_OFFBOARDED` event to the system's event bus. The IAM service subscribes to this event and disables the account within 60 seconds. After 24 hours, any `200`-level response attributed to the offboarded `sub` in the access log is treated as a critical security incident | On receipt of `STAFF_OFFBOARDED`: immediately revoke all active sessions and refresh tokens for the `sub`, set `account_status = DISABLED`, and write an `ACCOUNT_OFFBOARDED` entry to `audit_events`. Any attempt to authenticate with a disabled account emits `DISABLED_ACCOUNT_LOGIN_ATTEMPT` and notifies `SYSTEM_ADMIN`. Quarterly access reviews compare the active staff roster in the HR system against the IAM user list; any orphaned accounts are flagged for immediate removal. Privileged roles (`BRANCH_MANAGER`, `SYSTEM_ADMIN`) require re-certification every 90 days. |
+| **SQL injection in search query** — Malicious query in the catalog search parameter | Data exfiltration, data corruption, or full database compromise if exploited successfully | Web application firewall (WAF) pattern matching on common SQL injection payloads in query parameters. Application-level input validation rejects strings containing SQL metacharacters (`'`, `--`, `;`, `UNION`, `DROP`) and returns `400 Bad Request`. Parameterized query usage is enforced by a static-analysis linting rule in CI | All database interactions use parameterized queries or a typed ORM with no raw string interpolation allowed. The CI pipeline runs a SAST tool (e.g., Semgrep with the `java.lang.security.audit.sqli` ruleset) on every pull request and fails the build on any violation. The search input is additionally length-limited to 200 characters and stripped of non-printable characters at the API gateway layer before the request reaches the application. Any `400` response containing the substring `search` in the path is counted toward a WAF anomaly score; a score exceeding 20 within five minutes triggers an IP block. |
+| **Audit log tampering attempt** — Direct database write to the `audit_events` table, bypassing the API | Destruction of the evidentiary chain required for regulatory compliance and internal accountability; invalidates the 7-year retention guarantee | The `audit_events` table is owned by a dedicated `audit_svc` database role. Application service accounts (`app_svc`) have `INSERT` on `audit_events` via the API service only — `UPDATE` and `DELETE` are not granted to any application role. Database activity monitoring (DAM) alerts on any `UPDATE` or `DELETE` statement targeting `audit_events`, regardless of the issuing role | The API is the only authorized write path: all audit records are written through the `AuditEventRepository`, which is the sole holder of the `audit_svc` role credentials. The table has a database-level trigger that raises an exception and rolls back any `UPDATE` or `DELETE` statement. For long-term immutability, completed audit partitions (monthly) are exported to immutable object storage (WORM-enabled S3 bucket or equivalent) and the hash of each partition file is stored in a separate integrity manifest. Any hash mismatch during a compliance review is treated as a P1 incident. |
+| **Fine waiver without authorization** — Staff attempts to waive a $200 fine without manager approval | Financial loss; circumvention of the four-eyes control; potential for collusion between staff and members | The fine-waiver API endpoint (`POST /fines/{fineId}/waive`) enforces a tiered authorization check against the `amount` field before any state change is written. Amounts `> $50` require a JWT `roles` claim containing `BRANCH_MANAGER` or `SYSTEM_ADMIN`. Amounts `> $200` require `SYSTEM_ADMIN` exclusively. Attempts with insufficient role emit `WAIVER_AUTHORIZATION_FAILURE` to `audit_events` | For waivers between $0.01 and $50.00, a `LIBRARIAN` role is sufficient; the waiver is recorded with the staff `sub` and a mandatory `reasonCode`. For $50.01–$200.00, the endpoint returns `202 Accepted` and creates a `WaiverApprovalRequest` domain entity with status `PENDING_MANAGER`; the requesting staff member receives a `WAIVER_SUBMITTED` notification and the `BRANCH_MANAGER` receives a `WAIVER_PENDING_APPROVAL` notification. For amounts above $200.00, the same flow applies but the approver must hold `SYSTEM_ADMIN`. Approved waivers write both a `FINE_WAIVED` and an `OVERRIDE_APPROVED` entry to `audit_events`, capturing the approver `sub`, `reasonCode`, `amount`, and timestamp. Unapproved `WaiverApprovalRequest` records older than 7 days are automatically escalated. |
 
-### Implementation directives for this artifact
-- Cover privileged override workflow with just-in-time elevation and reason-code capture.
-- Define fraud and abuse detection indicators for repeated waiver and no-show patterns.
-- Specify data subject request handling impacts on historical circulation records.
+---
 
-### Lifecycle controls that must be reflected here
-- Borrowing must always enforce policy pre-checks, deterministic copy selection, and atomic loan/copy updates.
-- Reservation behavior must define queue ordering, allocation eligibility re-checks, and pickup expiry/no-show outcomes.
-- Fine and penalty flows must define accrual formula, cap behavior, and lost/damage adjudication paths.
-- Exception handling must define idempotency, conflict semantics, outbox reliability, and operator recovery procedures.
+### Role-Based Access Control Model
 
-### Traceability requirements
-- Every major rule in this document should map to at least one API contract, domain event, or database constraint.
-- Include policy decision codes and audit expectations wherever staff override or monetary adjustment is possible.
+The system enforces a five-tier role hierarchy. Each role is additive — higher roles inherit the permissions of lower roles within their scope.
 
-### Definition of done for this artifact
-- Content is specific to this artifact type and not a generic duplicate.
-- Rules are testable (unit/integration/contract) and reference concrete data/events/errors.
-- Diagram semantics (if present) are consistent with textual constraints and lifecycle behavior.
+| Role | Permitted Operations |
+|---|---|
+| `MEMBER` | Read and update own profile; view own loans, fines, and reservations; place and cancel own reservations; pay own fines |
+| `CIRCULATION_STAFF` | All `MEMBER` operations on any member within branch scope; check out and return copies; renew loans; issue standard fines |
+| `LIBRARIAN` | All `CIRCULATION_STAFF` operations; waive fines up to $50 with reason code; access branch-level circulation reports |
+| `BRANCH_MANAGER` | All `LIBRARIAN` operations; approve fine waivers up to $200; approve inter-library loan requests (policy `ILL_MEMBERSHIP_INSUFFICIENT`); authorize exceptions to `LOAN_LIMIT_EXCEEDED` and `MEMBER_FINE_BLOCK` policies |
+| `SYSTEM_ADMIN` | All operations across all branches; system configuration; user provisioning; approve fine waivers above $200; access all audit logs and financial reports |
+
+**Resource-level authorization:** Role possession is necessary but not sufficient. Every request to a member-scoped resource additionally checks that the caller's `branchId` JWT claim matches the branch recorded on the target member record (for staff roles), or that the caller's `sub` matches the resource owner (for `MEMBER` role). A `CIRCULATION_STAFF` member at Branch A cannot access loan records for a member registered at Branch B. Cross-branch access requires a `BRANCH_MANAGER` or `SYSTEM_ADMIN` role.
+
+**JWT claim structure:** All tokens issued by the authentication service carry the following registered and private claims:
+
+- `sub` — Unique identifier of the authenticated principal (member UUID or staff UUID)
+- `roles` — JSON array of role strings (e.g., `["CIRCULATION_STAFF", "LIBRARIAN"]`)
+- `branchId` — UUID of the home branch; `null` for `SYSTEM_ADMIN` principals (implicitly all branches)
+- `exp` — Unix epoch expiry; access tokens expire after 15 minutes; refresh tokens after 8 hours
+- `jti` — Unique token identifier used for revocation list lookups
+
+Tokens are signed with RS256. Public keys are rotated every 90 days. The JWKS endpoint is published at `/.well-known/jwks.json` and cached by resource servers with a 5-minute TTL.
+
+---
+
+### GDPR and Data Subject Request Handling
+
+**Right-to-erasure workflow:** When a member submits a deletion request via the member portal or in writing to branch staff, the DSR service executes the following steps:
+
+1. **Validate pre-conditions:** Query `active_loans` and `outstanding_fines` for the member. If either is non-zero, set DSR status to `PENDING_OBLIGATIONS`, notify the member of the blocking conditions, and schedule a daily re-check. The 30-day GDPR clock starts at initial receipt, not at obligation clearance.
+2. **Anonymize PII:** Once obligations are clear, replace `name`, `email`, `phone`, and `address` with deterministic anonymous values (`ANON_{memberUUID}` for name; `null` for contact fields). Remove all entries from the `reading_history` table linked to the member UUID.
+3. **Retain statistical records:** Rows in `loan_history` and `fine_history` are retained with the `member_id` foreign key replaced by a synthetic `ANON_{uuid}` that is not resolvable to a natural person. This satisfies the 7-year financial record retention requirement without retaining personally identifiable information.
+4. **Issue confirmation:** Send a DSR completion notice to the last known email address before it is nullified, then nullify the field.
+5. **Audit entry:** Write a `DATA_ERASURE_COMPLETED` entry to `audit_events` recording the DSR request ID, processing timestamp, and the anonymization actions taken.
+
+**What can be deleted vs. what must be retained:**
+
+- **Deleted:** Name, email, phone number, physical address, reading history, device fingerprints, marketing preferences, profile photo.
+- **Retained (anonymized):** Loan transaction records, fine transaction records, payment receipts — required for 7-year financial audit compliance.
+- **Retained (unmodified):** `audit_events` entries referencing the member's `sub` — these are legally required evidence and cannot be altered or deleted. The member's `sub` in audit records is a system UUID with no inherent PII; the linkage to a natural person is severed by the anonymization step above.
+
+Every data subject request — whether erasure, access, or rectification — generates an `audit_events` entry at creation and at each status transition (`RECEIVED`, `PENDING_OBLIGATIONS`, `IN_PROGRESS`, `COMPLETED`, `REJECTED`).
+
+---
+
+### Audit Trail and Non-Repudiation
+
+**`audit_events` table design:** The table is append-only by architectural contract. The application `app_svc` database role is granted `INSERT` only; `UPDATE` and `DELETE` are withheld at the database permission layer and additionally blocked by a row-level trigger. Columns include: `event_id` (UUID PK), `event_type` (enum), `actor_sub` (UUID), `actor_roles` (text array), `target_entity_type`, `target_entity_id`, `branch_id`, `payload` (JSONB), `created_at` (timestamptz, server-set, not client-supplied).
+
+**Events that must be logged:** Every operation that produces an override, exception, or privileged action writes to `audit_events`. Mandatory event types include:
+
+- `OVERRIDE_APPROVED` / `OVERRIDE_REJECTED` — for any bypass of `LOAN_LIMIT_EXCEEDED`, `MEMBER_FINE_BLOCK`, `PO_APPROVAL_REQUIRED`, or `ILL_MEMBERSHIP_INSUFFICIENT` policy codes
+- `FINE_WAIVED` / `FINE_MODIFIED` — with approver identity and reason code
+- `MEMBER_DATA_ACCESSED` — when staff access a member's PII fields outside of a direct service transaction
+- `PRIVILEGE_ESCALATION_ATTEMPT` / `UNAUTHORIZED_ACCESS_ATTEMPT` — for all rejected authorization checks on sensitive resources
+- `DATA_ERASURE_COMPLETED` / `DSR_STATUS_CHANGED` — for all data subject request lifecycle transitions
+- `ACCOUNT_OFFBOARDED` / `DISABLED_ACCOUNT_LOGIN_ATTEMPT` — for staff account lifecycle events
+- `DRM_ABUSE_DETECTED` — for confirmed DRM token misuse
+- `REVOKED_TOKEN_REPLAY` — for replay of invalidated JWTs
+
+**Retention and enforcement:** All `audit_events` records are retained for a minimum of 7 years from `created_at`. The table is partitioned by month. At the end of each month, the closing partition is exported to immutable object storage. The export job records the SHA-256 hash of the exported file in a separate `audit_partition_manifest` table. During any compliance audit or legal hold review, the integrity check re-hashes the object-storage file and compares it against the manifest; any mismatch automatically raises a P1 security incident. Deletion of any partition from object storage requires dual approval from two `SYSTEM_ADMIN` principals and is itself logged in the manifest.
