@@ -8,7 +8,7 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## Common Event Envelope
+## Contract Conventions
 
 ```json
 {
@@ -41,7 +41,10 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## 1. Tenancy Events
+
+## Domain Events
+
+## Tenancy Events
 
 ---
 
@@ -187,7 +190,7 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## 2. Auth Events
+## Auth Events
 
 ---
 
@@ -355,7 +358,7 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## 3. Data Events
+## Data Events
 
 ---
 
@@ -505,7 +508,7 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## 4. Storage Events
+## Storage Events
 
 ---
 
@@ -656,7 +659,7 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## 5. Functions Events
+## Functions Events
 
 ---
 
@@ -785,7 +788,7 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## 6. Realtime Events
+## Realtime Events
 
 ---
 
@@ -933,7 +936,7 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## 7. Provider / Control Events
+## Provider / Control Events
 
 ---
 
@@ -1062,7 +1065,7 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## 8. Security Events
+## Security Events
 
 ---
 
@@ -1163,7 +1166,7 @@ All events follow a common envelope schema. The payload is the event-specific bo
 
 ---
 
-## 9. Event Flow Overview
+## Event Flow Overview
 
 ```mermaid
 flowchart LR
@@ -1207,3 +1210,43 @@ flowchart LR
     EB --> ANOMALY
     EB --> SCHEMA_GEN
 ```
+
+## Publish and Consumption Sequence
+
+```mermaid
+sequenceDiagram
+    participant Developer
+    participant APIGateway
+    participant ProjectService
+    participant EventBus
+    participant UsageMeter
+    participant NotificationService
+    participant WebhookDelivery
+
+    Developer->>APIGateway: POST /databases (create database)
+    APIGateway->>ProjectService: Validate quota + provision
+    ProjectService->>EventBus: publish DatabaseProvisioned
+    EventBus->>UsageMeter: increment resource usage
+    EventBus->>NotificationService: send provisioning confirmation
+    EventBus->>WebhookDelivery: deliver to developer webhook
+
+    Developer->>APIGateway: POST /functions/deploy
+    APIGateway->>ProjectService: Build + deploy function
+    ProjectService->>EventBus: publish FunctionDeployed
+    EventBus->>UsageMeter: track compute allocation
+    EventBus->>WebhookDelivery: deliver deployment status
+
+    Note over EventBus: All events include project_id,<br/>timestamp, and correlation_id
+```
+
+## Operational SLOs
+
+| Event Category | Publish Latency P99 | Delivery Guarantee | Max Retry Attempts | Dead-Letter Retention |
+|---|---|---|---|---|
+| Tenancy | < 200ms | At-least-once | 5 | 7 days |
+| Auth | < 100ms | At-least-once | 5 | 7 days |
+| Data | < 300ms | At-least-once | 3 | 3 days |
+| Storage | < 500ms | At-least-once | 3 | 3 days |
+| Functions | < 500ms | At-least-once | 5 | 7 days |
+| Realtime | < 50ms | Best-effort | 1 | 1 day |
+| Security | < 100ms | Exactly-once | 10 | 30 days |

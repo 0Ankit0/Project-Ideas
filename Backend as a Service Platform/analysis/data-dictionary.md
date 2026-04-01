@@ -31,7 +31,10 @@
 
 ---
 
-## 1. Tenant
+
+## Core Entities
+
+## Tenant
 
 **Description:** The top-level organizational entity. Represents a company, team, or individual that owns a subscription to the BaaS Platform. All resources are ultimately scoped to a Tenant.
 
@@ -55,7 +58,7 @@
 
 ---
 
-## 2. Project
+## Project
 
 **Description:** A logical unit within a Tenant that groups related environments, resources, and configurations. A Tenant may own multiple Projects.
 
@@ -78,7 +81,7 @@
 
 ---
 
-## 3. Environment
+## Environment
 
 **Description:** A named deployment context within a Project. Environments provide complete isolation: separate database schemas, provider bindings, API keys, and secrets.
 
@@ -104,7 +107,7 @@
 
 ---
 
-## 4. CapabilityBinding
+## CapabilityBinding
 
 **Description:** Associates a Project Environment with a specific ProviderCatalogEntry for a given capability (storage, functions, messaging). Stores encrypted configuration as a reference to an external secret.
 
@@ -129,7 +132,7 @@
 
 ---
 
-## 5. ProviderCatalogEntry
+## ProviderCatalogEntry
 
 **Description:** Registry of available provider adapters. Each entry defines an adapter type, version, required/optional configuration schema, and the image or package reference for the adapter implementation.
 
@@ -155,7 +158,7 @@
 
 ---
 
-## 6. SwitchoverPlan
+## SwitchoverPlan
 
 **Description:** A structured, orchestrated plan to migrate a capability from one CapabilityBinding to another. Tracks state, safety gate results, and rollback capability.
 
@@ -182,7 +185,7 @@
 
 ---
 
-## 7. AuthUser
+## AuthUser
 
 **Description:** A user account registered within a Project. Users authenticate via email/password, OAuth2, magic link, or anonymous session. Users are scoped to a Project (not cross-project).
 
@@ -211,7 +214,7 @@
 
 ---
 
-## 8. SessionRecord
+## SessionRecord
 
 **Description:** Server-side record of an active or revoked authentication session. Enables refresh token rotation, replay detection, and bulk session revocation.
 
@@ -237,7 +240,7 @@
 
 ---
 
-## 9. DataNamespace
+## DataNamespace
 
 **Description:** A PostgreSQL schema within the project's database environment, used to group related tables. Maps 1:1 with a PostgreSQL schema object.
 
@@ -259,7 +262,7 @@
 
 ---
 
-## 10. TableDefinition
+## TableDefinition
 
 **Description:** Metadata record describing a table within a DataNamespace. Stores the column schema used by the Database API to generate SQL DDL and CRUD queries.
 
@@ -283,7 +286,7 @@
 
 ---
 
-## 11. FileObject
+## FileObject
 
 **Description:** Metadata record for a file stored in an object storage provider. The binary content resides in the provider; PostgreSQL holds only metadata and access control information.
 
@@ -311,7 +314,7 @@
 
 ---
 
-## 12. Bucket
+## Bucket
 
 **Description:** A named container for FileObjects, analogous to an S3 bucket or GCS bucket. Defines the access policy, associated CapabilityBinding, and quota.
 
@@ -337,7 +340,7 @@
 
 ---
 
-## 13. FunctionDefinition
+## FunctionDefinition
 
 **Description:** Metadata for a deployed serverless function. Defines runtime, artifact reference, trigger configuration, resource limits, and associated secrets.
 
@@ -370,7 +373,7 @@
 
 ---
 
-## 14. ExecutionRecord
+## ExecutionRecord
 
 **Description:** Immutable record of a single function execution. Created on invocation; updated as the execution progresses through states.
 
@@ -398,7 +401,7 @@
 
 ---
 
-## 15. EventChannel
+## EventChannel
 
 **Description:** A named, policy-governed publish/subscribe channel used by the Realtime Service for WebSocket fan-out and webhook delivery.
 
@@ -423,7 +426,7 @@
 
 ---
 
-## 16. Subscription
+## Subscription
 
 **Description:** A registered endpoint (WebSocket session or webhook URL) that receives events from one or more EventChannels. Tracks delivery status and retry state.
 
@@ -450,7 +453,7 @@
 
 ---
 
-## 17. SecretRef
+## SecretRef
 
 **Description:** A reference to a secret stored in an external secret manager. The platform never stores the resolved secret value — only a pointer (path/ARN/ID) and a display alias.
 
@@ -475,7 +478,7 @@
 
 ---
 
-## 18. UsageMeter
+## UsageMeter
 
 **Description:** Near-real-time usage counters per project/environment/dimension. Used for quota enforcement and billing analytics.
 
@@ -497,7 +500,7 @@
 
 ---
 
-## 19. AuditLog
+## AuditLog
 
 **Description:** Immutable, append-only record of all write operations across all platform resources. The underlying PostgreSQL role has INSERT + SELECT only; UPDATE and DELETE are revoked.
 
@@ -529,7 +532,7 @@
 
 ---
 
-## 20. Entity Relationship Overview
+## Canonical Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -557,3 +560,14 @@ erDiagram
     ENVIRONMENT ||--o{ USAGE_METER : "tracked by"
     TENANT ||--o{ AUDIT_LOG : "produces"
 ```
+
+## Data Quality Controls
+
+| Control | Scope | Enforcement | Notes |
+|---|---|---|---|
+| Tenant isolation | All entities | Row-level security, schema-per-tenant | Prevents cross-tenant data leakage |
+| Resource quota enforcement | Project, Capability | Pre-write validation | Prevents unbounded resource creation |
+| Audit log immutability | AuditLog | Append-only DB role | Ensures compliance trail integrity |
+| Soft delete retention | All entities | Deleted flag, 30-day retention | Prevents accidental permanent loss |
+| Secret encryption | SecretRef | AES-256 KMS-backed | Ensures no plaintext secrets at rest |
+| Usage meter accuracy | UsageMeter | Idempotent counters with dedup key | Prevents double-billing |

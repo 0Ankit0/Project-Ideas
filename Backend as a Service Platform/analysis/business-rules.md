@@ -15,13 +15,13 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This document defines the enforceable business rules governing the BaaS Platform's behavior. These rules are platform-level invariants — they apply across all tenants and cannot be overridden by project configuration unless explicitly noted. Rules are evaluated at specific pipeline stages (request validation, pre-write check, post-write event) and are enforced by designated services.
 
 ---
 
-## 2. Rule Evaluation Pipeline
+## Rule Evaluation Pipeline
 
 ```mermaid
 flowchart TD
@@ -48,7 +48,7 @@ flowchart TD
 
 ---
 
-## 3. Business Rules
+## Enforceable Rules
 
 ---
 
@@ -271,7 +271,7 @@ Webhook delivery MUST follow a strict retry policy:
 
 ---
 
-## 4. Traceability Table
+## Traceability Table
 
 | Rule ID | Rule Name | Related Use Cases | Related FR / NFR | Enforcer Service |
 |---------|-----------|-------------------|------------------|-----------------|
@@ -290,3 +290,13 @@ Webhook delivery MUST follow a strict retry policy:
 | BR-13 | Audit Log Immutability | UC-001–UC-008 | FR-058, NFR-025 | Audit Service |
 | BR-14 | SLO Breach Gate | All | NFR-011, NFR-012 | SLO Monitor |
 | BR-15 | Webhook Retry Policy | UC-007 | FR-048 | Webhook Delivery Service |
+
+## Exception and Override Handling
+
+| Exception | Trigger Condition | Authorised By | Override Process |
+|---|---|---|---|
+| Quota bypass | Trial account needs temporary limit increase | Platform Support | Time-boxed quota exception via admin panel |
+| SLA exemption | Scheduled maintenance affecting agreed SLA | Account Manager | Pre-approved maintenance window with customer notification |
+| Multi-region override | Compliance requirement differs from default | Legal + CTO | Region-specific policy profile attached to tenant |
+| Billing dispute | Customer contests usage-based charge | Finance + Support | Manual audit trail review, credit issued if discrepancy confirmed |
+| Data residency exception | Replication needed across restricted regions | DPO approval | Legal framework and DPA amendment required before enabling |
