@@ -1,292 +1,177 @@
-# Student Information System Design Documentation
+# Student Information System — Design Documentation
 
-> Comprehensive system design documentation for a full-fledged Student Information System (SIS) for a college that helps organize and manage all student details including enrollment, academics, attendance, grades, and administrative operations.
+> Comprehensive, implementation-ready system design documentation for a full-featured **Student Information System (SIS)** supporting multi-campus, multi-program institutions. Covers the complete student lifecycle from admission through graduation, including enrollment, course management, grading, attendance, fees, financial aid, examinations, and reporting.
+
+---
+
+## Key Features
+
+| Feature | Description |
+|---|---|
+| **Student Enrollment & Registration** | Full lifecycle from admission to graduation: application, admission, matriculation, term registration, add/drop, withdrawal, reinstatement |
+| **Course Catalog & Section Scheduling** | Manage courses, course prerequisites, sections per term, room assignments, delivery modes (in-person, online, hybrid) |
+| **Timetable & Conflict Management** | Automated timetable generation with conflict detection; support for multi-campus and async-online sections |
+| **Grade Management & GPA Calculation** | Configurable grade scales, gradebook entry, final grade posting, GPA/CGPA computation, repeat-forgiveness rules, grade amendments with audit trail |
+| **Attendance Tracking** | Session-level attendance marking, attendance percentage computation, automatic eligibility evaluation for examinations, medical-leave handling |
+| **Transcript Generation** | Official and unofficial transcripts with tamper-evident hash; version-controlled; Registrar sign-off workflow |
+| **Fee Assessment & Payment** | Term-based fee invoicing by category, late-fee accrual, academic-hold placement on overdue accounts, payment plans, payment gateway integration |
+| **Financial Aid & Scholarships** | Scholarship definition, merit/need/sports award management, term-by-term eligibility re-evaluation, disbursement coordination |
+| **Examination Management** | Exam scheduling, eligibility gating by attendance, result entry and publication, supplemental/make-up exam workflows |
+| **Academic Holds** | Financial, academic, and disciplinary hold placement and clearance; hold-aware enforcement on all academic actions |
+| **Waitlist Management** | FIFO waitlist with cohort-priority override, automatic seat promotion, configurable confirmation windows and expiry |
+| **Graduation Audit** | Automated multi-criteria graduation audit (program requirements, CGPA, financial clearance, holds, residency); degree conferral workflow |
+| **Parent / Guardian Portal** | Read-only portal access for parents and guardians to view student academic progress, attendance, and fee status |
+| **Academic Calendar** | Institution-wide and program-specific academic calendars; enrollment windows, grade deadlines, exam periods, holidays |
+| **Multi-Campus / Multi-Term Support** | Configurable per-campus and per-term policies; timezone-aware scheduling; cross-campus enrollment with transfer-credit articulation |
+| **Reports & Analytics** | Enrollment statistics, cohort GPA trends, attendance summaries, fee collection dashboards, scholarship utilization, graduation rate tracking |
+| **Notifications & Communications** | Event-driven notifications (enrollment confirmations, grade postings, fee due dates, exam reminders, hold alerts, waitlist promotions) |
+| **RBAC + ABAC Access Control** | Role-based access with attribute-based overlays for campus, department, term, and section context; MFA for privileged operations |
+| **Audit Trail** | Immutable audit log for all grade, transcript, fee, hold, and sensitive operations with actor identity and correlation tracking |
+| **External Integrations** | LMS (roster sync), IdP/SSO (SAML/OIDC + SCIM), Payment Gateway, Financial Aid System, Library, Regulatory Reporting |
+
+---
+
+## Actors
+
+| Actor | Description | Primary Capabilities |
+|---|---|---|
+| **Student** | Enrolled individual pursuing a program | Course registration, view grades/attendance/transcript, pay fees, apply for scholarships |
+| **Faculty / Instructor** | Teaching staff assigned to sections | Mark attendance, enter grades, manage gradebook, view section roster |
+| **Academic Advisor** | Faculty or staff guiding student academic plans | Approve overloads, issue waivers, review petitions, monitor advisee progress |
+| **Registrar** | Official keeper of academic records | Manage enrollment windows, issue transcripts, approve graduation, override policies |
+| **Admin Staff** | Administrative support and platform management | User management, fee processing, report generation, configuration |
+| **Department Head** | Manages department curriculum and faculty | Approve attendance condonations, department-level reports |
+| **Finance / Bursar** | Manages fee accounts and financial processes | Invoice management, payment processing, hold management, waiver approval |
+| **Parent / Guardian** | Read-only stakeholder viewing student progress | View grades, attendance, fee status (limited, consent-gated) |
+| **System / Policy Engine** | Automated background processes | Nightly rule evaluation, waitlist promotion, scholarship re-evaluation, hold placement |
+
+---
 
 ## Documentation Structure
 
-| Phase | Folder | Description |
-|-------|--------|-------------|
-| 1 | [requirements](./requirements/) | Functional & non-functional requirements, user stories |
-| 2 | [analysis](./analysis/) | Use cases, system context, activity & swimlane diagrams |
-| 3 | [high-level-design](./high-level-design/) | Sequence diagrams, domain model, DFD, architecture, C4 |
-| 4 | [detailed-design](./detailed-design/) | Class, sequence, state diagrams, ERD, API design |
-| 5 | [infrastructure](./infrastructure/) | Deployment, network, cloud architecture |
-| 6 | [implementation](./implementation/) | Implementation guidelines, C4 code diagram, backend status matrix |
-| 7 | [edge-cases](./edge-cases/) | Failure scenarios, detection signals, and recovery/mitigation runbooks |
+| # | Folder | File | Description |
+|---|---|---|---|
+| 1 | `requirements/` | `requirements.md` | Functional and non-functional requirements |
+| 2 | `requirements/` | `user-stories.md` | User stories with acceptance criteria |
+| 3 | `analysis/` | `use-case-diagram.md` | Use case diagrams per actor |
+| 4 | `analysis/` | `use-case-descriptions.md` | Detailed use case descriptions with flows |
+| 5 | `analysis/` | `system-context-diagram.md` | System boundary and external integrations |
+| 6 | `analysis/` | `activity-diagrams.md` | Business process activity flows |
+| 7 | `analysis/` | `swimlane-diagrams.md` | Cross-role workflow swimlane / BPMN diagrams |
+| 8 | `analysis/` | `data-dictionary.md` | Canonical entity reference, attributes, ER diagram |
+| 9 | `analysis/` | `business-rules.md` | Enforceable business rules BR-01 through BR-10 |
+| 10 | `analysis/` | `event-catalog.md` | Domain event contracts, payloads, and SLOs |
+| 11 | `high-level-design/` | `system-sequence-diagrams.md` | Black-box system sequence diagrams |
+| 12 | `high-level-design/` | `domain-model.md` | Domain model with aggregates and relationships |
+| 13 | `high-level-design/` | `data-flow-diagrams.md` | Data flow diagrams (levels 0–2) |
+| 14 | `high-level-design/` | `architecture-diagram.md` | High-level component architecture |
+| 15 | `high-level-design/` | `c4-diagrams.md` | C4 context and container diagrams |
+| 16 | `detailed-design/` | `class-diagrams.md` | Class diagrams with attributes and methods |
+| 17 | `detailed-design/` | `sequence-diagrams.md` | Internal sequence diagrams for key flows |
+| 18 | `detailed-design/` | `state-machine-diagrams.md` | State machines for Student, Enrollment, Grade, Fee |
+| 19 | `detailed-design/` | `erd-database-schema.md` | Full ERD and DDL-ready database schema |
+| 20 | `detailed-design/` | `component-diagrams.md` | Software component / module diagrams |
+| 21 | `detailed-design/` | `api-design.md` | REST API design with endpoints and payloads |
+| 22 | `detailed-design/` | `c4-component-diagram.md` | C4 component diagram |
+| 23 | `infrastructure/` | `deployment-diagram.md` | Deployment topology and environment mapping |
+| 24 | `infrastructure/` | `network-infrastructure.md` | Network zones, security groups, and traffic flows |
+| 25 | `infrastructure/` | `cloud-architecture.md` | Cloud architecture (AWS/GCP/Azure reference) |
+| 26 | `implementation/` | `implementation-guidelines.md` | Coding standards, patterns, and setup guide |
+| 27 | `implementation/` | `c4-code-diagram.md` | C4 code-level diagram |
+| 28 | `implementation/` | `backend-status-matrix.md` | Implementation status per feature / module |
+| 29 | `edge-cases/` | `README.md` | Edge case index and severity classification |
+| 30 | `edge-cases/` | `enrollment-and-seat-allocation.md` | Enrollment race conditions, waitlist edge cases |
+| 31 | `edge-cases/` | `grades-and-transcript-corrections.md` | Grade amendment, transcript correction edge cases |
+| 32 | `edge-cases/` | `attendance-and-term-policies.md` | Attendance disputes, term boundary edge cases |
+| 33 | `edge-cases/` | `fee-assessment-and-waivers.md` | Fee calculation, waiver, and payment edge cases |
+| 34 | `edge-cases/` | `api-and-ui.md` | API contract and UI interaction edge cases |
+| 35 | `edge-cases/` | `security-and-compliance.md` | Security, access control, and compliance edge cases |
+| 36 | `edge-cases/` | `operations.md` | Operational failure and recovery edge cases |
 
-## System Overview
-
-### Actors
-- **Students** - View academic records, enroll in courses, access grades and schedules
-- **Faculty** - Manage courses, record grades, track attendance, communicate with students
-- **Academic Advisors** - Guide student academic plans, approve course selections
-- **Admin Staff** - Handle registration, enrollment, financial records, and platform management
-- **Department Heads** - Manage departments, faculty assignments, and curriculum
-- **Registrar** - Maintain official academic records, issue transcripts, oversee graduation
-- **Parent/Guardian** - View student academic progress (limited read-only access)
-
-### Key Features
-- Student enrollment and registration management
-- Course catalog and schedule management
-- Grade recording and transcript generation
-- Attendance tracking and reporting
-- Fee management and financial aid
-- Academic calendar and event management
-- Communication and notification system
-- Analytics and performance reporting
-- Library integration
-- Role-based access control
-
-## Diagram Generation
-
-All diagrams are written in Mermaid code. To generate images:
-
-1. **VS Code**: Install "Mermaid Preview" extension
-2. **Online**: Use [mermaid.live](https://mermaid.live)
-3. **CLI**: Use `mmdc` (Mermaid CLI)
-   ```bash
-   npm install -g @mermaid-js/mermaid-cli
-   mmdc -i input.md -o output.png
-   ```
-
-Phases
-┌─────────────────────────────────────────────────────────────────┐
-│                     1. REQUIREMENTS PHASE                       │
-├─────────────────────────────────────────────────────────────────┤
-│  • Requirements Document                                        │
-│  • User Stories                                                 │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                     2. ANALYSIS PHASE                           │
-├─────────────────────────────────────────────────────────────────┤
-│  • Use Case Diagram (what users can do)                         │
-│  • Use Case Descriptions                                        │
-│  • System Context Diagram (system boundaries)                   │
-│  • Flowchart / Activity Diagram (business process)              │
-│  • BPMN / Swimlane Diagram (cross-department workflows)         │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                  3. HIGH-LEVEL DESIGN PHASE                     │
-├─────────────────────────────────────────────────────────────────┤
-│  • System Sequence Diagram (black-box interactions)             │
-│  • Domain Model (key entities & relationships)                  │
-│  • Data Flow Diagram (how data moves)                           │
-│  • High-Level Architecture Diagram (major components)           │
-│  • C4 Context & Container Diagram                               │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                  4. DETAILED DESIGN PHASE                       │
-├─────────────────────────────────────────────────────────────────┤
-│  • Class Diagram (detailed classes, methods, attributes)        │
-│  • Sequence Diagram (internal object interactions)              │
-│  • State Machine Diagram (object state transitions)             │
-│  • ERD / Database Schema (tables, relationships)                │
-│  • Component Diagram (software modules)                         │
-│  • API Design / Integration Diagram                             │
-│  • C4 Component Diagram                                         │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                  5. INFRASTRUCTURE PHASE                        │
-├─────────────────────────────────────────────────────────────────┤
-│  • Deployment Diagram (software to hardware mapping)            │
-│  • Network / Infrastructure Diagram                             │
-│  • Cloud Architecture Diagram (AWS/GCP/Azure)                   │
-└───────────────────────────┬─────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                     6. IMPLEMENTATION                           │
-├─────────────────────────────────────────────────────────────────┤
-│  • Code                                                         │
-│  • C4 Code Diagram (optional, class-level)                      │
-└─────────────────────────────────────────────────────────────────┘
+---
 
 ## Getting Started
 
-1. Start with `requirements/` to align scope and priorities.
-2. Review `analysis/` and `high-level-design/` for behavior and architecture context.
-3. Review `edge-cases/` before implementation to align failure handling and operational guardrails.
-4. Use `detailed-design/` + `implementation/` to plan build and rollout.
+### Reading Order
+
+Follow this sequence to build context progressively before implementation:
+
+```mermaid
+flowchart LR
+    A([requirements/]) --> B([analysis/])
+    B --> C([high-level-design/])
+    C --> D([detailed-design/])
+    D --> E([infrastructure/])
+    E --> F([implementation/])
+    B --> G([edge-cases/])
+    G --> F
+```
+
+1. **`requirements/`** — Align on scope, actors, and priorities. Read `requirements.md` first, then `user-stories.md`.
+2. **`analysis/`** — Understand domain behavior: read `use-case-diagram.md`, then `activity-diagrams.md` and `swimlane-diagrams.md` for workflows. Read `data-dictionary.md` for the entity model, `business-rules.md` for enforcement logic, and `event-catalog.md` for integration contracts.
+3. **`high-level-design/`** — Understand system structure: start with `system-context-diagram.md`, then `architecture-diagram.md`, `domain-model.md`, and `c4-diagrams.md`.
+4. **`edge-cases/`** — Read before writing implementation code. Understand all failure scenarios, detection signals, and recovery runbooks.
+5. **`detailed-design/`** — Implement from `erd-database-schema.md`, `class-diagrams.md`, `api-design.md`, and `sequence-diagrams.md`.
+6. **`infrastructure/`** and **`implementation/`** — Plan deployment, CI/CD, and rollout using these guides.
+
+### Diagram Rendering
+
+All diagrams use [Mermaid](https://mermaid.js.org/) syntax.
+
+| Method | Instructions |
+|---|---|
+| **VS Code** | Install the "Mermaid Preview" extension (`bierner.markdown-mermaid`) |
+| **GitHub** | Mermaid diagrams render natively in `.md` files |
+| **Online** | Paste into [mermaid.live](https://mermaid.live) |
+| **CLI export** | `npm install -g @mermaid-js/mermaid-cli && mmdc -i input.md -o output.png` |
+
+### Prerequisites for Implementation
+
+- Review `analysis/business-rules.md` for all BR-01 through BR-10 rules before writing any enrollment, grading, or fee logic.
+- Review `analysis/event-catalog.md` before implementing any service that produces or consumes domain events.
+- Review `edge-cases/` before writing any state-transition logic to ensure failure paths are handled.
+- All API endpoints must conform to the contracts in `detailed-design/api-design.md`.
+- Database schema must be implemented as specified in `detailed-design/erd-database-schema.md`.
+
+---
 
 ## Documentation Status
 
-- ✅ Core documentation set is available across all seven phases.
-- ✅ Analysis coverage includes activity flow, swimlane/BPMN, data dictionary, business rules, and event catalog.
-- ✅ Edge-case pack includes operational, security/compliance, interface-surface, and domain scenario coverage.
-
-## Enrollment, Academic Integrity, Access Control, and Integration Contracts (Implementation-Ready)
-
-### 1) Enrollment Lifecycle Rules (Authoritative)
-
-#### 1.1 Lifecycle States and Transitions
-| State | Entry Criteria | Exit Criteria | Allowed Actors | Terminal? |
+| File | Phase | Status | Last Updated | Notes |
 |---|---|---|---|---|
-| Prospect | Lead captured or inquiry created | Application submitted | Admissions CRM, Applicant | No |
-| Applicant | Complete application + required docs | Admitted or Rejected | Applicant, Admissions Officer | No |
-| Admitted | Admission decision = accepted | Matriculated or Offer Expired | Admissions, Registrar | No |
-| Matriculated | Identity + eligibility checks passed | Enrolled for a term | Registrar | No |
-| Enrolled (Term-Scoped) | Registered in >=1 credit-bearing section | Dropped all sections, Term Completed | Student, Advisor, Registrar | No |
-| Active (Institution-Scoped) | Student is not graduated/withdrawn/dismissed | Graduated, Withdrawn, Dismissed | SIS policy engine | No |
-| Leave of Absence | Approved leave request in valid window | Reinstated, Withdrawn, Dismissed | Student, Advisor, Registrar | No |
-| Graduated | Degree audit complete + conferral approved | N/A | Registrar | Yes |
-| Withdrawn | Approved withdrawal workflow complete | Reinstated (rare policy path) | Student, Registrar | Yes* |
-| Dismissed | Policy or disciplinary action finalized | Reinstated by exception | Registrar, Academic Board | Yes* |
-
-> *Terminal under normal policy; reinstatement requires exceptional workflow and two-party approval (advisor + registrar/board).
-
-#### 1.2 Deterministic State Machine
-```mermaid
-stateDiagram-v2
-    [*] --> Prospect
-    Prospect --> Applicant: submitApplication
-    Applicant --> Admitted: admissionAccepted
-    Applicant --> [*]: admissionRejected
-    Admitted --> Matriculated: identityVerified + docsCleared
-    Matriculated --> Enrolled: registerForTerm
-    Enrolled --> Active: termStart
-    Active --> Enrolled: nextTermRegistration
-    Active --> LeaveOfAbsence: approvedLeave
-    LeaveOfAbsence --> Active: reinstatementApproved
-    Active --> Graduated: conferralApproved
-    Active --> Withdrawn: withdrawalFinalized
-    Active --> Dismissed: dismissalFinalized
-```
-
-#### 1.3 Enrollment/Registration Enforcement Rules
-- **EL-001 Window Governance:** add/drop/withdraw windows are configured per term, program, and campus timezone; requests outside windows require override reason code.
-- **EL-002 Seat Allocation:** seat release follows deterministic priority `(cohortPriority DESC, waitlistTimestamp ASC, randomTieBreakerSeed ASC)`.
-- **EL-003 Prerequisite Resolution:** prerequisite checks run against canonical attempt history with in-progress and transfer-credit handling flags.
-- **EL-004 Conflict Detection:** section enrollment is rejected if timetable overlap, credit overload, hold, or missing approval constraints fail.
-- **EL-005 Downstream Consistency:** enrollment state changes emit events for LMS roster sync, fee recalculation, attendance eligibility, and aid re-evaluation.
-- **EL-006 Re-Enrollment Gate:** reinstatement requires cleared financial/disciplinary holds and advisor + registrar approvals.
-
-### 2) Grading and Transcript Consistency Constraints
-
-#### 2.1 Grade Lifecycle and Versioning
-- **GC-001 Immutable Posting:** once a grade version is `POSTED`, it is immutable.
-- **GC-002 Amendment Model:** corrections create a new version linked by `supersedesGradeVersionId`; no in-place edits.
-- **GC-003 Reason Codes:** every amendment must provide standardized reason (`CALCULATION_ERROR`, `LATE_SUBMISSION_APPROVED`, `INCOMPLETE_RESOLUTION`, etc.).
-- **GC-004 Effective Dating:** transcript rendering always uses latest `effective=true` grade version at render time.
-
-#### 2.2 Canonical Consistency Rules
-| Rule ID | Constraint | Failure Handling |
-|---|---|---|
-| TR-001 | Transcript rows derive only from canonical course-attempt + grade-version records | Block issuance and raise registrar task |
-| TR-002 | GPA/CGPA computed from policy-bound grade points and repeat/forgiveness rules | Recompute job queued; stale cache invalidated |
-| TR-003 | Standing/honors/SAP updates run after each posted or amended grade event | Trigger synchronous policy check + async reconciliation |
-| TR-004 | Official transcript issuance requires registrar sign-off + tamper-evident hash | Refuse release if signature or hash missing |
-| TR-005 | Retroactive grade changes require impact statements (prereq, audit, aid, standing) | Hold change in `PENDING_IMPACT_REVIEW` |
-
-#### 2.3 Grade Correction Sequence (Required)
-```mermaid
-sequenceDiagram
-    participant F as Faculty
-    participant SIS as SIS API
-    participant R as Registrar
-    participant GP as Grade Policy Engine
-    participant TX as Transcript Service
-    participant AU as Audit Log
-
-    F->>SIS: Submit grade amendment (attemptId, newGrade, reasonCode)
-    SIS->>GP: Validate policy window + authority + reason
-    GP-->>SIS: Validation result
-    alt valid
-        SIS->>AU: Append immutable audit event
-        SIS->>SIS: Create new gradeVersion (supersedes old)
-        SIS->>TX: Recompute transcript/GPA/standing deltas
-        TX-->>R: Impact report + approval task
-        R->>SIS: Approve correction
-        SIS-->>F: Amendment finalized
-    else invalid
-        SIS-->>F: Reject with machine-readable errors
-    end
-```
-
-### 3) Role-Based Access Specifics (RBAC + ABAC)
-
-#### 3.1 Access Model
-- **RBAC baseline** grants capability by role.
-- **ABAC overlays** constrain by context attributes: campus, department, term, section assignment, advisee linkage, data sensitivity, legal hold.
-- **Break-glass access** is time-bound, ticket-linked, and dual-approved.
-
-#### 3.2 Permission Matrix (Minimum Required)
-| Capability | Student | Faculty | Advisor | Registrar/Admin | Notes |
-|---|---:|---:|---:|---:|---|
-| View own transcript | ✅ | ❌ | ❌ | ✅ | Student self-service allowed |
-| Submit final grades | ❌ | ✅* | ❌ | ✅ | *Assigned sections + open window only |
-| Amend posted grade | ❌ | Request | ❌ | ✅ | Registrar finalizes amendments |
-| Approve overload/waiver petition | ❌ | ❌ | ✅ | ✅ | Program-scoped |
-| Release official transcript | ❌ | ❌ | ❌ | ✅ | Requires digital signature policy |
-| View disciplinary records | Limited | ❌ | Limited | Scoped | Enhanced logging required |
-
-#### 3.3 Security and Audit Controls
-- **AC-001** least privilege defaults; deny-by-default policy on all privileged endpoints.
-- **AC-002** MFA required for registrar/admin and any user performing grade or transcript actions.
-- **AC-003** field-level masking for PII/financial attributes in UI, exports, and logs.
-- **AC-004** all read/write of sensitive records generate audit events with `actorId`, `scope`, `justification`, `requestId`.
-- **AC-005** periodic entitlement recertification (at least once per term).
-
-### 4) Integration Contracts for External Systems
-
-#### 4.1 Contract-First Standards
-- APIs must publish OpenAPI/AsyncAPI artifacts with JSON Schema references and semantic versions.
-- Breaking changes require version increment and migration window policy.
-- Event contracts are backward-compatible for at least one full term unless emergency exception approved.
-
-#### 4.2 External Integration Surface
-| System | Direction | Contract Type | SLA/SLO | Idempotency Key |
-|---|---|---|---|---|
-| LMS | Bi-directional | REST + Events | Roster sync < 5 min | `termId:sectionId:studentId:eventType` |
-| IdP/SSO | Inbound auth + outbound provisioning | SAML/OIDC + SCIM | Login p95 < 2s | `provisioningRequestId` |
-| Payment Gateway | Outbound payment + inbound webhook | REST + Signed Webhooks | Payment callback < 60s | `invoiceId:attemptNo` |
-| Financial Aid | Bi-directional | REST + Batch SFTP (optional) | Aid status < 15 min | `aidApplicationId:termId` |
-| Library | Bi-directional | REST | Borrowing status < 10 min | `studentId:loanId:eventType` |
-| Regulatory Reporting | Outbound | Secure file/API | Deadline-bound batch | `reportPeriod:studentId:recordType` |
-
-#### 4.3 Event Contract Baseline
-```mermaid
-flowchart LR
-    A[Enrollment/Grade Change in SIS] --> B[Outbox Event Store]
-    B --> C[Event Publisher]
-    C --> D[LMS]
-    C --> E[Billing/Payments]
-    C --> F[Financial Aid]
-    C --> G[Analytics Warehouse]
-    C --> H[Notification Service]
-```
-
-Required event metadata fields:
-- `eventId`, `eventType`, `schemaVersion`, `occurredAt`, `sourceSystem`, `correlationId`, `idempotencyKey`
-- domain IDs: `studentId`, `termId`, `courseOfferingId`, `attemptId`, `gradeVersionId` (as applicable)
-
-#### 4.4 Reliability, Security, and Drift Controls
-- **IC-001** retries use exponential backoff + jitter; dead-letter queues mandatory.
-- **IC-002** all webhook callbacks must be signed and timestamp-validated.
-- **IC-003** encryption in transit (TLS 1.2+) and at rest for replicated payload stores.
-- **IC-004** contract tests + sandbox certification are release gates for enrollment/grade/transcript/billing changes.
-- **IC-005** schema drift detection runs continuously and blocks incompatible deploys.
-
-### 5) Operational Readiness and Acceptance Criteria
-
-#### 5.1 Observability and SLOs
-- Enrollment action API p95 latency <= 400ms during peak registration.
-- Grade posting-to-transcript consistency <= 2 minutes (p99).
-- LMS roster propagation <= 5 minutes (p99).
-- Audit event durability >= 99.999% persisted write success.
-
-#### 5.2 Data Retention and Compliance
-- Grade versions and transcript issuance records are retained per institutional and statutory policy (minimum 7 years where applicable).
-- Audit logs for sensitive operations retained in immutable storage tier with legal hold support.
-- Data subject access/deletion requests must preserve legally required academic records with redaction-by-policy.
-
-#### 5.3 Implementation-Ready Test Scenarios
-1. Waitlist promotion tie-breaker determinism under concurrent seat release.
-2. Retroactive grade correction impact on prerequisites and degree audit.
-3. Unauthorized faculty grade amendment blocked with explicit error code.
-4. Payment webhook replay handled idempotently without duplicate ledger entries.
-5. Transcript signature/hash verification fails on tampered artifact.
-6. Re-enrollment blocked when financial hold exists; succeeds after hold clearance.
-
+| `requirements/requirements.md` | Requirements | ✅ Complete | 2024-08 | FR + NFR + constraints |
+| `requirements/user-stories.md` | Requirements | ✅ Complete | 2024-08 | Stories with acceptance criteria |
+| `analysis/use-case-diagram.md` | Analysis | ✅ Complete | 2024-08 | All actor use cases |
+| `analysis/use-case-descriptions.md` | Analysis | ✅ Complete | 2024-08 | Detailed flows + alternates |
+| `analysis/system-context-diagram.md` | Analysis | ✅ Complete | 2024-08 | External integrations mapped |
+| `analysis/activity-diagrams.md` | Analysis | ✅ Complete | 2024-08 | Key business process flows |
+| `analysis/swimlane-diagrams.md` | Analysis | ✅ Complete | 2024-08 | Cross-role BPMN diagrams |
+| `analysis/data-dictionary.md` | Analysis | ✅ Complete | 2024-08 | 30+ entities; ER diagram |
+| `analysis/business-rules.md` | Analysis | ✅ Complete | 2024-08 | BR-01 through BR-10 |
+| `analysis/event-catalog.md` | Analysis | ✅ Complete | 2024-08 | 18 domain events; SLOs |
+| `high-level-design/system-sequence-diagrams.md` | HLD | ✅ Complete | 2024-08 | Black-box sequences |
+| `high-level-design/domain-model.md` | HLD | ✅ Complete | 2024-08 | Aggregates and associations |
+| `high-level-design/data-flow-diagrams.md` | HLD | ✅ Complete | 2024-08 | DFD levels 0–2 |
+| `high-level-design/architecture-diagram.md` | HLD | ✅ Complete | 2024-08 | Component architecture |
+| `high-level-design/c4-diagrams.md` | HLD | ✅ Complete | 2024-08 | C4 context + container |
+| `detailed-design/class-diagrams.md` | Detailed Design | ✅ Complete | 2024-08 | All domain modules |
+| `detailed-design/sequence-diagrams.md` | Detailed Design | ✅ Complete | 2024-08 | Internal service interactions |
+| `detailed-design/state-machine-diagrams.md` | Detailed Design | ✅ Complete | 2024-08 | Student, Enrollment, Grade, Fee |
+| `detailed-design/erd-database-schema.md` | Detailed Design | ✅ Complete | 2024-08 | Full schema with DDL |
+| `detailed-design/component-diagrams.md` | Detailed Design | ✅ Complete | 2024-08 | Module decomposition |
+| `detailed-design/api-design.md` | Detailed Design | ✅ Complete | 2024-08 | REST endpoints + payloads |
+| `detailed-design/c4-component-diagram.md` | Detailed Design | ✅ Complete | 2024-08 | C4 component level |
+| `infrastructure/deployment-diagram.md` | Infrastructure | ✅ Complete | 2024-08 | K8s deployment topology |
+| `infrastructure/network-infrastructure.md` | Infrastructure | ✅ Complete | 2024-08 | Network zones + security groups |
+| `infrastructure/cloud-architecture.md` | Infrastructure | ✅ Complete | 2024-08 | AWS reference architecture |
+| `implementation/implementation-guidelines.md` | Implementation | ✅ Complete | 2024-08 | Coding standards + setup |
+| `implementation/c4-code-diagram.md` | Implementation | ✅ Complete | 2024-08 | C4 code-level view |
+| `implementation/backend-status-matrix.md` | Implementation | ✅ Complete | 2024-08 | Feature implementation status |
+| `edge-cases/README.md` | Edge Cases | ✅ Complete | 2024-08 | Index + severity classification |
+| `edge-cases/enrollment-and-seat-allocation.md` | Edge Cases | ✅ Complete | 2024-08 | Enrollment race conditions |
+| `edge-cases/grades-and-transcript-corrections.md` | Edge Cases | ✅ Complete | 2024-08 | Grade amendment flows |
+| `edge-cases/attendance-and-term-policies.md` | Edge Cases | ✅ Complete | 2024-08 | Attendance disputes |
+| `edge-cases/fee-assessment-and-waivers.md` | Edge Cases | ✅ Complete | 2024-08 | Fee and payment edge cases |
+| `edge-cases/api-and-ui.md` | Edge Cases | ✅ Complete | 2024-08 | API contract edge cases |
+| `edge-cases/security-and-compliance.md` | Edge Cases | ✅ Complete | 2024-08 | Security and compliance risks |
+| `edge-cases/operations.md` | Edge Cases | ✅ Complete | 2024-08 | Operational failure scenarios |

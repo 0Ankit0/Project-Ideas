@@ -1,215 +1,160 @@
 # Data Dictionary
 
-This data dictionary is the canonical reference for **Student Information System**. It defines shared terminology, entity semantics, and governance controls required to keep student information workflows consistent across teams and services.
+This data dictionary is the canonical reference for the **Student Information System (SIS)**. It defines shared terminology, entity semantics, attribute constraints, and governance controls required to keep student information workflows consistent across all teams and integrated systems.
 
 ## Scope and Goals
-- Establish a stable vocabulary for architecture, API, analytics, and operations teams.
-- Define minimum required fields for core entities and expected relationship boundaries.
-- Document data quality and retention controls needed for production readiness.
+
+- Establish a stable, authoritative vocabulary for architecture, API, analytics, and operations teams.
+- Define minimum required attributes, data types, and relationship boundaries for all core SIS entities.
+- Document data quality, classification, and retention controls needed for production readiness and regulatory compliance.
+
+---
 
 ## Core Entities
-| Entity | Description | Required Attributes |
-|---|---|---|
-| TenantOrOrganization | Top-level ownership boundary for data segregation | `org_id, name, status, region, created_at` |
-| UserOrActor | Human/system principal that performs actions | `actor_id, org_id, role, status, last_active_at` |
-| PrimaryRecord | Main lifecycle object handled by the platform | `record_id, org_id, state, owner_id, created_at, updated_at` |
-| ChildTransaction | Operational transaction or sub-step linked to primary record | `txn_id, record_id, txn_type, amount_or_value, occurred_at` |
-| PolicyOrRule | Versioned policy configuration that influences decisions | `policy_id, scope, version, effective_from, effective_to` |
-| AuditEvent | Append-only evidence for state changes and controls | `audit_id, record_id, actor_id, action, reason_code, occurred_at` |
+
+| Entity | Description | Primary Key | Key Attributes | Relationships |
+|---|---|---|---|---|
+| Institution | Top-level organizational boundary; owns all configuration | `institution_id` | `name`, `domain`, `grade_scale_id`, `timezone`, `status` | Parent of Campus, Program, AcademicYear |
+| Campus | Physical or virtual campus within an institution | `campus_id` | `institution_id`, `name`, `address`, `timezone`, `is_virtual` | Belongs to Institution; hosts Section, Timetable |
+| AcademicYear | Named academic year (e.g., 2024–25) | `academic_year_id` | `institution_id`, `label`, `start_date`, `end_date` | Contains many Terms |
+| Term | A single teaching period (semester, quarter, trimester) | `term_id` | `academic_year_id`, `name`, `type`, `enrollment_open_at`, `enrollment_lock_at`, `grade_deadline` | Contains Sections; scopes Enrollment |
+| Department | Academic department offering courses and programs | `department_id` | `institution_id`, `name`, `code`, `head_instructor_id` | Owns Course, Program, Instructor |
+| Program | Degree or certificate program defining graduation requirements | `program_id` | `department_id`, `name`, `type`, `total_credits`, `min_graduation_gpa`, `max_credits_per_term`, `repeat_forgiveness` | Contains ProgramRequirement; enrolls Students |
+| Course | Reusable course definition in the catalog | `course_id` | `department_id`, `code`, `title`, `credit_hours`, `delivery_mode`, `is_active` | Has Prerequisites; offered as Sections |
+| CoursePrerequisite | Prerequisite relationship between two courses | `prereq_id` | `course_id`, `required_course_id`, `min_grade`, `type (PRE/CO)` | Links Course to required Course |
+| Section | A scheduled offering of a course for a specific term | `section_id` | `course_id`, `term_id`, `campus_id`, `instructor_id`, `max_enrollment`, `enrolled_count`, `room`, `status` | Has ClassSchedule; linked to Enrollment, Attendance |
+| ClassSchedule | Recurring time slot for a section | `schedule_id` | `section_id`, `day_of_week`, `start_time`, `end_time`, `room`, `effective_from`, `effective_to` | Belongs to Section; informs Timetable conflict checks |
+| Instructor | Faculty member who teaches sections | `instructor_id` | `department_id`, `employee_id`, `name`, `email`, `designation`, `status` | Teaches Sections; enters Grades and Attendance |
+| Student | Enrolled individual pursuing a program | `student_id` | `institution_id`, `program_id`, `admission_number`, `name`, `email`, `status`, `cgpa`, `total_credits_earned` | Has Enrollments, Grades, Attendance, Fees, Transcripts |
+| ParentGuardian | Parent or guardian with read-only portal access | `guardian_id` | `student_id`, `name`, `relationship`, `email`, `phone`, `portal_access_enabled` | Linked to Student (many-to-one) |
+| Enrollment | A student's registration in a specific section for a term | `enrollment_id` | `student_id`, `section_id`, `term_id`, `status (ACTIVE/DROPPED/WITHDRAWN/COMPLETED)`, `enrolled_at`, `grade_id` | Links Student to Section; owns Grade |
+| WaitlistEntry | Queue entry when a section is full | `waitlist_id` | `student_id`, `section_id`, `term_id`, `position`, `waitlisted_at`, `expires_at`, `status` | Linked to Section; promotes to Enrollment |
+| Grade | Final grade awarded for a course enrollment | `grade_id` | `enrollment_id`, `letter_grade`, `grade_points`, `credit_hours`, `posted_by`, `posted_at`, `is_final`, `version` | Belongs to Enrollment; aggregated into Transcript |
+| GradeAmendment | Versioned correction to a previously posted grade | `amendment_id` | `grade_id`, `previous_letter`, `new_letter`, `reason_code`, `approved_by`, `effective_at` | Supersedes Grade; logged to AuditEvent |
+| GradeBook | Gradebook container for a section's assessment scores | `gradebook_id` | `section_id`, `instructor_id`, `last_updated_at` | Contains GradeBookEntry records |
+| GradeBookEntry | Individual student assessment score within a gradebook | `entry_id` | `gradebook_id`, `student_id`, `assessment_name`, `max_score`, `scored`, `weight`, `submitted_at` | Child of GradeBook |
+| Transcript | Official or unofficial academic record for a student | `transcript_id` | `student_id`, `type (OFFICIAL/UNOFFICIAL)`, `issued_at`, `issued_by`, `cgpa`, `hash`, `status` | Aggregates TranscriptEntry records |
+| TranscriptEntry | One course row on a transcript | `entry_id` | `transcript_id`, `course_code`, `course_title`, `term`, `credit_hours`, `letter_grade`, `grade_points`, `notes` | Child of Transcript |
+| Attendance | Attendance summary for a student in a section | `attendance_id` | `student_id`, `section_id`, `sessions_held`, `sessions_attended`, `attendance_pct`, `status` | Aggregates AttendanceRecord |
+| AttendanceRecord | Single session attendance mark | `record_id` | `attendance_id`, `session_date`, `status (PRESENT/ABSENT/LATE/EXCUSED)`, `marked_by`, `marked_at` | Child of Attendance |
+| FeeCategory | Template category for fee types | `category_id` | `institution_id`, `name`, `code`, `is_recurring`, `amount`, `frequency` | Parent of FeeInvoice |
+| FeeInvoice | Term-specific fee invoice issued to a student | `invoice_id` | `student_id`, `term_id`, `category_id`, `amount`, `due_date`, `status (PENDING/PAID/OVERDUE/WAIVED)`, `late_fee_accrued` | Linked to Student, Term; has Payments |
+| FeeWaiver | Partial or full waiver applied to a fee invoice | `waiver_id` | `invoice_id`, `reason`, `waived_amount`, `approved_by`, `approved_at` | Applied to FeeInvoice |
+| Payment | Payment transaction against an invoice | `payment_id` | `invoice_id`, `amount`, `method`, `transaction_ref`, `status (SUCCESS/FAILED/REFUNDED)`, `paid_at` | Child of FeeInvoice |
+| Scholarship | Scholarship award definition | `scholarship_id` | `institution_id`, `name`, `type (MERIT/NEED/SPORTS)`, `amount`, `min_cgpa`, `min_credits`, `renewable` | Linked to ScholarshipAward |
+| ScholarshipAward | Active scholarship awarded to a specific student | `award_id` | `scholarship_id`, `student_id`, `term_id`, `amount`, `status (ACTIVE/SUSPENDED/REVOKED)`, `awarded_at` | Links Scholarship to Student |
+| AcademicHold | Active hold blocking student actions | `hold_id` | `student_id`, `type (FINANCIAL/ACADEMIC/DISCIPLINARY)`, `placed_at`, `reason`, `placed_by`, `cleared_at` | Linked to Student; enforced in rule pipeline |
+| Examination | Scheduled examination event for a section | `exam_id` | `section_id`, `term_id`, `type (MIDTERM/FINAL/SUPPLEMENTAL)`, `date`, `start_time`, `end_time`, `venue`, `status` | Belongs to Section; has ExamResult |
+| ExamResult | A student's result for an examination | `result_id` | `exam_id`, `student_id`, `marks_obtained`, `max_marks`, `grade`, `is_absent`, `published_at` | Linked to Examination and Student |
+
+---
 
 ## Canonical Relationship Diagram
+
 ```mermaid
 erDiagram
-    TENANTORORGANIZATION ||--o{ USERORACTOR : owns
-    TENANTORORGANIZATION ||--o{ PRIMARYRECORD : contains
-    PRIMARYRECORD ||--o{ CHILDTRANSACTION : has
-    POLICYORRULE ||--o{ PRIMARYRECORD : governs
-    PRIMARYRECORD ||--o{ AUDITEVENT : audited_by
-    USERORACTOR ||--o{ AUDITEVENT : performs
+    INSTITUTION ||--o{ CAMPUS : "hosts"
+    INSTITUTION ||--o{ ACADEMICYEAR : "organises"
+    INSTITUTION ||--o{ DEPARTMENT : "contains"
+    ACADEMICYEAR ||--o{ TERM : "divides into"
+    DEPARTMENT ||--o{ PROGRAM : "offers"
+    DEPARTMENT ||--o{ COURSE : "owns"
+    DEPARTMENT ||--o{ INSTRUCTOR : "employs"
+    PROGRAM ||--o{ STUDENT : "enrols"
+    COURSE ||--o{ COURSEPREREQUISITE : "requires"
+    COURSE ||--o{ SECTION : "offered as"
+    TERM ||--o{ SECTION : "scopes"
+    CAMPUS ||--o{ SECTION : "hosts"
+    INSTRUCTOR ||--o{ SECTION : "teaches"
+    SECTION ||--o{ CLASSSCHEDULE : "has"
+    SECTION ||--o{ ENROLLMENT : "accepts"
+    SECTION ||--o{ WAITLISTENTRY : "queues"
+    SECTION ||--o{ ATTENDANCE : "tracks"
+    SECTION ||--o{ EXAMINATION : "schedules"
+    STUDENT ||--o{ ENROLLMENT : "registers"
+    STUDENT ||--o{ FEEINVOICE : "billed"
+    STUDENT ||--o{ TRANSCRIPT : "holds"
+    STUDENT ||--o{ SCHOLARSHIPAWARD : "receives"
+    STUDENT ||--o{ ACADEMICHOLD : "subject to"
+    ENROLLMENT ||--|| GRADE : "results in"
+    GRADE ||--o{ GRADEAMENDMENT : "corrected by"
+    FEEINVOICE ||--o{ PAYMENT : "settled by"
+    FEEINVOICE ||--o{ FEEWAIVER : "adjusted by"
+    TRANSCRIPT ||--o{ TRANSCRIPTENTRY : "contains"
+    ATTENDANCE ||--o{ ATTENDANCERECORD : "details"
+    EXAMINATION ||--o{ EXAMRESULT : "produces"
+    SCHOLARSHIP ||--o{ SCHOLARSHIPAWARD : "granted as"
 ```
+
+---
+
+## Attribute Reference
+
+### Student
+
+| Attribute | Type | Nullable | Constraints | Notes |
+|---|---|---|---|---|
+| `student_id` | UUID | No | PK | System-generated on admission |
+| `admission_number` | VARCHAR(20) | No | UNIQUE, NOT NULL | Institution-formatted ID |
+| `program_id` | UUID | No | FK → Program | Current enrolled program |
+| `status` | ENUM | No | PROSPECT\|APPLICANT\|ADMITTED\|ACTIVE\|LOA\|GRADUATED\|WITHDRAWN\|DISMISSED | Drives access and eligibility |
+| `cgpa` | DECIMAL(4,2) | Yes | 0.00–4.00 | Recomputed on each grade post; cached |
+| `total_credits_earned` | INTEGER | No | ≥ 0 | Excludes W, I, AU |
+| `date_of_birth` | DATE | No | | PII — masked in exports |
+| `national_id` | VARCHAR(30) | Yes | | PII — encrypted at rest |
+| `email` | VARCHAR(254) | No | UNIQUE, valid format | Primary login and notification address |
+
+### Enrollment
+
+| Attribute | Type | Nullable | Constraints | Notes |
+|---|---|---|---|---|
+| `enrollment_id` | UUID | No | PK | |
+| `student_id` | UUID | No | FK → Student | |
+| `section_id` | UUID | No | FK → Section | |
+| `term_id` | UUID | No | FK → Term | Denormalised for query performance |
+| `status` | ENUM | No | ACTIVE\|DROPPED\|WITHDRAWN\|COMPLETED | |
+| `enrolled_at` | TIMESTAMPTZ | No | NOT NULL | Timezone-aware |
+| `dropped_at` | TIMESTAMPTZ | Yes | | Null if not dropped |
+| `grade_id` | UUID | Yes | FK → Grade | Null until grade posted |
+
+### Grade
+
+| Attribute | Type | Nullable | Constraints | Notes |
+|---|---|---|---|---|
+| `grade_id` | UUID | No | PK | |
+| `enrollment_id` | UUID | No | FK → Enrollment | |
+| `letter_grade` | VARCHAR(3) | No | Must match GradeScale | A, A−, B+, B … F, W, I, TR, AU |
+| `grade_points` | DECIMAL(3,1) | Yes | 0.0–4.0 | Null for W, I, TR, AU |
+| `credit_hours` | DECIMAL(4,1) | No | > 0 | Denormalised from Course |
+| `posted_by` | UUID | No | FK → Instructor or Registrar | |
+| `posted_at` | TIMESTAMPTZ | No | | |
+| `version` | INTEGER | No | ≥ 1; increments on amendment | |
+| `supersedes_grade_id` | UUID | Yes | FK → Grade | Null for version 1 |
+
+---
 
 ## Data Quality Controls
-1. All write paths enforce required-field validation and referential integrity for mandatory foreign keys.
-2. External imports must include provenance metadata (`source_system`, `source_ref`, `ingested_at`).
-3. Status/state fields use controlled vocabularies and reject unknown values.
-4. Duplicate detection runs on natural keys where business identity collisions are likely.
-5. Sensitive fields carry classification tags to drive masking, encryption, and export behavior.
 
-## Retention and Audit
-- Operational records remain online for active workflow windows and support forensic queries.
-- Historical records move to archive tiers by policy without breaking traceability.
-- Audit events are immutable and linked through correlation ids for incident analysis.
+1. **Required-field validation** is enforced at the API layer and at the database layer via `NOT NULL` constraints and `CHECK` expressions. A field failing validation returns `HTTP 422` with a machine-readable error array.
+2. **Referential integrity** for all mandatory foreign keys (e.g., `student_id`, `section_id`, `term_id`) is enforced with `ON DELETE RESTRICT` to prevent orphan records.
+3. **Controlled vocabularies** — status fields, grade letters, hold types, attendance statuses — use `ENUM` types or lookup tables; unknown values are rejected at write time.
+4. **Natural-key deduplication:** `(student_id, section_id, term_id)` on `Enrollment` is unique; `(student_id, exam_id)` on `ExamResult` is unique. Duplicate inserts return `HTTP 409 CONFLICT`.
+5. **PII classification:** Fields tagged `PII_HIGH` (national ID, date of birth, financial data) are encrypted at rest (AES-256) and masked in application logs and API exports unless the caller holds the `pii:read` scope.
+6. **Immutable audit trail:** All writes to `Grade`, `Transcript`, `ScholarshipAward`, `AcademicHold`, and `FeeWaiver` emit an append-only `AuditEvent` record containing `actor_id`, `action`, `before_state`, `after_state`, `occurred_at`, and `correlation_id`.
+7. **External import provenance:** Batch imports (transfer credits, payment reconciliation, external exam results) must include `source_system`, `source_ref`, and `ingested_at`; import jobs are logged to `ImportBatch`.
+8. **Schema migration policy:** Backward-compatible changes (add nullable column, add index) may deploy without a version bump. Breaking changes (rename, drop, change type) require a new schema version and a data migration plan signed off by the platform lead.
 
-## Enrollment, Academic Integrity, Access Control, and Integration Contracts (Implementation-Ready)
+---
 
-### 1) Enrollment Lifecycle Rules (Authoritative)
+## Retention and Audit Policy
 
-#### 1.1 Lifecycle States and Transitions
-| State | Entry Criteria | Exit Criteria | Allowed Actors | Terminal? |
+| Record Type | Online Retention | Archive Tier | Legal Hold Support | Deletion Rule |
 |---|---|---|---|---|
-| Prospect | Lead captured or inquiry created | Application submitted | Admissions CRM, Applicant | No |
-| Applicant | Complete application + required docs | Admitted or Rejected | Applicant, Admissions Officer | No |
-| Admitted | Admission decision = accepted | Matriculated or Offer Expired | Admissions, Registrar | No |
-| Matriculated | Identity + eligibility checks passed | Enrolled for a term | Registrar | No |
-| Enrolled (Term-Scoped) | Registered in >=1 credit-bearing section | Dropped all sections, Term Completed | Student, Advisor, Registrar | No |
-| Active (Institution-Scoped) | Student is not graduated/withdrawn/dismissed | Graduated, Withdrawn, Dismissed | SIS policy engine | No |
-| Leave of Absence | Approved leave request in valid window | Reinstated, Withdrawn, Dismissed | Student, Advisor, Registrar | No |
-| Graduated | Degree audit complete + conferral approved | N/A | Registrar | Yes |
-| Withdrawn | Approved withdrawal workflow complete | Reinstated (rare policy path) | Student, Registrar | Yes* |
-| Dismissed | Policy or disciplinary action finalized | Reinstated by exception | Registrar, Academic Board | Yes* |
+| Student academic record (grades, transcripts) | Lifetime of institution | Permanent | Yes | Statutory minimum; no deletion |
+| Audit events (grade, transcript, financial) | 7 years active | 10+ years cold | Yes | Immutable; legal-hold overrides |
+| Attendance records | 5 years | 10 years cold | No | Per institutional policy |
+| Fee invoices and payment records | 7 years | 10 years cold | Yes | Accounting statute |
+| Application and admission documents | 5 years post-decision | 7 years cold | No | Per data-minimisation policy |
+| Anonymised analytics snapshots | Indefinite | N/A | No | No PII |
 
-> *Terminal under normal policy; reinstatement requires exceptional workflow and two-party approval (advisor + registrar/board).
-
-#### 1.2 Deterministic State Machine
-```mermaid
-stateDiagram-v2
-    [*] --> Prospect
-    Prospect --> Applicant: submitApplication
-    Applicant --> Admitted: admissionAccepted
-    Applicant --> [*]: admissionRejected
-    Admitted --> Matriculated: identityVerified + docsCleared
-    Matriculated --> Enrolled: registerForTerm
-    Enrolled --> Active: termStart
-    Active --> Enrolled: nextTermRegistration
-    Active --> LeaveOfAbsence: approvedLeave
-    LeaveOfAbsence --> Active: reinstatementApproved
-    Active --> Graduated: conferralApproved
-    Active --> Withdrawn: withdrawalFinalized
-    Active --> Dismissed: dismissalFinalized
-```
-
-#### 1.3 Enrollment/Registration Enforcement Rules
-- **EL-001 Window Governance:** add/drop/withdraw windows are configured per term, program, and campus timezone; requests outside windows require override reason code.
-- **EL-002 Seat Allocation:** seat release follows deterministic priority `(cohortPriority DESC, waitlistTimestamp ASC, randomTieBreakerSeed ASC)`.
-- **EL-003 Prerequisite Resolution:** prerequisite checks run against canonical attempt history with in-progress and transfer-credit handling flags.
-- **EL-004 Conflict Detection:** section enrollment is rejected if timetable overlap, credit overload, hold, or missing approval constraints fail.
-- **EL-005 Downstream Consistency:** enrollment state changes emit events for LMS roster sync, fee recalculation, attendance eligibility, and aid re-evaluation.
-- **EL-006 Re-Enrollment Gate:** reinstatement requires cleared financial/disciplinary holds and advisor + registrar approvals.
-
-### 2) Grading and Transcript Consistency Constraints
-
-#### 2.1 Grade Lifecycle and Versioning
-- **GC-001 Immutable Posting:** once a grade version is `POSTED`, it is immutable.
-- **GC-002 Amendment Model:** corrections create a new version linked by `supersedesGradeVersionId`; no in-place edits.
-- **GC-003 Reason Codes:** every amendment must provide standardized reason (`CALCULATION_ERROR`, `LATE_SUBMISSION_APPROVED`, `INCOMPLETE_RESOLUTION`, etc.).
-- **GC-004 Effective Dating:** transcript rendering always uses latest `effective=true` grade version at render time.
-
-#### 2.2 Canonical Consistency Rules
-| Rule ID | Constraint | Failure Handling |
-|---|---|---|
-| TR-001 | Transcript rows derive only from canonical course-attempt + grade-version records | Block issuance and raise registrar task |
-| TR-002 | GPA/CGPA computed from policy-bound grade points and repeat/forgiveness rules | Recompute job queued; stale cache invalidated |
-| TR-003 | Standing/honors/SAP updates run after each posted or amended grade event | Trigger synchronous policy check + async reconciliation |
-| TR-004 | Official transcript issuance requires registrar sign-off + tamper-evident hash | Refuse release if signature or hash missing |
-| TR-005 | Retroactive grade changes require impact statements (prereq, audit, aid, standing) | Hold change in `PENDING_IMPACT_REVIEW` |
-
-#### 2.3 Grade Correction Sequence (Required)
-```mermaid
-sequenceDiagram
-    participant F as Faculty
-    participant SIS as SIS API
-    participant R as Registrar
-    participant GP as Grade Policy Engine
-    participant TX as Transcript Service
-    participant AU as Audit Log
-
-    F->>SIS: Submit grade amendment (attemptId, newGrade, reasonCode)
-    SIS->>GP: Validate policy window + authority + reason
-    GP-->>SIS: Validation result
-    alt valid
-        SIS->>AU: Append immutable audit event
-        SIS->>SIS: Create new gradeVersion (supersedes old)
-        SIS->>TX: Recompute transcript/GPA/standing deltas
-        TX-->>R: Impact report + approval task
-        R->>SIS: Approve correction
-        SIS-->>F: Amendment finalized
-    else invalid
-        SIS-->>F: Reject with machine-readable errors
-    end
-```
-
-### 3) Role-Based Access Specifics (RBAC + ABAC)
-
-#### 3.1 Access Model
-- **RBAC baseline** grants capability by role.
-- **ABAC overlays** constrain by context attributes: campus, department, term, section assignment, advisee linkage, data sensitivity, legal hold.
-- **Break-glass access** is time-bound, ticket-linked, and dual-approved.
-
-#### 3.2 Permission Matrix (Minimum Required)
-| Capability | Student | Faculty | Advisor | Registrar/Admin | Notes |
-|---|---:|---:|---:|---:|---|
-| View own transcript | ✅ | ❌ | ❌ | ✅ | Student self-service allowed |
-| Submit final grades | ❌ | ✅* | ❌ | ✅ | *Assigned sections + open window only |
-| Amend posted grade | ❌ | Request | ❌ | ✅ | Registrar finalizes amendments |
-| Approve overload/waiver petition | ❌ | ❌ | ✅ | ✅ | Program-scoped |
-| Release official transcript | ❌ | ❌ | ❌ | ✅ | Requires digital signature policy |
-| View disciplinary records | Limited | ❌ | Limited | Scoped | Enhanced logging required |
-
-#### 3.3 Security and Audit Controls
-- **AC-001** least privilege defaults; deny-by-default policy on all privileged endpoints.
-- **AC-002** MFA required for registrar/admin and any user performing grade or transcript actions.
-- **AC-003** field-level masking for PII/financial attributes in UI, exports, and logs.
-- **AC-004** all read/write of sensitive records generate audit events with `actorId`, `scope`, `justification`, `requestId`.
-- **AC-005** periodic entitlement recertification (at least once per term).
-
-### 4) Integration Contracts for External Systems
-
-#### 4.1 Contract-First Standards
-- APIs must publish OpenAPI/AsyncAPI artifacts with JSON Schema references and semantic versions.
-- Breaking changes require version increment and migration window policy.
-- Event contracts are backward-compatible for at least one full term unless emergency exception approved.
-
-#### 4.2 External Integration Surface
-| System | Direction | Contract Type | SLA/SLO | Idempotency Key |
-|---|---|---|---|---|
-| LMS | Bi-directional | REST + Events | Roster sync < 5 min | `termId:sectionId:studentId:eventType` |
-| IdP/SSO | Inbound auth + outbound provisioning | SAML/OIDC + SCIM | Login p95 < 2s | `provisioningRequestId` |
-| Payment Gateway | Outbound payment + inbound webhook | REST + Signed Webhooks | Payment callback < 60s | `invoiceId:attemptNo` |
-| Financial Aid | Bi-directional | REST + Batch SFTP (optional) | Aid status < 15 min | `aidApplicationId:termId` |
-| Library | Bi-directional | REST | Borrowing status < 10 min | `studentId:loanId:eventType` |
-| Regulatory Reporting | Outbound | Secure file/API | Deadline-bound batch | `reportPeriod:studentId:recordType` |
-
-#### 4.3 Event Contract Baseline
-```mermaid
-flowchart LR
-    A[Enrollment/Grade Change in SIS] --> B[Outbox Event Store]
-    B --> C[Event Publisher]
-    C --> D[LMS]
-    C --> E[Billing/Payments]
-    C --> F[Financial Aid]
-    C --> G[Analytics Warehouse]
-    C --> H[Notification Service]
-```
-
-Required event metadata fields:
-- `eventId`, `eventType`, `schemaVersion`, `occurredAt`, `sourceSystem`, `correlationId`, `idempotencyKey`
-- domain IDs: `studentId`, `termId`, `courseOfferingId`, `attemptId`, `gradeVersionId` (as applicable)
-
-#### 4.4 Reliability, Security, and Drift Controls
-- **IC-001** retries use exponential backoff + jitter; dead-letter queues mandatory.
-- **IC-002** all webhook callbacks must be signed and timestamp-validated.
-- **IC-003** encryption in transit (TLS 1.2+) and at rest for replicated payload stores.
-- **IC-004** contract tests + sandbox certification are release gates for enrollment/grade/transcript/billing changes.
-- **IC-005** schema drift detection runs continuously and blocks incompatible deploys.
-
-### 5) Operational Readiness and Acceptance Criteria
-
-#### 5.1 Observability and SLOs
-- Enrollment action API p95 latency <= 400ms during peak registration.
-- Grade posting-to-transcript consistency <= 2 minutes (p99).
-- LMS roster propagation <= 5 minutes (p99).
-- Audit event durability >= 99.999% persisted write success.
-
-#### 5.2 Data Retention and Compliance
-- Grade versions and transcript issuance records are retained per institutional and statutory policy (minimum 7 years where applicable).
-- Audit logs for sensitive operations retained in immutable storage tier with legal hold support.
-- Data subject access/deletion requests must preserve legally required academic records with redaction-by-policy.
-
-#### 5.3 Implementation-Ready Test Scenarios
-1. Waitlist promotion tie-breaker determinism under concurrent seat release.
-2. Retroactive grade correction impact on prerequisites and degree audit.
-3. Unauthorized faculty grade amendment blocked with explicit error code.
-4. Payment webhook replay handled idempotently without duplicate ledger entries.
-5. Transcript signature/hash verification fails on tampered artifact.
-6. Re-enrollment blocked when financial hold exists; succeeds after hold clearance.
-
+Data subject access and deletion requests (DSAR) must preserve all legally required academic records. Non-academic PII (contact details of former students post-record retention) may be redacted per `DSARPolicy.redaction_rules`.
