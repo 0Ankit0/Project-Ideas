@@ -1,113 +1,117 @@
-# Use Case Diagram - Document Intelligence System
+# Use Case Diagram — Document Intelligence System
+
+## System Boundary and Actors
+
+The Document Intelligence System (DIS) boundary encompasses all automated processing pipelines and human-in-the-loop review workflows. External actors interact with the system via REST API, WebUI, and webhook callbacks.
 
 ```mermaid
-graph TB
+graph TD
     subgraph Actors
-        USER((Document<br/>Processor))
-        REVIEWER((Reviewer))
-        ADMIN((System Admin))
-        DS((Data Scientist))
-        API((API Consumer))
+        DP[Document Processor]
+        HR[Human Reviewer]
+        SA[System Administrator]
+        DS[Data Scientist]
+        CO[Compliance Officer]
+        AC[API Consumer / ERP]
+        OCR_P[Cloud OCR Provider]
+        ML_R[ML Model Registry]
+        ERP_S[ERP System]
     end
-    
-    subgraph "Document Intelligence System"
-        UC1[Upload Document]
-        UC2[View Extracted Data]
-        UC3[Correct Errors]
-        UC4[Export Data]
-        UC5[Configure Rules]
-        UC6[Train Models]
-        UC7[API Upload]
-        UC8[API Retrieve]
+
+    subgraph DIS["Document Intelligence System"]
+        UC01[Submit Document Batch]
+        UC02[OCR Processing]
+        UC03[Classify Document]
+        UC04[Extract Fields]
+        UC05[Validate Extraction]
+        UC06[Human Review]
+        UC07[Export to ERP]
+        UC08[Retrain Model]
+        UC09[Manage Templates]
+        UC10[Manage Retention Policy]
+        UC11[Audit PII Access]
+        UC12[Process GDPR Erasure]
+        UC13[Configure Validation Rules]
+        UC14[Monitor Processing Status]
+        UC15[Register Webhook]
+        UC16[Detect and Redact PII]
+        UC17[Manage User Roles]
+        UC18[Review Queue Management]
     end
-    
-    USER --> UC1
-    USER --> UC2
-    REVIEWER --> UC3
-    USER --> UC4
-    ADMIN --> UC5
-    DS --> UC6
-    API --> UC7
-    API --> UC8
+
+    DP --> UC01
+    DP --> UC14
+    DP --> UC15
+    HR --> UC06
+    HR --> UC18
+    SA --> UC09
+    SA --> UC10
+    SA --> UC13
+    SA --> UC17
+    DS --> UC08
+    CO --> UC11
+    CO --> UC12
+    AC --> UC07
+    AC --> UC14
+    OCR_P --> UC02
+    ML_R --> UC08
+    ERP_S --> UC07
+
+    UC01 --> UC02
+    UC02 --> UC03
+    UC03 --> UC04
+    UC04 --> UC05
+    UC05 --> UC06
+    UC06 --> UC07
+    UC04 --> UC16
+    UC08 --> UC03
+    UC08 --> UC04
 ```
 
-## Actor Summary
+## Actor Descriptions
 
-| Actor | Primary Actions |
-|-------|----------------|
-| Document Processor | Upload documents, view extracted data |
-| Reviewer | Validate and correct extractions |
-| System Admin | Configure extraction rules |
-| Data Scientist | Train and optimize AI models |
-| API Consumer | Programmatic document processing |
----
+| Actor | Type | Description |
+|---|---|---|
+| Document Processor | Primary Human | Submits document batches, monitors pipeline, triggers exports |
+| Human Reviewer | Primary Human | Reviews low-confidence results, corrects extracted fields |
+| System Administrator | Primary Human | Manages configuration: templates, rules, users, retention |
+| Data Scientist | Primary Human | Manages model lifecycle: training, evaluation, promotion |
+| Compliance Officer | Primary Human | Audits PII access, handles GDPR requests, approves medical exports |
+| API Consumer / ERP | Primary System | Receives exported structured data via REST or SFTP |
+| Cloud OCR Provider | Secondary System | AWS Textract / Google Cloud Vision API |
+| ML Model Registry | Secondary System | MLflow — stores and versions trained models |
+| ERP System | Secondary System | SAP, Oracle — target of document data exports |
 
-## AI/ML Operations Addendum
+## Use Case Summary
 
-### Extraction & Classification Pipeline Detail
-- Ingestion normalizes PDFs/images (de-skew, orientation correction, denoise, page splitting) before OCR inference, and preserves page-level provenance (`document_id`, `page_no`, `checksum`) for reproducibility.
-- OCR outputs word-level tokens with bounding boxes and confidence, then layout reconstruction builds reading order, sections, tables, and key-value candidates for downstream models.
-- Classification runs as a two-stage ensemble: coarse document family classifier followed by template/domain subtype classifier; routing controls which extraction graph, validation rules, and post-processors execute.
-- Extraction combines multiple strategies (template anchors, layout-aware transformer NER, regex/rule validators, and table parsers) with conflict resolution and source attribution at field level.
-
-### Confidence Thresholding Logic
-- Every predicted artifact (doc type, entity, field, table cell) carries calibrated confidence; calibration is maintained per model version using held-out reliability sets (temperature scaling/isotonic).
-- Thresholds are policy-driven and tiered: **auto-accept**, **review-required**, and **reject/reprocess** bands, configurable per document type and field criticality (e.g., totals, IDs, legal dates).
-- Composite confidence uses weighted signals: model probability, OCR quality, extraction-rule agreement, cross-field consistency checks, and historical drift indicators.
-- Dynamic threshold overrides apply during incidents (e.g., OCR degradation or new template rollout) with explicit expiry, audit log entries, and rollback playbooks.
-
-### Human-in-the-Loop Review Flow
-- Low-confidence or policy-flagged documents enter a reviewer queue with SLA tiers, reason codes, and pre-highlighted spans/bounding boxes to minimize correction time.
-- Reviewer edits are captured as structured feedback (`before`, `after`, `reason`, `reviewer_role`) and linked to model/version metadata for supervised retraining datasets.
-- Dual-review and adjudication is required for high-risk fields or regulated document classes; disagreements are labeled and retained for error analysis.
-- Review outcomes feed active-learning samplers that prioritize uncertain/novel templates while enforcing PII minimization and role-based masking in annotation tools.
-
-### Model Lifecycle Governance
-- Model registry tracks lineage across datasets, feature pipelines, prompts/config, evaluation reports, approval status, and deployment environment.
-- Promotion gates enforce quality thresholds (classification F1, field-level precision/recall, calibration error, latency/cost SLOs) plus fairness and security checks before production release.
-- Runtime monitoring covers drift (input schema, token distributions, template novelty), confidence shifts, reviewer override rates, and business KPI regressions with automated alerts.
-- Rollout strategy uses canary/shadow deployments, version pinning per tenant/workflow, and deterministic rollback with incident postmortems and governance sign-off.
-
-### Use Case Extensions
-- Add actors for ML Ops engineer, data steward, and reviewer supervisor to reflect governance and quality-control responsibilities.
----
-
-
-## Implementation-Ready Deep Dive
-
-### Operational Control Objectives
-| Objective | Target | Owner | Evidence |
+| ID | Use Case | Primary Actor | Priority |
 |---|---|---|---|
-| Straight-through processing rate | >= 75% for baseline templates | ML Ops Lead | Weekly quality report |
-| Critical-field precision | >= 99% on regulated fields | Applied ML Engineer | Offline eval + reviewer sample audit |
-| Reviewer turnaround SLA | P95 < 2 business hours | Review Ops Manager | Queue dashboard + SLA breach alerts |
-| Rollback readiness | < 15 min rollback execution | Platform SRE | Change ticket + rollback drill logs |
+| UC-01 | Submit Document Batch | Document Processor | Must Have |
+| UC-02 | OCR Processing | Cloud OCR Provider | Must Have |
+| UC-03 | Classify Document | DIS (automated) | Must Have |
+| UC-04 | Extract Fields | DIS (automated) | Must Have |
+| UC-05 | Validate Extraction | DIS (automated) | Must Have |
+| UC-06 | Human Review | Human Reviewer | Must Have |
+| UC-07 | Export to ERP | API Consumer | Must Have |
+| UC-08 | Retrain Model | Data Scientist | Should Have |
+| UC-09 | Manage Templates | System Administrator | Must Have |
+| UC-10 | Manage Retention Policy | System Administrator | Must Have |
+| UC-11 | Audit PII Access | Compliance Officer | Must Have |
+| UC-12 | Process GDPR Erasure | Compliance Officer | Must Have |
+| UC-13 | Configure Validation Rules | System Administrator | Must Have |
+| UC-14 | Monitor Processing Status | Document Processor | Must Have |
+| UC-15 | Register Webhook | API Consumer | Should Have |
+| UC-16 | Detect and Redact PII | DIS (automated) | Must Have |
+| UC-17 | Manage User Roles | System Administrator | Must Have |
+| UC-18 | Review Queue Management | Human Reviewer | Must Have |
 
-### Implementation Backlog (Must-Have)
-1. Implement per-field threshold policy engine with policy versioning and tenant/document-type overrides.
-2. Add calibrated confidence tracking table and nightly reliability job with ECE/Brier drift alarms.
-3. Introduce reviewer work allocation service (skill-based routing, dual-review for high-risk forms).
-4. Create retraining dataset contracts (gold labels, weak labels, rejected examples, hard-negative mining).
-5. Establish model governance workflow (proposal -> validation -> canary -> promotion -> archive).
+## Include / Extend Relationships
 
-### Production Acceptance Checklist
-- [ ] End-to-end traceability from uploaded file to exported structured payload.
-- [ ] Full audit trail for every manual correction and model/policy decision.
-- [ ] Canary release + rollback automation validated in staging and production-like data.
-- [ ] Drift/quality SLO dashboards wired to paging policy and incident template.
-- [ ] Security controls for PII redaction, purpose-limited access, and retention enforcement.
-
-### Mermaid: Extended Use Cases
-```mermaid
-flowchart TB
-    Actor1([Uploader]) --> UC1((Submit Document))
-    Actor2([Reviewer]) --> UC2((Review Low Confidence Fields))
-    Actor3([ML Ops Engineer]) --> UC3((Promote Model Release))
-    Actor4([Compliance Officer]) --> UC4((Audit Decisions))
-    UC1 --> UC5((Run OCR + Classification + Extraction))
-    UC5 --> UC6((Apply Threshold Policy))
-    UC6 --> UC2
-    UC2 --> UC7((Approve/Correct/Reject))
-    UC7 --> UC8((Feed Training Dataset))
-```
-
+| Use Case | Relationship | Extended/Included Use Case |
+|---|---|---|
+| UC-04 Extract Fields | `<<include>>` | UC-16 Detect and Redact PII |
+| UC-05 Validate Extraction | `<<extend>>` | UC-06 Human Review (when validation fails) |
+| UC-02 OCR Processing | `<<extend>>` | UC-06 Human Review (when confidence < 0.80) |
+| UC-03 Classify Document | `<<extend>>` | UC-06 Human Review (when confidence < 0.70) |
+| UC-07 Export to ERP | `<<include>>` | UC-11 Audit PII Access |
+| UC-08 Retrain Model | `<<include>>` | UC-04 Extract Fields (use validated data) |

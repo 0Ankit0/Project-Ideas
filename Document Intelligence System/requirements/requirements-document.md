@@ -1,344 +1,200 @@
-# Requirements Document - Document Intelligence System
+# Requirements Document — Document Intelligence System
 
-> **Domain Independence**: Uses generic terminology. Adapt as needed:
-> - **Document** → Invoice, Resume, Medical Record, Contract, Form, etc.
-> - **Entity** → Vendor, Candidate, Patient, Party, etc.
-> - **Field** → Invoice #, Skill, Diagnosis, Clause, etc.
-
----
-
-## 1. Project Overview
+## 1. Introduction
 
 ### 1.1 Purpose
-An AI-powered document intelligence system that automates document processing through OCR, classification, entity extraction, and validation. Built with Python and modern AI frameworks, the system eliminates manual data entry across various document types.
+This document defines the complete functional and non-functional requirements for the Document Intelligence System (DIS), an enterprise platform that automates the ingestion, OCR processing, classification, structured data extraction, validation, human review, and ERP export of business documents.
 
 ### 1.2 Scope
+DIS processes documents submitted via REST API or scheduled batch imports. It supports PDF, TIFF, JPEG, PNG, DOCX, and XLSX formats. Processed data is exported to SAP, Oracle ERP, or arbitrary REST/SFTP endpoints. The system maintains full audit trails and complies with GDPR, HIPAA, and SOC-2 Type II.
 
-| In Scope | Out of Scope |
-|----------|--------------|
-| Document upload & storage | Document creation/editing |
-| OCR text extraction | Handwriting recognition (v1) |
-| Document classification | Document translation |
-| Named Entity Recognition (NER) | Sentiment analysis |
-| Key-value pair extraction | Document generation |
-| Table detection & extraction | E-signature verification |
-| Data validation & confidence scoring | Blockchain integration |
-| API for integration | User authentication (host app) |
+### 1.3 Stakeholders
 
-### 1.3 Domain Adaptability Matrix
-
-| Feature | Invoice | Resume | Medical Record | Contract |
-|---------|---------|--------|----------------|----------|
-| Document | Invoice PDF | CV/Resume | Patient Chart | Legal Contract |
-| Key Entities | Vendor, Amount, Tax | Name, Skills, Experience | Patient, Diagnosis, Medications | Parties, Terms, Dates |
-| Primary Fields | Invoice #, Total, Date | Education, Skills, Years | Vitals, Prescriptions | Clauses, Obligations |
-| Validation | Tax calculation, Duplicates | Required skills match | Medical code validation | Legal compliance |
+| Stakeholder | Role |
+|---|---|
+| Document Processor | Submits batches, monitors processing status |
+| Human Reviewer | Reviews low-confidence extractions, resolves exceptions |
+| System Administrator | Manages users, roles, OCR providers, templates |
+| Data Scientist | Trains and evaluates classification and extraction models |
+| Compliance Officer | Audits PII handling, retention policies, export manifests |
+| ERP Integration Team | Consumes exported structured data |
 
 ---
 
 ## 2. Functional Requirements
 
-### 2.1 Document Upload & Management
+### FR-01 — Batch Document Submission
+The system shall accept a multipart HTTP POST to `/batches` containing one or more document files (PDF, TIFF, JPEG, PNG, DOCX, XLSX) and a JSON metadata payload specifying `source`, `priority` (P1/P2/P3), and optional `workflow_config_id`.
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-DU-001 | System shall accept PDF, JPEG, PNG, TIFF uploads | Must Have |
-| FR-DU-002 | System shall support batch upload (up to 100 docs) | Should Have |
-| FR-DU-003 | System shall validate file size (max 10MB per file) | Must Have |
-| FR-DU-004 | System shall store original documents securely | Must Have |
-| FR-DU-005 | System shall generate unique document IDs | Must Have |
-| FR-DU-006 | System shall track document processing status | Must Have |
+### FR-02 — File Validation on Ingestion
+The system shall validate each submitted file: maximum file size 100 MB per file, maximum 1 000 documents per batch, allowed MIME types enforced. Files failing validation shall be rejected with HTTP 422 and a structured error listing each invalid file.
 
-### 2.2 OCR & Text Extraction
+### FR-03 — Duplicate Detection
+The system shall compute SHA-256 hash of each document's binary content. If a document with the same hash already exists within the same batch, it shall be rejected with status `DUPLICATE` and a reference to the original document ID (BR-03).
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-OCR-001 | System shall extract text from scanned documents | Must Have |
-| FR-OCR-002 | System shall handle multi-page documents | Must Have |
-| FR-OCR-003 | System shall preserve text layout/structure | Should Have |
-| FR-OCR-004 | System shall support multiple languages | Should Have |
-| FR-OCR-005 | System shall handle poor quality scans | Must Have |
-| FR-OCR-006 | System shall provide confidence scores for OCR | Must Have |
+### FR-04 — Document Storage
+Validated documents shall be stored in object storage (S3 or GCS) with server-side AES-256 encryption. The storage path pattern shall be `{tenant_id}/{year}/{month}/{batch_id}/{document_id}.{ext}`.
 
-### 2.3 Document Classification
+### FR-05 — Asynchronous Processing Queue
+After ingestion, each document shall be enqueued to a task queue (Kafka topic `document.queued`) for asynchronous OCR processing. The API response shall return HTTP 202 with `batch_id` and a polling URL.
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-DC-001 | System shall classify documents into predefined types | Must Have |
-| FR-DC-002 | System shall support custom document types | Should Have |
-| FR-DC-003 | System shall provide classification confidence scores | Must Have |
-| FR-DC-004 | System shall handle ambiguous documents | Should Have |
-| FR-DC-005 | System shall learn from user corrections | Could Have |
+### FR-06 — OCR Processing
+The system shall extract text and layout information from each document page using a configured OCR provider (AWS Textract, Google Cloud Vision, or Tesseract). For each page, an `OCRResult` record shall be created containing: `page_number`, `raw_text`, `word_level_bounding_boxes` (JSON), `confidence_score` (0.0–1.0), `provider`, `processing_time_ms`.
 
-### 2.4 Entity Extraction (NER)
+### FR-07 — OCR Confidence Routing
+Documents with average OCR confidence < 0.80 shall be routed to the human review queue with priority equal to or higher than the document's batch priority (BR-01). Documents with average OCR confidence ≥ 0.95 shall be auto-accepted without mandatory review.
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-NER-001 | System shall extract named entities (names, dates, amounts) | Must Have |
-| FR-NER-002 | System shall support domain-specific entities | Must Have |
-| FR-NER-003 | System shall normalize extracted entities | Should Have |
-| FR-NER-004 | System shall handle entity relationships | Should Have |
-| FR-NER-005 | System shall provide entity confidence scores | Must Have |
+### FR-08 — Document Classification
+After OCR, each document shall be classified using a fine-tuned LayoutLM model. The classification result shall include: `document_class` (e.g., `invoice`, `contract`, `receipt`, `medical_record`, `tax_form`, `id_document`, `purchase_order`), `confidence_score`, `model_version_id`, `alternative_classes` (top-3 ranked).
 
-### 2.5 Key-Value Pair Extraction
+### FR-09 — Classification Confidence Routing
+If classification confidence < 0.70, the document shall be routed to human review for manual classification. The review task shall include the top-3 candidate classes and their confidence scores.
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-KV-001 | System shall extract field-value pairs | Must Have |
-| FR-KV-002 | System shall map to predefined schema | Must Have |
-| FR-KV-003 | System shall handle missing fields | Must Have |
-| FR-KV-004 | System shall validate field formats | Should Have |
-| FR-KV-005 | System shall support custom field definitions | Should Have |
+### FR-10 — Template-Based Extraction
+The system shall support named extraction templates that define a list of `ExtractedField` targets: `field_name`, `field_type` (string, number, date, currency, boolean), `extraction_region` (bounding box or zone label), `is_mandatory`, `validation_rules` references.
 
-### 2.6 Table Detection & Extraction
+### FR-11 — Model-Based Field Extraction
+The system shall run a trained field extraction model to extract structured values from classified documents. For each field, an `ExtractedField` record shall be created with: `field_name`, `extracted_value`, `normalized_value`, `confidence_score`, `bounding_box`, `extraction_method` (model | template | regex).
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-TD-001 | System shall detect tables in documents | Must Have |
-| FR-TD-002 | System shall extract table data to structured format | Must Have |
-| FR-TD-003 | System shall handle multi-page tables | Should Have |
-| FR-TD-004 | System shall preserve table headers | Must Have |
+### FR-12 — Per-Field Confidence Enforcement
+Critical fields (`invoice_total`, `tax_id`, `contract_value`, `patient_id`) must achieve confidence ≥ 0.92. Standard fields must achieve confidence ≥ 0.75. Fields below threshold shall be flagged as `NEEDS_REVIEW` and included in the review task payload (BR-02).
 
-### 2.7 Data Validation
+### FR-13 — PII Detection and Redaction
+The system shall run a Named Entity Recognition (NER) model to detect PII fields: SSN, date of birth, bank account numbers, credit card numbers, passport numbers. Detected PII shall be redacted (replaced with `[REDACTED_<TYPE>]`) in stored extracted values unless the document has a `compliance_override` flag set by a `compliance_officer` role (BR-05).
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-VAL-001 | System shall validate extracted data against rules | Must Have |
-| FR-VAL-002 | System shall flag validation errors | Must Have |
-| FR-VAL-003 | System shall support custom validation rules | Should Have |
-| FR-VAL-004 | System shall check for duplicate documents | Should Have |
-| FR-VAL-005 | System shall verify calculated fields | Should Have |
+### FR-14 — Validation Rules Engine
+The system shall evaluate configurable `ValidationRule` records against extracted fields. Rule types supported: `regex` (value matches pattern), `range` (numeric value within min/max), `lookup` (value exists in reference table), `cross_field` (relationship between two fields, e.g., `line_total = quantity * unit_price`), `date_format` (ISO 8601 or custom format), `not_empty` (mandatory field check).
 
-### 2.8 Review & Correction
+### FR-15 — Validation Result Recording
+Each rule evaluation shall produce a `ValidationResult` record with: `rule_id`, `field_id`, `status` (PASS | FAIL | WARNING), `actual_value`, `expected_pattern`, `message`. A document with any FAIL result on a mandatory rule shall be routed to the review queue.
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-REV-001 | System shall provide UI for reviewing extractions | Must Have |
-| FR-REV-002 | System shall allow manual corrections | Must Have |
-| FR-REV-003 | System shall track correction history | Should Have |
-| FR-REV-004 | System shall learn from corrections | Could Have |
-| FR-REV-005 | System shall flag low-confidence extractions | Must Have |
+### FR-16 — Review Queue Management
+The system shall maintain prioritized review queues: `Q_MEDICAL_LEGAL` (P1, SLA 4 h), `Q_FINANCIAL` (P2, SLA 24 h), `Q_GENERAL` (P3, SLA 72 h). Each queue entry shall be a `ReviewTask` with `assigned_to`, `due_at`, `status`, and the document's OCR, classification, extraction, and validation data attached.
 
-### 2.9 Export & Integration
+### FR-17 — Review Task Assignment
+Review tasks shall be assigned to reviewers based on role and document class. Medical records shall only be visible to `physician`, `nurse`, and `compliance_officer` roles (BR-06). Unassigned tasks shall be surfaced in a pool for self-assignment.
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-EXP-001 | System shall export data to JSON/CSV/XML | Must Have |
-| FR-EXP-002 | System shall provide REST API for integration | Must Have |
-| FR-EXP-003 | System shall support webhook notifications | Should Have |
-| FR-EXP-004 | System shall integrate with ERP/CRM systems | Could Have |
+### FR-18 — Human Review Interface Data
+The system shall expose via API: the rendered document pages (signed S3 URLs), extracted field values with confidence overlays, validation failure messages, and an editable field form. Corrections shall be stored as `ReviewDecision` records referencing the original `ExtractedField`.
+
+### FR-19 — Review Completion and SLA Tracking
+On review completion, all corrected fields shall update the document's extraction record with `source = HUMAN_CORRECTION`. Documents overdue (current time > `due_at`) shall be escalated: auto-reassigned to the queue manager and a notification sent. SLA breach events shall be emitted.
+
+### FR-20 — Export to ERP
+The system shall support export of approved documents to SAP via IDOC/RFC, Oracle via REST API, and generic endpoints via REST or SFTP. Each export shall produce a signed manifest (SHA-256 of payload) stored in `export_records`. Export requires `signed_manifest` and creates an `AuditLog` entry (BR-09).
+
+### FR-21 — Export Filtering and Scheduling
+Exports may be configured to run on a schedule (cron expression) or triggered on-demand. Filters available: `document_class`, `batch_id`, `date_range`, `status = APPROVED`.
+
+### FR-22 — Audit Log
+Every state transition for a document, every review decision, every export, every model inference, and every PII access shall produce an immutable `AuditLog` entry with: `entity_type`, `entity_id`, `event_type`, `actor_id`, `actor_role`, `timestamp`, `before_state`, `after_state`, `ip_address`.
+
+### FR-23 — Template Management
+Administrators shall be able to create, update, version, and deactivate extraction templates via the `/templates` API. Templates support field zone definitions in JSON. Template versions are immutable once used in production.
+
+### FR-24 — Model Registry Integration
+The system shall integrate with MLflow Model Registry. Each `ModelVersion` record shall store: `model_name`, `version`, `stage` (Staging | Production | Archived), `metrics` (F1, precision, recall), `training_dataset_id`, `artifact_uri`.
+
+### FR-25 — Retraining Pipeline
+The system shall support triggering a retraining job via `POST /models/retrain`. Retraining requires ≥ 500 validated samples per document class with ≥ 80% inter-annotator agreement (BR-08). The pipeline shall: sample training data, train model, evaluate on held-out test set, log to MLflow, and transition to Staging if F1 ≥ 0.92.
+
+### FR-26 — Document Retention and Deletion
+The system shall enforce retention policies: standard documents retained 7 years, medical records 10 years. At the end of the retention window, documents shall be queued for deletion. GDPR right-to-erasure requests shall delete PII fields for records outside mandatory retention windows (BR-04).
+
+### FR-27 — Webhook Notifications
+The system shall deliver webhook events to registered subscriber URLs for: `BatchReceived`, `OCRCompleted`, `ClassificationCompleted`, `ExtractionCompleted`, `ValidationFailed`, `ReviewCompleted`, `DocumentExported`. Delivery shall be retried up to 3 times with exponential backoff.
+
+### FR-28 — Multi-Tenancy
+The system shall enforce tenant isolation: all queries, storage paths, and API responses scoped to the authenticated tenant. Cross-tenant data access shall be prevented at the database row level using `tenant_id` predicates on all tables.
+
+### FR-29 — Role-Based Access Control
+The system shall enforce RBAC with roles: `admin`, `document_processor`, `human_reviewer`, `data_scientist`, `compliance_officer`, `physician`, `nurse`, `api_consumer`. Each API endpoint has a minimum required role documented in the API specification.
+
+### FR-30 — Batch Status Polling and Webhooks
+Clients shall be able to poll `GET /batches/{batch_id}` for status. The response shall include per-document status summary: total, queued, processing, completed, failed, in_review, exported.
+
+### FR-31 — Page-Level OCR Granularity
+The system shall process each page of a multi-page document independently. Page-level OCR results shall be accessible via `GET /documents/{id}/pages`. Page rotation correction shall be applied automatically when the detected angle exceeds 2 degrees.
+
+### FR-32 — Extraction Schema Versioning
+Each `ExtractionSchema` shall be versioned. When a template is updated, existing documents retain their extraction results linked to the schema version active at processing time.
+
+### FR-33 — Confidence Score Aggregation
+The system shall compute document-level confidence scores as the weighted average of OCR confidence (weight 0.3) and extraction field confidence (weight 0.7), excluding fields with `is_mandatory = false`.
+
+### FR-34 — Language Detection
+The system shall detect the primary language of each document using `langdetect`. Multi-language documents (confidence for a single language < 0.85) shall be flagged with `language = MULTI` and routed to specialized review.
+
+### FR-35 — Classification Access Control
+Documents classified as `medical_record` shall only be readable by users with roles `physician`, `nurse`, or `compliance_officer`. Attempts by other roles to retrieve classification or extraction results for medical records shall return HTTP 403 (BR-06).
 
 ---
 
 ## 3. Non-Functional Requirements
 
-### 3.1 Performance
+### NFR-01 — OCR Throughput
+The system shall sustain ≥ 100 pages per minute OCR throughput under normal load (≤ 80% CPU utilization) measured over a 10-minute window. This requires horizontal scaling of the OCR worker pool.
 
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-P-001 | OCR processing time (single page) | < 3 seconds |
-| NFR-P-002 | Classification time | < 1 second |
-| NFR-P-003 | Entity extraction time | < 2 seconds |
-| NFR-P-004 | API response time (p95) | < 500ms |
-| NFR-P-005 | Concurrent document processing | 100+ docs/min |
+### NFR-02 — Classification Accuracy
+The document classification model shall achieve ≥ 95% macro-F1 score on the production holdout test set across all supported document classes. This metric shall be evaluated after each retraining cycle.
 
-### 3.2 Accuracy
+### NFR-03 — Extraction Accuracy
+For critical fields (`invoice_total`, `tax_id`), the field-level extraction accuracy shall be ≥ 92% on validated ground truth. For standard fields, accuracy shall be ≥ 85%.
 
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-A-001 | OCR accuracy (good quality scans) | > 98% |
-| NFR-A-002 | Document classification accuracy | > 95% |
-| NFR-A-003 | Entity extraction F1 score | > 90% |
-| NFR-A-004 | Key-value extraction accuracy | > 92% |
+### NFR-04 — API Response Time (p99)
+API endpoints for document status, review task retrieval, and export status shall respond within 500 ms at p99 under a load of 500 concurrent users.
 
-### 3.3 Scalability
+### NFR-05 — Batch Ingestion Latency
+From `POST /batches` submission to `DocumentQueued` event publication, the latency shall be ≤ 5 seconds for batches of up to 50 documents.
 
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-S-001 | Documents processed per day | 100K+ |
-| NFR-S-002 | Storage capacity | Petabyte scale |
-| NFR-S-003 | Concurrent users | 10K+ |
+### NFR-06 — Availability
+The system shall achieve 99.9% availability (≤ 8.7 hours downtime per year) for the API layer and review workflow. OCR processing has a relaxed SLA of 99.5% availability, with graceful degradation to Tesseract when cloud OCR providers are unavailable.
 
-### 3.4 Security & Compliance
+### NFR-07 — Data Durability
+Document binaries stored in S3 shall have 11 nines (99.999999999%) durability via cross-region replication. Database backups shall be taken every 6 hours with point-in-time recovery enabled.
 
-| ID | Requirement | Description |
-|----|-------------|-------------|
-| NFR-SEC-001 | Data encryption | At rest (AES-256), in transit (TLS 1.3) |
-| NFR-SEC-002 | PII handling | Redaction, pseudonymization |
-| NFR-SEC-003 | HIPAA compliance | For medical records |
-| NFR-SEC-004 | GDPR compliance | Data privacy, right to deletion |
-| NFR-SEC-005 | Audit logging | Track all data access |
+### NFR-08 — Security — Encryption
+All data in transit shall use TLS 1.3. All data at rest shall use AES-256 encryption. PII fields (`ssn`, `dob`, `bank_account`) shall be additionally encrypted at the field level using a tenant-specific encryption key managed by AWS KMS or GCP KMS.
 
----
+### NFR-09 — Security — Authentication
+All API calls shall require a JWT bearer token issued by the IAM service with a maximum lifetime of 1 hour. Service-to-service calls shall use short-lived OIDC tokens (15-minute lifetime).
 
-## 4. AI/ML Requirements
+### NFR-10 — GDPR Compliance
+The system shall support GDPR Articles 17 (right to erasure), 20 (data portability), and 30 (records of processing activities). PII erasure requests shall be processed within 30 days. Audit logs of erasure events shall be retained for 5 years.
 
-### 4.1 OCR Models
-- Tesseract OCR for open-source option
-- Cloud OCR APIs (AWS Textract, Google Vision, Azure Form Recognizer)
-- Custom fine-tuned models for domain-specific documents
+### NFR-11 — HIPAA Compliance
+Documents classified as `medical_record` shall be handled under HIPAA requirements: access restricted to authorized roles (BR-06), audit logs for every access, automatic logoff after 15 minutes of reviewer inactivity, and PHI encryption at rest and in transit.
 
-### 4.2 NER Models
-- spaCy with custom entity types
-- Hugging Face Transformers (BERT, RoBERTa)
-- Domain-specific NER models (medical, legal, financial)
+### NFR-12 — Scalability
+The system shall scale horizontally. OCR worker pods shall auto-scale (HPA) based on Kafka consumer lag: scale up when lag > 500 messages, scale down when lag < 50 messages. Maximum pod count: 50 OCR workers.
 
-### 4.3 Classification Models
-- Traditional ML (Random Forest, SVM)
-- Deep learning (CNN, Transformers)
-- Transfer learning from pre-trained models
+### NFR-13 — Observability
+The system shall emit structured JSON logs (correlation ID on every log line), Prometheus metrics (throughput, error rate, latency histograms, queue depth, model inference time), and OpenTelemetry distributed traces for every document processing pipeline execution.
+
+### NFR-14 — Disaster Recovery
+RPO (Recovery Point Objective): ≤ 1 hour. RTO (Recovery Time Objective): ≤ 4 hours. Failover to a secondary region shall be automated using DNS failover and database replication.
+
+### NFR-15 — Audit and Compliance Logging
+Audit logs shall be append-only, cryptographically chained (each log entry includes the SHA-256 hash of the previous entry), and exported to a SIEM (Splunk/Elasticsearch) in real time. Log retention: 7 years minimum.
 
 ---
 
-## 5. Constraints
+## 4. Constraints
 
-| Type | Constraint |
-|------|------------|
-| Technical | Python 3.9+ required |
-| Technical | GPU recommended for deep learning models |
-| Performance | Document size < 10MB |
-| Data | Minimum 1000 labeled documents for training |
-| Regulatory | HIPAA/GDPR compliance required |
-| Cost | Cloud OCR API usage limits |
-
----
-
-## 6. Dependencies
-
-| Dependency | Type | Risk |
-|------------|------|------|
-| OCR Services (Tesseract, Cloud APIs) | External | Medium |
-| NLP Libraries (spaCy, Transformers) | Open Source | Low |
-| PDF Processing (PyPDF2, pdfplumber) | Open Source | Low |
-| Cloud Storage (S3, GCS) | Infrastructure | Medium |
-| GPU Infrastructure | Infrastructure | Medium |
+| Constraint | Description |
+|---|---|
+| C-01 | Cloud OCR spend cap: $0.005 per page maximum (switch to Tesseract if exceeded) |
+| C-02 | No training data leaves the tenant's cloud region (data residency) |
+| C-03 | Model artifacts must be versioned in MLflow before deployment to production |
+| C-04 | All exports to external ERPs require compliance officer approval for medical records |
+| C-05 | Maximum document retention 10 years; no indefinite storage |
 
 ---
 
-## 7. Stakeholders & Personas
+## 5. Assumptions
 
-| Role | Goals | Primary Needs |
-|------|-------|---------------|
-| Business Owner | Reduce manual processing cost | KPIs, throughput, accuracy |
-| Operations Lead | Process documents reliably | Queue visibility, retries |
-| Data Scientist | Improve extraction quality | Training data, feedback loop |
-| Compliance Officer | Meet regulatory requirements | Audit trails, retention |
-| End User | Review and correct outputs | Intuitive UI, low latency |
-
-## 8. Assumptions & Dependencies
-
-| Type | Assumption/Dependency | Impact |
-|------|------------------------|--------|
-| Data | Documents are legible and not corrupted | OCR accuracy impacts |
-| Data | Known document templates exist for priority domains | Improves KV extraction |
-| Infra | Object storage available for originals | Required for retention |
-| Security | SSO provider available | Required for RBAC |
-
-## 9. Observability & Auditability
-
-| Signal | Scope | Examples |
-|--------|-------|----------|
-| Metrics | OCR, classification, extraction | accuracy, p95 latency |
-| Logs | Processing pipeline | OCR errors, parser failures |
-| Traces | End-to-end request | upload → extraction → export |
-| Audit | User actions | review edits, exports |
-
-## 10. Reliability, DR & Capacity
-
-| Requirement | Target |
-|-------------|--------|
-| RTO | ≤ 4 hours |
-| RPO | ≤ 15 minutes |
-| Multi-AZ processing | Required for production |
-| Queue durability | At-least-once processing |
-
-## 11. Acceptance Criteria
-
-- OCR accuracy $> 98\%$ for good-quality scans.
-- Entity extraction F1 $> 90\%$ for target domain.
-- 95% of documents processed within SLA.
-- All review actions are audit logged.
-
-## 12. Risks & Mitigations
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Poor scan quality | Low OCR accuracy | Image enhancement, manual review |
-| Template drift | Field extraction failures | Auto-template detection and retraining |
-| Data leakage | Compliance risk | PII redaction and access controls |
-| Vendor API outage | Processing delays | Failover OCR engine |
-
-## 13. Glossary
-
-| Term | Definition |
-|------|------------|
-| **OCR** | Optical Character Recognition - converting images to text |
-| **NER** | Named Entity Recognition - extracting entities from text |
-| **Entity** | Specific piece of information (name, date, amount, etc.) |
-| **Key-Value Pair** | Field name and its corresponding value |
-| **Confidence Score** | AI model's certainty in extraction (0-1) |
-| **Document Type** | Category of document (invoice, resume, etc.) |
-| **Ground Truth** | Human-verified correct extraction |
----
-
-## AI/ML Operations Addendum
-
-### Extraction & Classification Pipeline Detail
-- Ingestion normalizes PDFs/images (de-skew, orientation correction, denoise, page splitting) before OCR inference, and preserves page-level provenance (`document_id`, `page_no`, `checksum`) for reproducibility.
-- OCR outputs word-level tokens with bounding boxes and confidence, then layout reconstruction builds reading order, sections, tables, and key-value candidates for downstream models.
-- Classification runs as a two-stage ensemble: coarse document family classifier followed by template/domain subtype classifier; routing controls which extraction graph, validation rules, and post-processors execute.
-- Extraction combines multiple strategies (template anchors, layout-aware transformer NER, regex/rule validators, and table parsers) with conflict resolution and source attribution at field level.
-
-### Confidence Thresholding Logic
-- Every predicted artifact (doc type, entity, field, table cell) carries calibrated confidence; calibration is maintained per model version using held-out reliability sets (temperature scaling/isotonic).
-- Thresholds are policy-driven and tiered: **auto-accept**, **review-required**, and **reject/reprocess** bands, configurable per document type and field criticality (e.g., totals, IDs, legal dates).
-- Composite confidence uses weighted signals: model probability, OCR quality, extraction-rule agreement, cross-field consistency checks, and historical drift indicators.
-- Dynamic threshold overrides apply during incidents (e.g., OCR degradation or new template rollout) with explicit expiry, audit log entries, and rollback playbooks.
-
-### Human-in-the-Loop Review Flow
-- Low-confidence or policy-flagged documents enter a reviewer queue with SLA tiers, reason codes, and pre-highlighted spans/bounding boxes to minimize correction time.
-- Reviewer edits are captured as structured feedback (`before`, `after`, `reason`, `reviewer_role`) and linked to model/version metadata for supervised retraining datasets.
-- Dual-review and adjudication is required for high-risk fields or regulated document classes; disagreements are labeled and retained for error analysis.
-- Review outcomes feed active-learning samplers that prioritize uncertain/novel templates while enforcing PII minimization and role-based masking in annotation tools.
-
-### Model Lifecycle Governance
-- Model registry tracks lineage across datasets, feature pipelines, prompts/config, evaluation reports, approval status, and deployment environment.
-- Promotion gates enforce quality thresholds (classification F1, field-level precision/recall, calibration error, latency/cost SLOs) plus fairness and security checks before production release.
-- Runtime monitoring covers drift (input schema, token distributions, template novelty), confidence shifts, reviewer override rates, and business KPI regressions with automated alerts.
-- Rollout strategy uses canary/shadow deployments, version pinning per tenant/workflow, and deterministic rollback with incident postmortems and governance sign-off.
-
-### Requirements Alignment
-- Add NFRs for calibration quality, review SLA attainment, and model-governance auditability to align with enterprise acceptance criteria across all domains.
----
-
-
-## Implementation-Ready Deep Dive
-
-### Operational Control Objectives
-| Objective | Target | Owner | Evidence |
-|---|---|---|---|
-| Straight-through processing rate | >= 75% for baseline templates | ML Ops Lead | Weekly quality report |
-| Critical-field precision | >= 99% on regulated fields | Applied ML Engineer | Offline eval + reviewer sample audit |
-| Reviewer turnaround SLA | P95 < 2 business hours | Review Ops Manager | Queue dashboard + SLA breach alerts |
-| Rollback readiness | < 15 min rollback execution | Platform SRE | Change ticket + rollback drill logs |
-
-### Implementation Backlog (Must-Have)
-1. Implement per-field threshold policy engine with policy versioning and tenant/document-type overrides.
-2. Add calibrated confidence tracking table and nightly reliability job with ECE/Brier drift alarms.
-3. Introduce reviewer work allocation service (skill-based routing, dual-review for high-risk forms).
-4. Create retraining dataset contracts (gold labels, weak labels, rejected examples, hard-negative mining).
-5. Establish model governance workflow (proposal -> validation -> canary -> promotion -> archive).
-
-### Production Acceptance Checklist
-- [ ] End-to-end traceability from uploaded file to exported structured payload.
-- [ ] Full audit trail for every manual correction and model/policy decision.
-- [ ] Canary release + rollback automation validated in staging and production-like data.
-- [ ] Drift/quality SLO dashboards wired to paging policy and incident template.
-- [ ] Security controls for PII redaction, purpose-limited access, and retention enforcement.
-
-### Detailed NFR Baselines
-- **Latency**: P95 <= 12s for <= 10 pages; P99 <= 30s for <= 50 pages with asynchronous callback.
-- **Resilience**: 99.9% monthly availability for ingest and inference APIs; degraded mode documented.
-- **Quality**: Calibration ECE <= 0.04 and reviewer override rate <= 8% for mature templates.
-- **Compliance**: All processing events mapped to control IDs and retention policies by document class.
-
+1. OCR providers (Textract, Vision API) are available with < 2% error rate in the target region.
+2. PostgreSQL is used as the primary relational store; Redis for caching and task queuing.
+3. The Kafka cluster is pre-provisioned with adequate partition count for target throughput.
+4. ML model training infrastructure (GPU nodes) is available via Kubernetes node pools or managed ML services.
+5. Tenant onboarding and IAM integration are handled by an external Identity and Access Management Platform.
