@@ -311,3 +311,80 @@ Define implementation-ready functional and non-functional requirements for the *
 - Event catalog: [../design/event-catalog.md](../design/event-catalog.md)
 - Component design: [../design/component-design.md](../design/component-design.md)
 - Sequence diagrams: [../design/sequence-diagrams.md](../design/sequence-diagrams.md)
+
+---
+
+## Extended Non-Functional Requirements
+
+### Compliance and Regulatory
+
+| ID | Category | Requirement | Target | Measurement Method |
+|---|---|---|---|---|
+| NFR-COMP-01 | Compliance | Audit trail completeness for regulatory inspection | 100% of state-changing operations logged with actor, reason, and timestamp | Audit log coverage report; quarterly review |
+| NFR-COMP-02 | Compliance | Food/pharma lot traceability (when applicable) | Full lot genealogy from receipt to shipment retrievable within 30 s | Traceability query benchmark |
+| NFR-COMP-03 | Compliance | GDPR / data residency | Tenant data stored within the configured region; no cross-region transfer without explicit consent | Data residency policy audit |
+| NFR-COMP-04 | Compliance | PII in logs | Zero PII fields in application log output | Automated log PII scan in CI pipeline |
+
+### Reliability and Fault Tolerance
+
+| ID | Category | Requirement | Target | Measurement Method |
+|---|---|---|---|---|
+| NFR-REL-01 | Reliability | Idempotency coverage | 100% of mutating API endpoints support idempotency key with 24-hour TTL | API contract test suite |
+| NFR-REL-02 | Reliability | Message delivery guarantee | At-least-once delivery for all domain events; consumers are idempotent | Event pipeline integration tests |
+| NFR-REL-03 | Reliability | Circuit breaker coverage | All external API calls (carrier, ERP, WCS) protected by circuit breaker with configurable threshold | Circuit breaker health dashboard |
+| NFR-REL-04 | Reliability | DLQ monitoring | Dead-letter queue depth alert within 2 minutes of threshold breach (> 10 messages) | Alert latency test |
+| NFR-REL-05 | Reliability | Graceful degradation | System continues to process scans and picks during read-model refresh failures; only analytics are impacted | Fault injection test |
+
+### Maintainability and Extensibility
+
+| ID | Category | Requirement | Target | Measurement Method |
+|---|---|---|---|---|
+| NFR-MAINT-01 | Maintainability | API versioning | All breaking API changes are versioned; deprecated versions remain active for ≥ 90 days with migration guide | API changelog and deprecation notices |
+| NFR-MAINT-02 | Maintainability | Configuration-driven rules | All business rule thresholds (tolerance %, min/max quantities, approval limits) are configurable without code deployment | Rule configuration audit |
+| NFR-MAINT-03 | Maintainability | Zero-downtime deployments | Rolling deployments with no service interruption; health endpoints consumed by orchestration layer | Deployment pipeline test; uptime monitor |
+| NFR-MAINT-04 | Extensibility | Plugin carrier integration | New carrier integrations can be added by implementing the `CarrierAdapter` interface without modifying core shipping service | Architecture review; interface contract test |
+
+### Usability and Accessibility
+
+| ID | Category | Requirement | Target | Measurement Method |
+|---|---|---|---|---|
+| NFR-UX-01 | Usability | Scanner response time perceived by operator | ≤ 800 ms P95 end-to-end from scan submit to audible confirmation | APM trace; field acceptance test |
+| NFR-UX-02 | Usability | Dashboard load time | ≤ 3 s for initial dashboard load on a standard LTE connection | Browser performance test |
+| NFR-UX-03 | Usability | Error message clarity | All error codes map to a human-readable description and a suggested corrective action in the scanner UI | UX review; user acceptance test |
+| NFR-UX-04 | Accessibility | WCAG 2.1 AA compliance for web dashboards | No WCAG 2.1 Level AA violations on the operational and analytics dashboards | Automated accessibility scanner in CI |
+
+---
+
+## Glossary
+
+| Term | Definition |
+|---|---|
+| **ASN (Advanced Shipping Notice)** | An electronic document sent by a supplier before a shipment arrives, listing expected items, quantities, lots, and delivery details. |
+| **ATP (Available to Promise)** | The quantity of inventory that can be committed to new orders, calculated as on-hand minus existing reservations and quarantine holds. |
+| **Bin** | The smallest addressable storage location in the warehouse hierarchy (Warehouse → Zone → Aisle → Rack → Bin). |
+| **Blind Count** | A cycle counting method where the counter does not see the system's expected quantity before submitting their count, ensuring unbiased results. |
+| **Carrier Cutoff** | The latest time by which a shipment must be dispatched to meet the carrier's scheduled pickup and the customer's delivery commitment. |
+| **Cross-Docking** | A fulfilment strategy where received goods are moved directly from inbound receiving to outbound shipping without being stored in reserve locations. |
+| **Cycle Count** | A partial, rotating physical inventory process where a subset of bins or zones is counted on a scheduled basis to maintain inventory accuracy without a full shutdown. |
+| **DLQ (Dead-Letter Queue)** | A message queue that holds events or commands that have failed processing after the maximum number of retry attempts, awaiting manual triage or replay. |
+| **FEFO (First Expired, First Out)** | An inventory rotation policy that selects the lot with the earliest expiry date for fulfilment first, minimizing waste for perishable or dated goods. |
+| **FIFO (First In, First Out)** | An inventory rotation policy that selects the oldest received inventory first for fulfilment, regardless of expiry date. |
+| **GRN (Goods Receipt Note)** | A document generated upon completion of inbound receiving that records confirmed quantities, lot/serial data, operator identity, and PO/ASN references. |
+| **Idempotency Key** | A client-supplied unique token attached to a mutating request so that re-submission of the same request produces the same outcome without creating duplicate records. |
+| **LIFO (Last In, First Out)** | An inventory rotation policy that selects the most recently received inventory first; typically used for non-perishable goods with no compliance requirement. |
+| **Lot** | A batch of items produced or received together, sharing the same production date, expiry date, or quality certificate. Used for traceability and rotation enforcement. |
+| **Manifest** | A document listing all parcels in a carrier load, including tracking numbers, weights, dimensions, and service levels, transmitted to the carrier at dispatch time. |
+| **Outbox Pattern** | A reliability pattern where domain events are first written to a database outbox table within the same transaction as the state change, then asynchronously relayed to the event bus, ensuring exactly-once publication. |
+| **Putaway** | The process of physically placing received goods in their assigned storage location (bin) in the warehouse, guided by directed putaway rules. |
+| **Quarantine** | An inventory status indicating that items are held and excluded from all allocation and pick operations pending quality inspection, investigation, or hold resolution. |
+| **Replenishment** | The process of moving stock from a reserve or bulk storage zone to a pick-face zone to restore the pick-face bin to its target (maximum) quantity. |
+| **Reservation** | A soft-lock on a quantity of a specific SKU/lot/bin that holds that inventory exclusively for a specific order line during the fulfilment process. |
+| **RMA (Return Merchandise Authorization)** | A pre-authorized document allowing a customer to return goods; it specifies the items expected, the inspection disposition, and the credit or replacement policy. |
+| **Serial Number** | A unique identifier assigned to an individual unit of a SKU, enabling item-level traceability from receipt through shipment and return. |
+| **SKU (Stock Keeping Unit)** | A unique identifier for a specific product variant (including size, color, and packaging), used as the primary product key in inventory tracking. |
+| **Transactional Outbox** | See *Outbox Pattern*. |
+| **Variance** | The difference between the system's expected quantity for a bin or lot and the quantity confirmed by a physical count, receiving scan, or cycle count. |
+| **Wave** | A planned group of outbound orders released together to the picking floor at the same time, optimized by carrier cutoff, priority, zone cluster, and picker capacity. |
+| **WCS (Warehouse Control System)** | A lower-level system that directly controls physical automation equipment in the warehouse (conveyors, sorters, AS/RS), receiving task signals from the WMS. |
+| **Zone** | A logical and physical subdivision of the warehouse with specific storage characteristics (e.g., ambient, refrigerated, hazmat, bulk, pick-face) that govern which SKUs can be stored there. |
+| **ZPL (Zebra Programming Language)** | A label description language used by Zebra Technologies printers, commonly used for generating barcode shipping labels in warehouse environments. |
