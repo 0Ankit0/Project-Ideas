@@ -1,259 +1,385 @@
-# Requirements Document - Restaurant Management System
+# Restaurant Management System - Requirements Document
 
-## 1. Project Overview
+## Executive Summary
 
-### 1.1 Purpose
-Build a production-ready restaurant management platform that unifies guest seating and ordering, waiter service, kitchen execution, ingredient inventory, procurement, cashier settlement, operational accounting, branch management, and shift operations across multiple restaurant branches.
+The Restaurant Management System (RMS) is a comprehensive, cloud-native platform designed to modernize and unify every operational aspect of multi-branch restaurant businesses. From the moment a guest makes a reservation to the point where a cashier closes the drawer at the end of service, the RMS orchestrates every workflow — seating management, waiter-assisted ordering, kitchen production, inventory tracking, payment settlement, shift scheduling, and financial reconciliation — within a single, cohesive platform accessible across tablets, POS terminals, kitchen display screens, and management dashboards.
 
-### 1.2 Scope
+Unlike fragmented point solutions that force restaurants to manage separate systems for reservations, POS, kitchen displays, and accounting, the RMS treats the restaurant as a connected graph of operational entities. A reservation naturally flows into a table assignment, which flows into waiter order capture, which routes kitchen tickets to the right stations, which triggers inventory deductions, which ultimately resolves into a guest bill that feeds the cashier session and accounting export. Every event in this chain is traceable, auditable, and recoverable — even under degraded network conditions or peak-load stress.
 
-| In Scope | Out of Scope |
-|----------|--------------|
-| Multi-branch dine-in and takeaway operations | Full payroll and HR suite |
-| Optional delivery-channel integration | Full general-ledger ERP replacement |
-| Reservations, waitlisting, table service, and kitchen workflows | Customer loyalty program engine beyond basic hooks |
-| Menu, pricing, modifiers, taxes, and discount controls | Custom payment gateway implementation |
-| Recipe/BOM-based inventory, procurement, wastage, and stock counts | Manufacturing-grade supply-chain optimization |
-| Cashier settlement, tax, reconciliation, and accounting export | Full statutory accounting package |
-| Shift scheduling, attendance, and daily branch close | Advanced workforce payroll calculations |
+The platform is built to scale from a single-location café to a chain of 500+ branches, supporting thousands of concurrent staff devices without sacrificing the sub-second responsiveness that high-volume table service demands. Security, compliance, and operational resilience are first-class design constraints, not afterthoughts. The RMS enables branch managers, inventory teams, and executives to make data-driven decisions through real-time dashboards and exportable reports, while keeping day-to-day staff workflows lean, fast, and intuitive.
 
-### 1.3 Operating Model
-- Multiple branches share a centrally administered platform while maintaining branch-scoped tables, shifts, stock, and cash sessions.
-- The platform primarily serves internal restaurant operations, with limited guest-facing features for reservations, waitlists, and order/status touchpoints.
-- Orders may originate from dine-in, takeaway, or optionally integrated delivery channels.
-- Accounting support focuses on operational settlement, taxes, reconciliation, and export to external accounting systems rather than full ERP accounting.
+---
 
-### 1.4 Primary Actors
+## Project Scope
 
-| Actor | Goals |
-|-------|-------|
-| Guest / Customer | Reserve tables, minimize waiting, place or receive food accurately, and settle bills smoothly |
-| Host / Reception | Manage tables, reservations, waitlists, and guest seating efficiently |
-| Waiter / Captain | Capture accurate orders, coordinate service, and respond to guest updates quickly |
-| Chef / Kitchen Staff | Prepare items in the right sequence, manage station load, and surface stock or timing issues |
-| Cashier / Accountant | Settle payments, process refunds, reconcile shifts, and prepare accounting exports |
-| Inventory / Purchase Manager | Maintain stock accuracy, procure ingredients, and reduce wastage |
-| Branch Manager | Monitor branch performance, staffing, inventory risk, and operational exceptions |
-| Admin | Configure menus, taxes, roles, policies, and integrations across branches |
+### In Scope
 
-## 2. Functional Requirements
+| Area | Description |
+|------|-------------|
+| Multi-branch dine-in and takeaway operations | Full table, order, kitchen, inventory, billing, and shift lifecycle management per branch |
+| Reservation and waitlist management | Guest-facing and staff-facing reservation flows, walk-in queuing, ETA quoting |
+| Table and floor management | Table maps, zone assignments, merge/split, cleaning workflows |
+| Menu and pricing management | Branch-aware menus, categories, modifiers, tax rules, happy-hour pricing |
+| Order management and POS | Waiter-driven order capture, course firing, split orders, voids |
+| Kitchen operations (KDS) | Station-based ticket routing, preparation state machine, pass coordination |
+| Inventory and procurement | Ingredient management, recipe BOM, purchase orders, receiving, wastage |
+| Billing and payment processing | Bill generation, split payments, multi-tender, refunds, settlement |
+| Staff and shift management | Shift scheduling, attendance tracking, branch day open/close |
+| Delivery channel integration | Integration with Uber Eats, DoorDash, Zomato and other aggregators |
+| Loyalty program hooks | Basic loyalty points accrual and redemption tied to guest profiles |
+| Reporting and analytics | Sales dashboards, kitchen SLA reports, inventory variance, shift summaries |
+| System administration | Role-based access, branch configuration, audit trails, policy management |
 
-### 2.1 Identity, Branch Configuration, and Access Control
+### Out of Scope
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-IAM-001 | System shall support branch-scoped and organization-wide roles with role-based access control | Must Have |
-| FR-IAM-002 | System shall support staff accounts for host, waiter, chef, cashier, inventory manager, branch manager, and admin roles | Must Have |
-| FR-IAM-003 | System shall maintain branch configuration for tables, service zones, taxes, payment methods, printers, and kitchen stations | Must Have |
-| FR-IAM-004 | System shall audit privileged actions including voids, refunds, manual discounts, stock adjustments, and reconciliation overrides | Must Have |
+| Area | Reason |
+|------|--------|
+| Full payroll and HR suite | Handled by dedicated HRMS platforms |
+| General ledger ERP accounting | Export adapters provided; full accounting out of scope |
+| Custom payment gateway implementation | Integration with Stripe, Square, Razorpay via standard APIs |
+| Manufacturing-grade supply-chain optimization | Advanced logistics is outside restaurant operations scope |
+| Customer-facing mobile app (standalone) | Guest touchpoints are web-based; native app is Phase 3 |
 
-### 2.2 Reservations, Waitlisting, and Seating
+---
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-RES-001 | System shall support guest reservations with branch, party size, seating preference, and reservation time | Must Have |
-| FR-RES-002 | Hosts shall manage waitlists and walk-in seating with queue visibility | Must Have |
-| FR-RES-003 | System shall support table assignment, merge/split tables, and seating-status updates | Must Have |
-| FR-RES-004 | System shall expose limited guest-facing reservation and waitlist status touchpoints | Should Have |
+## Stakeholders
 
-### 2.3 Menu, Pricing, and Modifiers
+| Role | Responsibility | Key Concerns |
+|------|----------------|--------------|
+| Restaurant Owner / Executive | Strategic oversight and investment decisions | ROI, multi-branch visibility, compliance |
+| Branch Manager | Day-to-day operations management | Staff productivity, service quality, daily close accuracy |
+| Restaurant Manager | Floor and kitchen coordination | Table turnover, kitchen SLA, guest satisfaction |
+| Host / Reception Staff | Reservations, seating, and waitlist | Accurate ETA, fast seating, no overbooking |
+| Waiter / Server | Order capture and table service | Fast POS, accurate kitchen routing, easy bill split |
+| Chef / Kitchen Staff | Food preparation and station management | Clear ticket queues, accurate prep times, stock visibility |
+| Cashier / Accountant | Payment settlement and reconciliation | Tax accuracy, split bill support, day-end close |
+| Inventory Manager | Stock control and procurement | Recipe deductions, low-stock alerts, vendor management |
+| Delivery Staff | Delivery order fulfillment | Clear order details, accurate packing lists |
+| IT / System Administrator | Platform configuration and maintenance | Security, uptime, audit trails, integration stability |
+| End Customer / Guest | Dining experience | Accurate reservations, fast service, correct billing |
+| Payment Processor (Stripe/Square) | Transaction processing | API stability, PCI compliance |
+| Third-party Delivery Aggregators | Order intake and dispatch | API reliability, order sync accuracy |
+| Accounting System (QuickBooks) | Financial reporting | Clean export data, tax summaries |
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-MEN-001 | System shall support branch-aware menus, categories, items, combos, and modifier groups | Must Have |
-| FR-MEN-002 | Menu items shall support pricing, taxes, happy-hour rules, and discount eligibility | Must Have |
-| FR-MEN-003 | System shall support recipe/BOM mapping between menu items and inventory ingredients | Must Have |
-| FR-MEN-004 | System shall support item unavailability and station-specific routing without removing historical sales context | Must Have |
+---
 
-### 2.4 Order Capture and Front-of-House Service
+## Functional Requirements
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-ORD-001 | Waiters shall create, update, split, merge, and submit dine-in or takeaway orders | Must Have |
-| FR-ORD-002 | System shall support seat-level ordering, course firing, notes, and special requests | Must Have |
-| FR-ORD-003 | System shall support order-source distinction for dine-in, takeaway, and optional delivery channels | Must Have |
-| FR-ORD-004 | System shall maintain table timelines, guest checks, and service status visibility for staff | Must Have |
-| FR-ORD-005 | System shall support voids, item removals, and manager approvals for controlled order changes | Must Have |
-
-### 2.5 Kitchen and Preparation Workflows
+### Module 1: Restaurant and Branch Management
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| FR-KIT-001 | Kitchen staff shall receive routed kitchen tickets by station, priority, and fire timing | Must Have |
-| FR-KIT-002 | System shall support kitchen ticket states such as queued, in preparation, ready, served, delayed, or voided | Must Have |
-| FR-KIT-003 | System shall surface ingredient shortages or station overloads back to front-of-house staff | Must Have |
-| FR-KIT-004 | System shall support preparation timing, refire flows, and pass/dispatch coordination | Must Have |
+| FR-01 | The system shall support creation and management of multiple restaurant branches, each with its own configuration for tables, service zones, menus, taxes, payment methods, and printers. | Must Have |
+| FR-02 | Each branch shall have independently configurable operating hours, service types (dine-in, takeaway, delivery), and peak-load policies. | Must Have |
+| FR-03 | The system shall support a branch day-open workflow that validates staffing coverage, cash drawer initialization, and kitchen station readiness before allowing service transactions. | Must Have |
+| FR-04 | The system shall support a branch day-close workflow that validates all checks are settled or transferred, all drawers are reconciled, and all kitchen tickets are resolved before allowing end-of-day sign-off. | Must Have |
+| FR-05 | Administrators shall be able to clone branch configurations, propagate menu updates across selected branches, and manage branch-level feature flags from a central console. | Should Have |
 
-### 2.6 Inventory, Procurement, and Stock Control
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-INV-001 | System shall maintain ingredient masters, units of measure, stock levels, and reorder thresholds | Must Have |
-| FR-INV-002 | System shall deduct ingredient stock based on recipe usage and configurable booking points | Must Have |
-| FR-INV-003 | System shall support purchase requests, purchase orders, receiving, vendor records, and discrepancy handling | Must Have |
-| FR-INV-004 | System shall support stock counts, wastage logging, transfers, and manual adjustment approvals | Must Have |
-| FR-INV-005 | System shall alert staff to low-stock, stockout, or negative-stock risk conditions | Must Have |
-
-### 2.7 Billing, Payments, and Operational Accounting
+### Module 2: Table and Floor Management
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| FR-BIL-001 | System shall generate bills with taxes, service charges, discounts, and modifiers accurately applied | Must Have |
-| FR-BIL-002 | System shall support split bills, partial settlements, voids, refunds, and multiple payment methods | Must Have |
-| FR-BIL-003 | Cashiers shall open and close drawer sessions and record settlement totals by payment method | Must Have |
-| FR-BIL-004 | System shall support daily close, branch reconciliation, and operational accounting exports | Must Have |
-| FR-BIL-005 | System shall provide exportable tax, sales, refund, and settlement summaries for external accounting systems | Must Have |
+| FR-06 | The system shall maintain a real-time interactive floor map per branch showing table status (available, reserved, occupied, cleaning, blocked) with party size, elapsed time, and assigned server. | Must Have |
+| FR-07 | Hosts shall be able to assign, reassign, merge, and split tables, with the system maintaining full order and check lineage across these operations. | Must Have |
+| FR-08 | The system shall support configurable table turn timers that alert hosts when a table exceeds its expected service duration, supporting both manual and automatic table release workflows. | Must Have |
+| FR-09 | The system shall track table cleaning status and prevent new seatings until a table is marked clean by authorized staff. | Must Have |
+| FR-10 | The system shall support blocking tables for maintenance, events, or VIP reservations with required reason codes and automatic unblock scheduling. | Should Have |
 
-### 2.8 Shift Scheduling, Attendance, and Branch Operations
-
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| FR-WFM-001 | Branch managers shall create operational shift schedules for service, kitchen, cashier, and inventory roles | Must Have |
-| FR-WFM-002 | System shall record staff attendance, shift start/end, and branch staffing visibility | Must Have |
-| FR-WFM-003 | System shall support branch day-open and day-close checklists tied to operational readiness | Should Have |
-
-### 2.9 Reporting, Notifications, and Administration
+### Module 3: Reservation and Waitlist Management
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| FR-OPS-001 | System shall provide dashboards for sales, table turnover, kitchen delays, stock risk, shift performance, and settlement health | Must Have |
-| FR-OPS-002 | System shall notify staff about reservations, delayed tickets, low stock, pending approvals, and day-close issues | Must Have |
-| FR-OPS-003 | Administrators shall configure taxes, payment methods, discount rules, menu availability, and branch policies | Must Have |
-| FR-OPS-004 | System shall expose audit trails and operational event logs for compliance and troubleshooting | Must Have |
+| FR-11 | The system shall support guest reservations with fields for guest name, contact, party size, seating preference (indoor, outdoor, bar), dietary notes, and requested date/time. | Must Have |
+| FR-12 | The reservation engine shall perform real-time availability checks against table capacity, existing reservations, and estimated turn times before confirming a booking. | Must Have |
+| FR-13 | The system shall maintain a digital waitlist for walk-in guests with live queue position, estimated wait time, and SMS/in-app notifications when their table is ready. | Must Have |
+| FR-14 | The system shall enforce configurable no-show policies, including automatic cancellation after a grace period and optional deposit or credit card hold requirements. | Should Have |
+| FR-15 | Hosts shall be able to view a consolidated reservation timeline showing confirmed bookings, walk-in queue, and table availability projections for the next 4 hours. | Must Have |
 
-## 3. Non-Functional Requirements
+### Module 4: Menu and Item Management
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-16 | The system shall support a hierarchical menu structure with categories, sub-categories, items, variants, and modifier groups configurable per branch. | Must Have |
+| FR-17 | Each menu item shall support multiple pricing rules including base price, variant pricing, happy-hour pricing, and time/day-based pricing tiers. | Must Have |
+| FR-18 | The system shall support item-level tax configurations including GST, VAT, and service charge with per-item and category-level overrides. | Must Have |
+| FR-19 | Menu items shall be linkable to recipe Bill of Materials (BOM), enabling automatic inventory deduction upon order or production milestones. | Must Have |
+| FR-20 | The system shall support item availability toggling (available, 86'd, scheduled unavailable) that propagates instantly to POS terminals and guest-facing displays without removing historical sales context. | Must Have |
+
+### Module 5: Order Management and POS
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-21 | Waiters shall be able to create, edit, add items to, apply modifiers to, and submit orders from tablet or POS terminal with an optimistic UI that handles intermittent connectivity. | Must Have |
+| FR-22 | The system shall support seat-level ordering, allowing items to be assigned to specific seats within a table for accurate split billing. | Must Have |
+| FR-23 | The system shall support course-based ordering with manual and automatic course firing, enabling kitchen execution to match the guest's dining pace. | Must Have |
+| FR-24 | The system shall support item voids, order cancellations, and quantity changes with mandatory reason codes and manager approval for post-submission modifications. | Must Have |
+| FR-25 | The system shall maintain order version history with optimistic locking to prevent concurrent editing conflicts between multiple staff members working the same table. | Must Have |
+
+### Module 6: Kitchen Operations and KDS
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-26 | The system shall route kitchen tickets to the correct station (grill, fryer, salad, pastry, beverages) based on item-station assignments in the menu configuration. | Must Have |
+| FR-27 | Kitchen staff shall be able to update ticket states (queued, accepted, in preparation, ready at pass, served, voided) from a touch-optimized Kitchen Display System (KDS) interface. | Must Have |
+| FR-28 | The system shall support course synchronization rules that hold back main course tickets until appetizers for the same table reach a configurable "ready" threshold. | Must Have |
+| FR-29 | The system shall surface real-time station load indicators, overdue ticket alerts, and estimated completion times to both kitchen staff and front-of-house coordinators. | Must Have |
+| FR-30 | The system shall support ticket refire workflows with mandatory reason tagging (quality issue, order change, reorder) feeding into waste tracking and QoS analytics. | Should Have |
+
+### Module 7: Billing and Payment Processing
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-31 | The system shall generate accurate bills incorporating item prices, modifiers, applicable taxes, service charges, discounts, and loyalty redemptions in a line-item format. | Must Have |
+| FR-32 | The system shall support bill splitting by seat, by item, or by equal share, with partial payment tracking ensuring the check remains open until fully settled. | Must Have |
+| FR-33 | The system shall support multiple payment methods per transaction including cash, credit/debit card, digital wallets, QR code payments, and house accounts. | Must Have |
+| FR-34 | Cashiers shall be able to process voids and refunds with manager authorization, maintaining a complete audit trail linking refunds to original transactions. | Must Have |
+| FR-35 | The system shall support cashier drawer sessions with opening balance entry, transaction logging per payment method, and closing balance reconciliation with variance reporting. | Must Have |
+
+### Module 8: Inventory and Procurement
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-36 | The system shall maintain ingredient masters with unit of measure, storage category, reorder threshold, and preferred vendor linkage per branch. | Must Have |
+| FR-37 | The system shall automatically deduct ingredient stock based on recipe BOM mappings at configurable booking points (order submission, kitchen fire, or settlement). | Must Have |
+| FR-38 | The system shall support purchase request creation, purchase order approval, goods receiving with discrepancy logging, and vendor performance tracking. | Must Have |
+| FR-39 | The system shall support periodic stock counts with variance comparison against expected theoretical stock, waste logging, ingredient transfers between branches, and manual adjustment approvals. | Must Have |
+| FR-40 | The system shall generate low-stock and stockout alerts visible on POS terminals, KDS, and manager dashboards, and shall suppress or flag impacted menu items automatically. | Must Have |
+
+### Module 9: Staff and Shift Management
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-41 | Branch managers shall be able to create and publish shift schedules for all operational roles (host, waiter, chef, cashier, inventory) with configurable shift templates. | Must Have |
+| FR-42 | The system shall record staff clock-in and clock-out times linked to their assigned shift, providing real-time staffing coverage visibility on the manager dashboard. | Must Have |
+| FR-43 | The system shall support role-based access scoping so that staff members can only access features and data relevant to their current shift assignment. | Must Have |
+
+### Module 10: Delivery and Channel Integration
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-44 | The system shall integrate with Uber Eats, DoorDash, and Zomato APIs to ingest delivery orders directly into the POS and kitchen workflow without manual re-entry. | Should Have |
+| FR-45 | Delivery orders from aggregators shall be routed to kitchen stations identically to dine-in orders, with delivery-specific packing and dispatch status tracking. | Should Have |
+| FR-46 | The system shall display aggregator order statuses (driver assigned, picked up, delivered) on manager and dispatch dashboards with estimated delivery time projections. | Should Have |
+| FR-47 | The system shall maintain separate sales reporting streams for dine-in, takeaway, and delivery channels to support channel-level profitability analysis. | Should Have |
+| FR-48 | The system shall handle aggregator order cancellations and modifications with automated kitchen ticket updates and inventory rollback where applicable. | Should Have |
+
+### Module 11: Loyalty Program
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-49 | The system shall maintain guest loyalty profiles with point balances, tier status, and redemption history linked to guest reservations and billing records. | Should Have |
+| FR-50 | Loyalty points shall be automatically awarded at bill settlement based on configurable earn rates per menu category and branch. | Should Have |
+| FR-51 | Guests and cashiers shall be able to apply loyalty redemptions at checkout, with the system validating point balance and applying the correct discount calculation. | Should Have |
+
+### Module 12: Reporting and Analytics
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-52 | The system shall provide real-time dashboards for sales by category, table turnover rate, kitchen ticket SLA performance, stock depletion rate, and cashier settlement health. | Must Have |
+| FR-53 | The system shall generate end-of-day, weekly, and monthly reports covering gross sales, refunds, discounts, tax collected, and net revenue exportable as PDF and CSV. | Must Have |
+| FR-54 | The system shall provide inventory variance reports comparing theoretical vs. physical stock, with drill-down by ingredient, date range, and branch. | Must Have |
+
+### Module 13: System Administration
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-55 | Administrators shall be able to define and assign role templates with granular feature permissions scoped to specific branches or the entire organization. | Must Have |
+| FR-56 | The system shall maintain immutable audit logs for all privileged actions including voids, refunds, manual discounts, stock adjustments, role changes, and reconciliation overrides. | Must Have |
+| FR-57 | The system shall support configuration management for tax codes, payment gateways, printer endpoints, KDS station mappings, and notification templates from a central admin console. | Must Have |
+
+---
+
+## Non-Functional Requirements
+
+### Performance
 
 | ID | Requirement | Target |
 |----|-------------|--------|
-| NFR-P-001 | POS action response time | < 300 ms p95 |
-| NFR-P-002 | Order submission to kitchen routing | < 2 seconds |
-| NFR-P-003 | Bill generation latency | < 2 seconds |
-| NFR-A-001 | Service availability | 99.9% monthly |
-| NFR-S-001 | Supported branches | 500+ |
-| NFR-S-002 | Concurrent staff devices | 20,000+ |
-| NFR-SEC-001 | Encryption | TLS 1.3 in transit, AES-256 at rest |
-| NFR-SEC-002 | Audit coverage | 100% privileged actions logged |
-| NFR-OPS-001 | Branch offline resilience | Critical workflows support degraded-mode operation |
-| NFR-UX-001 | Staff usability | Optimized for fast tablet/POS usage in high-volume service |
+| NFR-PERF-01 | POS action response time (add item, apply modifier) | < 300 ms p95 |
+| NFR-PERF-02 | Order submission to kitchen routing acknowledgment | < 2 seconds p95 |
+| NFR-PERF-03 | Bill generation including tax computation | < 2 seconds p95 |
+| NFR-PERF-04 | Table map refresh latency for host display | < 1 second p95 |
+| NFR-PERF-05 | Kitchen ticket state update propagation to POS | < 2 seconds p95 |
 
-## 4. Constraints and Assumptions
+### Scalability
 
-- Full payroll and general-ledger accounting are out of scope.
-- Delivery workflows may rely on external providers or aggregators rather than a custom fleet system.
-- Inventory depletion may be configurable to occur at order submit, kitchen fire, or settlement depending on operational policy.
-- Receipt printing, KDS, and payment hardware may require branch-specific integrations.
-- The platform must tolerate intermittent branch connectivity without losing authoritative transaction history.
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-SCALE-01 | Concurrent branches supported | 500+ |
+| NFR-SCALE-02 | Concurrent staff devices per deployment | 20,000+ |
+| NFR-SCALE-03 | Orders processed per minute at peak | 10,000+ system-wide |
+| NFR-SCALE-04 | Horizontal scaling approach | Stateless services behind load balancers |
 
-## 5. Success Metrics
+### Availability
 
-- 95% of standard table orders route to the correct kitchen station without manual correction.
-- 100% of completed bills remain traceable to orders, taxes, payment methods, and cashier sessions.
-- 100% of manual stock adjustments, voids, refunds, and reconciliations are auditable.
-- Branch managers can identify sales, delays, stock risk, and staffing gaps from one dashboard.
-- Inventory variance between expected and counted stock remains measurable and explainable by ledger events.
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-AVAIL-01 | Core service availability (monthly) | 99.9% (< 44 min downtime/month) |
+| NFR-AVAIL-02 | Branch offline resilience | Critical POS workflows operate in degraded mode for up to 15 minutes |
+| NFR-AVAIL-03 | Planned maintenance windows | Off-peak hours with zero-downtime deployment target |
+| NFR-AVAIL-04 | Recovery Time Objective (RTO) | < 30 minutes for any single service failure |
+| NFR-AVAIL-05 | Recovery Point Objective (RPO) | < 5 minutes for transactional data |
 
-## 6. Cross-Cutting Detailed Operational Flows
+### Security
 
-### 6.1 Ordering Flow (Dine-In and Takeaway)
-1. Host/waiter opens table or takeaway context and system attaches active menu, pricing profile, tax profile, and branch policy.
-2. Waiter captures seat-level items, modifiers, allergy notes, and course preferences.
-3. System performs synchronous validations: item availability, modifier cardinality, discount eligibility, and approval-restricted actions.
-4. Draft order is auto-saved with optimistic versioning to prevent concurrent overwrite.
-5. On submit, order lines are split into station-bound production tasks and acknowledged back to POS with immutable ticket IDs.
-6. Service timeline starts SLA clocks for first-fire, all-items-ready, and table-turn benchmarks.
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-SEC-01 | Data in transit encryption | TLS 1.3 minimum |
+| NFR-SEC-02 | Data at rest encryption | AES-256 |
+| NFR-SEC-03 | Authentication mechanism | JWT with short-lived tokens + refresh token rotation |
+| NFR-SEC-04 | Payment data handling | PCI-DSS SAQ-A compliant (no raw card data stored) |
+| NFR-SEC-05 | Privileged action audit coverage | 100% of voids, refunds, discounts, adjustments, role changes |
 
-### 6.2 Kitchen Orchestration Flow
-1. Ticket router evaluates station mapping, prep-time estimates, and branch capacity weights.
-2. Kitchen display queues tasks by priority bands (VIP/expedite, standard, delayed/recovery).
-3. Chef marks states (`queued -> accepted -> in_preparation -> ready_at_pass -> served`).
-4. Pass controller enforces course synchronization so mains are not released before configured appetizer dependencies.
-5. Delay/stockout flags are published to waiter tablets with suggested alternatives and expected-ready-time recomputation.
-6. Refire events require reason tagging and manager visibility for waste and QoS analytics.
+### Compliance
 
-### 6.3 Table/Slot Management Flow
-1. Reservation engine assigns slots using party size, duration forecasts, and table combinability constraints.
-2. Host dashboard continuously reconciles reservations, waitlist, walk-ins, and no-show timers.
-3. Seating action binds party to table graph node(s), waiter zone, and service SLA profile.
-4. Mid-service split/merge operations rebalance check ownership while preserving audit chain from original reservation or walk-in.
-5. Release flow marks table as `cleaning` then `ready`, with optional blocker if unpaid balances or incident notes exist.
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-COMP-01 | Tax reporting | Configurable GST/VAT compliance per jurisdiction |
+| NFR-COMP-02 | Data retention | Transaction records retained for minimum 7 years |
+| NFR-COMP-03 | GDPR / Privacy | Guest personal data exportable and deletable on request |
+| NFR-COMP-04 | Audit trail immutability | Append-only event store with no update/delete operations |
 
-### 6.4 Payment and Settlement Flow
-1. Bill composer locks order lines, computes taxes/fees/discounts, and exposes split dimensions (equal, by seat, by item).
-2. Cashier executes one or more tenders (cash, card, wallet, house-account) with idempotent payment intents.
-3. Partial settlement keeps check open while paid components become non-voidable except through supervised refund flow.
-4. Final settlement closes check, updates table state, posts ledger entries, and increments cashier session totals.
-5. Day-close pipeline validates drawer totals, unresolved refunds, and export readiness before reconciliation sign-off.
+### Usability
 
-### 6.5 Cancellation and Reversal Flow
-1. Cancellation request is categorized: reservation cancel, pre-fire order cancel, post-fire void, payment reversal, or no-show closure.
-2. Policy engine checks cancellation window, actor permissions, and fraud/abuse heuristics.
-3. Approved cancellations emit compensating events (inventory rollback when allowed, kitchen ticket cancel, payment void/refund intent).
-4. Guest/staff notifications include reason, financial impact, and next valid action.
-5. All reversals remain linked to origin transaction for audit and dispute handling.
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-USE-01 | POS task completion time (new order, 3 items) | < 45 seconds for trained staff |
+| NFR-USE-02 | KDS interface legibility | Readable from 1.5 meters in kitchen lighting |
+| NFR-USE-03 | Accessibility | WCAG 2.1 AA for management and guest-facing web UIs |
+| NFR-USE-04 | Mobile responsiveness | Full function on 7-inch tablets and above |
 
-### 6.6 Peak-Load Operational Controls
-1. Capacity monitor computes real-time load indices from active tables, pending tickets, station queue depth, and payment queue time.
-2. When thresholds are crossed, system activates controls: reservation throttling, auto-quoted wait times, menu simplification profiles, and batching hints.
-3. Kitchen load-shedding may defer long-prep items or cap concurrent fires per station.
-4. POS applies guardrails (manager approval for non-critical modifiers/discounts during surge if policy enabled).
-5. Recovery mode automatically rolls back throttles once queue depth and SLA breach probability return below branch-defined limits.
+### Maintainability
 
-### 6.7 Implementation-Ready Control Points and Acceptance Criteria
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-MAINT-01 | Deployment model | Containerized microservices with CI/CD pipeline |
+| NFR-MAINT-02 | Logging | Structured JSON logs with correlation IDs on all services |
+| NFR-MAINT-03 | Monitoring | Distributed tracing (OpenTelemetry) and real-time alerting |
+| NFR-MAINT-04 | Configuration management | Environment-variable driven; no hardcoded configs |
+| NFR-MAINT-05 | API versioning | Semantic versioning with minimum 2-version backward compatibility |
 
-#### 6.7.1 Canonical State Models
+---
 
-| Domain | Mandatory States | Terminal States | Notes |
-|-------|------------------|-----------------|-------|
-| Order Line | `draft`, `submitted`, `queued`, `in_preparation`, `ready`, `served`, `voided` | `served`, `voided` | Forward-only except controlled reversal via compensating events |
-| Table | `available`, `reserved`, `occupied`, `cleaning`, `blocked` | `available`, `blocked` | `blocked` requires incident reason and manager clear action |
-| Check | `open`, `partially_paid`, `paid`, `refund_pending`, `refunded`, `voided` | `paid`, `refunded`, `voided` | `voided` only pre-settlement unless override granted |
-| Payment Intent | `initiated`, `authorized`, `captured`, `failed`, `voided`, `refunded` | `captured`, `failed`, `voided`, `refunded` | Idempotent retries must not create duplicate capture |
+## MVP vs Phase 2 vs Phase 3 Scope
 
-#### 6.7.2 Event Contract Minimums
-- Every cross-service event shall include: `event_id`, `event_type`, `occurred_at`, `branch_id`, `actor_id`, `entity_id`, `entity_version`, and `correlation_id`.
-- Cancellation/reversal events shall include mandatory `reason_code` and `policy_decision_id`.
-- Kitchen events shall include `station_id`, `ticket_priority`, and `promised_ready_at`.
-- Payment events shall include `tender_type`, `amount`, `currency`, and `provider_reference`.
+| Feature | Priority | Phase |
+|---------|----------|-------|
+| Branch and table management | Critical | MVP |
+| Staff authentication and RBAC | Critical | MVP |
+| Reservation and waitlist management | Critical | MVP |
+| Menu and modifier management | Critical | MVP |
+| Dine-in order capture (POS) | Critical | MVP |
+| Kitchen ticket routing (KDS) | Critical | MVP |
+| Basic inventory deduction | Critical | MVP |
+| Bill generation and tax calculation | Critical | MVP |
+| Cash and card payment settlement | Critical | MVP |
+| Cashier drawer open/close | Critical | MVP |
+| Basic sales and shift reports | Critical | MVP |
+| Audit logs and admin console | Critical | MVP |
+| Takeaway order support | High | MVP |
+| Shift scheduling and attendance | High | MVP |
+| Purchase order and goods receiving | High | Phase 2 |
+| Full stock count and variance | High | Phase 2 |
+| Delivery channel integration (Uber Eats, DoorDash) | High | Phase 2 |
+| Split bill by seat and item | High | Phase 2 |
+| Loyalty points earn and redeem | Medium | Phase 2 |
+| Happy-hour and time-based pricing | Medium | Phase 2 |
+| Advanced KDS course synchronization | Medium | Phase 2 |
+| Manager analytics dashboard | Medium | Phase 2 |
+| Multi-tender payments (wallets, QR) | Medium | Phase 2 |
+| SMS/Email reservation notifications | Medium | Phase 2 |
+| Zomato and additional aggregator integration | Low | Phase 3 |
+| Guest-facing mobile app (React Native) | Low | Phase 3 |
+| Franchise-level consolidated reporting | Low | Phase 3 |
+| AI-driven demand forecasting for inventory | Low | Phase 3 |
+| Customer-facing digital menu (QR code) | Low | Phase 3 |
+| Payroll export integration | Low | Phase 3 |
 
-#### 6.7.3 Operational SLA Gates (per branch)
+---
 
-| Flow | SLO Target | Breach Trigger | Required Automated Response |
-|------|------------|----------------|-----------------------------|
-| Order submit to station queue | p95 < 2s | 3 consecutive 5-min windows above threshold | Trigger surge tier `watch`, alert manager console |
-| First course fire time | p90 < 12 min (configurable) | >20% open tickets exceeding branch SLA | Enable station rebalance recommendations |
-| Payment authorization | p95 < 4s | Provider timeout rate > 5% over 10 min | Auto-switch to retry-safe fallback path |
-| Reservation quote accuracy | ETA error < +/- 8 min p90 | ETA drift > 10 min for 15 min | Inflate ETA model confidence bounds |
+## Constraints and Assumptions
 
-#### 6.7.4 Mandatory Audit Evidence
-1. Every cancellation, void, and refund shall be reconstructable from origin event to final financial impact.
-2. Peak-load mode transitions shall be auditable with threshold values and operator/system trigger source.
-3. Table merge/split history shall preserve original check lineage for dispute and tax traceability.
-4. Any manager override shall store before/after values and approval justification text.
+### Technical Constraints
+- The platform must support deployment on AWS, GCP, or Azure using containerized workloads (Docker/Kubernetes).
+- Receipt printing, KDS hardware, and payment terminals are branch-specific peripheral integrations; the platform provides standard integration interfaces rather than hardware drivers.
+- Offline-capable POS clients must queue transactions locally and sync upon reconnection without data loss.
+- All payment processing must route through certified third-party gateways; no raw card data may be stored on platform servers.
 
-### 6.8 Flow-to-Requirement Traceability Matrix
+### Business Constraints
+- The platform must support configurable currency, tax jurisdiction, and language settings to support international deployment.
+- Branch data isolation must be enforced at the data layer; a breach of one branch's data must not expose another branch's operational data.
+- Inventory depletion policy (at order, at fire, or at settlement) must be configurable per branch without requiring code changes.
 
-| Flow Segment | Primary Requirement IDs | Supporting NFR IDs | Required Evidence Artifact |
-|--------------|--------------------------|--------------------|----------------------------|
-| Order draft/submit/route | FR-ORD-001, FR-ORD-002, FR-KIT-001 | NFR-P-001, NFR-P-002 | Submit latency dashboard + ticket routing audit |
-| Kitchen execution and pass | FR-KIT-002, FR-KIT-003, FR-KIT-004 | NFR-P-002, NFR-UX-001 | Station SLA report + delay reason log |
-| Slot allocation and seating | FR-RES-001, FR-RES-002, FR-RES-003 | NFR-P-001, NFR-S-001 | Slot conflict report + waitlist ETA accuracy |
-| Billing and settlement | FR-BIL-001, FR-BIL-002, FR-BIL-003 | NFR-P-003, NFR-SEC-002 | Settlement variance report + payment idempotency log |
-| Cancellations and reversals | FR-ORD-005, FR-BIL-002, FR-OPS-004 | NFR-SEC-002 | Approval trail + compensating-event chain |
-| Peak-load controls | FR-OPS-001, FR-OPS-002, FR-WFM-003 | NFR-A-001, NFR-OPS-001 | Tier transition history + SLA breach timeline |
+### Assumptions
+- Restaurant staff have access to compatible tablet or POS terminal hardware provided by the restaurant operator.
+- External delivery aggregator APIs (Uber Eats, DoorDash, Zomato) are accessible and have stable webhook/polling interfaces.
+- Guest contact information for reservations is voluntarily provided and consent-managed by the restaurant operator.
+- Accounting export format requirements will be defined per deployment in a post-MVP integration specification.
+- Kitchen display screens operate on a stable local network with fallback to offline queue mode.
 
-### 6.9 Flow Governance Diagram
+---
 
-```mermaid
-flowchart TD
-    A[Operational Event] --> B{Flow family?}
-    B -->|Ordering| C[Apply FR-ORD + FR-KIT policy checks]
-    B -->|Slots| D[Apply FR-RES capacity + waitlist rules]
-    B -->|Payments| E[Apply FR-BIL settlement + tender rules]
-    B -->|Cancellation| F[Apply approval + reversal policies]
-    B -->|Peak Load| G[Apply FR-OPS surge controls]
-    C --> H[Emit audit evidence + SLO telemetry]
-    D --> H
-    E --> H
-    F --> H
-    G --> H
-```
+## Acceptance Criteria
+
+### System-Level Acceptance Criteria
+
+1. **Order Routing Accuracy**: 99%+ of submitted orders must route to the correct kitchen station without manual staff intervention in a 30-day production trial.
+2. **Billing Accuracy**: 100% of settled checks must be traceable to their originating orders, applied taxes, discount rules, payment methods, and cashier sessions with zero unexplained variances.
+3. **Audit Completeness**: 100% of privileged actions (voids, refunds, manual discounts, stock adjustments, role changes) must appear in the immutable audit log within 5 seconds of occurrence.
+4. **Reservation Accuracy**: No confirmed reservation may be double-booked against the same table slot; the system must surface a slot conflict error before confirmation.
+5. **Payment Idempotency**: No payment intent may result in a duplicate charge; the system must detect and reject duplicate capture attempts using idempotency keys.
+6. **Offline Resilience**: Core POS and KDS workflows must remain functional for a minimum of 15 minutes during API gateway unavailability, with automatic sync upon reconnection.
+7. **Performance Benchmarks**: The system must pass load tests simulating 500 concurrent branches with 40 active staff devices each, maintaining p95 response times within defined NFR targets.
+8. **Inventory Variance Explainability**: At any point in time, the difference between theoretical stock (opening balance + received - recipe deductions - recorded wastage) and physical count must be explainable by auditable ledger events with no unexplained residuals greater than 2% of total throughput.
+9. **Day-Close Integrity**: The day-close process must reject sign-off if any open check, unresolved payment intent, or drawer variance above threshold exists, ensuring financial accuracy before next-day operations begin.
+10. **Role Access Isolation**: No staff member may access features or data outside their assigned role and branch scope; access control violations must be logged as security events.
+
+### Feature-Level Acceptance Criteria
+
+#### Table Management
+- Table map must reflect status changes within 1 second across all concurrently logged-in host terminals.
+- Table merge must consolidate all associated order lines into a single check view without losing individual seat assignments.
+- Table split must create independent checks with correct item assignments and allow independent payment settlement.
+
+#### Reservation System
+- System must reject reservations for time slots where all tables of sufficient capacity are already booked.
+- Waitlist position updates must be broadcast to queued guests within 30 seconds of each seating action.
+- Cancellation of a reservation must release the table slot back to available inventory within 5 seconds.
+
+#### Kitchen Operations
+- All submitted order items must appear on the correct station KDS within 3 seconds of order submission.
+- Course fire must not release subsequent course tickets until the preceding course for the same table is in "ready" state on all stations.
+- A manually voided kitchen ticket must disappear from the KDS screen within 2 seconds and generate a waste log entry.
+
+#### Inventory Management
+- Stock deductions from recipe BOMs must post within 10 seconds of the configured deduction trigger event.
+- A low-stock alert for any ingredient below its reorder threshold must appear on manager dashboard and affected POS terminals within 60 seconds of the threshold being crossed.
+- A stock count submission must produce a variance report comparing physical counts to theoretical quantities within 30 seconds of submission.
+
+#### Payment Processing
+- Bill total must match the sum of all line items, taxes, service charges, and discounts to within the smallest currency unit (zero rounding error).
+- A partial payment must leave the check in "partially paid" status and must not allow table release until fully settled.
+- A refund initiated against a settled check must create a negative ledger entry and update the cashier session totals within the same business session.
+
+---
+
+## Glossary
+
+| Term | Definition |
+|------|------------|
+| Branch | A single physical restaurant location managed independently within the platform |
+| BOM / Recipe | Bill of Materials mapping a menu item to its constituent ingredients and quantities |
+| KDS | Kitchen Display System — screen-based interface replacing printed kitchen tickets |
+| Check | The billing record for a table or order, accumulating items, taxes, and payments |
+| Drawer Session | A cashier's shift-level cash and payment tracking session opened at shift start and closed at shift end |
+| Course Firing | The act of releasing a batch of kitchen tickets for a specific course at a controlled time |
+| Aggregator | Third-party food delivery platform (Uber Eats, DoorDash, Zomato) that sends orders to the RMS |
+| Theoretical Stock | Expected stock level calculated from opening balance, receipts, transfers, and BOM deductions |
+| Physical Count | Actual stock quantity measured during a periodic stock count |
+| Variance | Difference between theoretical stock and physical count, expressed as quantity and percentage |
+| Idempotency Key | A unique identifier per payment request that prevents duplicate charges on retry |
+| No-Show | A guest with a confirmed reservation who fails to arrive within the grace period |
+| 86'd | Industry term for a menu item that is temporarily unavailable due to stock depletion |
+| Refire | Re-sending a kitchen ticket for an item that needs to be re-prepared due to quality or order error |
+| Day-Close | End-of-day operational process that reconciles all transactions, closes drawers, and prepares accounting exports |
+
