@@ -17,7 +17,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This data dictionary defines the canonical data model for the Ticketing and Project Management System. It serves as the authoritative reference for all entity definitions, attribute specifications, relationship cardinalities, and data quality rules. This dictionary is the foundation for database schema design, API contract definitions, and data migration scripts.
 
@@ -32,7 +32,7 @@ This data dictionary defines the canonical data model for the Ticketing and Proj
 
 ---
 
-## 2. Core Entities
+## Core Entities
 
 | Entity | Type | Description |
 |--------|------|-------------|
@@ -80,7 +80,7 @@ This data dictionary defines the canonical data model for the Ticketing and Proj
 
 ---
 
-## 3. Canonical Relationship Diagram
+## Canonical Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -156,7 +156,7 @@ erDiagram
 
 ---
 
-## 4. Entity Definitions
+## Entity Definitions
 
 ### 4.1 Workspace
 
@@ -469,7 +469,7 @@ erDiagram
 | id | UUID | PK, NOT NULL | Unique identifier |
 | project_id | UUID | FK, NOT NULL | Owning project (status definitions are project-scoped) |
 | name | VARCHAR(100) | NOT NULL | Status name |
-| category | ENUM | NOT NULL | todo, in_progress, done | Category for grouping |
+| category | ENUM | NOT NULL | open, in_progress, done | Category for grouping |
 | color | VARCHAR(7) | NOT NULL | Hex color code |
 | position | INTEGER | NOT NULL | Display order |
 | is_initial | BOOLEAN | NOT NULL, DEFAULT false | Default status for new tickets |
@@ -906,7 +906,7 @@ erDiagram
 
 ---
 
-## 5. Data Quality Controls
+## Data Quality Controls
 
 ### 5.1 Referential Integrity
 
@@ -973,7 +973,7 @@ All state changes MUST generate corresponding `AuditLog` entries.
 
 ---
 
-## 6. Enumeration Value Sets
+## Enumeration Value Sets
 
 ### 6.1 Ticket Type
 

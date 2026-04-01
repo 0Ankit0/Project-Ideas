@@ -16,7 +16,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This document defines the enforceable business rules governing the Ticketing and Project Management System's behavior. These rules are platform-level invariants that apply across all workspaces, projects, and boards. Rules are evaluated at specific pipeline stages (request validation, pre-write authorization check, state transition validation, post-write event emission) and are enforced by designated services.
 
@@ -32,7 +32,7 @@ These rules ensure data consistency, enforce organizational policies, prevent un
 
 ---
 
-## 2. Rule Evaluation Pipeline
+## Rule Evaluation Pipeline
 
 ```mermaid
 flowchart TD
@@ -68,7 +68,7 @@ flowchart TD
 
 ---
 
-## 3. Enforceable Rules
+## Enforceable Rules
 
 ---
 
@@ -602,7 +602,7 @@ for webhook in webhook_subscriptions:
 
 ---
 
-## 4. Exception and Override Handling
+## Exception and Override Handling
 
 Certain business rules support controlled exceptions and overrides for operational flexibility:
 
@@ -638,7 +638,7 @@ Repeated override patterns (>10 overrides of same type in 30 days) trigger an au
 
 ---
 
-## 5. Traceability Table
+## Traceability Table
 
 | Rule ID | Rule Name | Related Use Cases | Related Requirements | Enforcer Service |
 |---------|-----------|-------------------|---------------------|------------------|

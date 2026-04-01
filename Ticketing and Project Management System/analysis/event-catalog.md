@@ -18,7 +18,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This event catalog defines all domain events published and consumed within the Ticketing and Project Management System. Events are the primary mechanism for asynchronous communication between bounded contexts, enabling loose coupling, audit trails, integration synchronization, and notification delivery.
 
@@ -39,7 +39,7 @@ This event catalog defines all domain events published and consumed within the T
 
 ---
 
-## 2. Contract Conventions
+## Contract Conventions
 
 ### 2.1 CloudEvents Envelope
 
@@ -108,7 +108,7 @@ Event payload (data field) MUST NOT exceed 1 MB. Large payloads (e.g., full tick
 
 ---
 
-## 3. Domain Events
+## Domain Events
 
 ### Event Summary Table
 
@@ -146,7 +146,7 @@ Event payload (data field) MUST NOT exceed 1 MB. Large payloads (e.g., full tick
 
 ---
 
-## 4. Publish and Consumption Sequence
+## Publish and Consumption Sequence
 
 ### 4.1 Ticket Creation Flow
 
@@ -360,7 +360,7 @@ sequenceDiagram
 
 ---
 
-## 5. Operational SLOs
+## Operational SLOs
 
 ### 5.1 Event Publishing SLOs
 
@@ -398,7 +398,7 @@ Failed events (after max retries) are routed to DLQ:
 
 ---
 
-## 6. Event Schema Definitions
+## Event Schema Definitions
 
 ### 6.1 ticket.created
 
@@ -846,7 +846,7 @@ Failed events (after max retries) are routed to DLQ:
 
 ---
 
-## 7. Consumer Service Matrix
+## Consumer Service Matrix
 
 | Consumer Service | Subscribed Events | Processing Pattern | Retry Strategy | DLQ Enabled |
 |------------------|-------------------|-------------------|----------------|-------------|
