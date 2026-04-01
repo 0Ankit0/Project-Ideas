@@ -16,7 +16,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This document defines the enforceable business rules governing the Content Management System's operational behavior. These rules represent platform-level invariants that ensure content integrity, workflow compliance, security, and performance. Rules are evaluated at specific lifecycle stages (request validation, pre-write check, post-publish event, scheduled execution) and are enforced by designated services and middleware components.
 
@@ -24,7 +24,7 @@ Business rules apply universally across all organizations and spaces unless expl
 
 ---
 
-## 2. Rule Evaluation Pipeline
+## Rule Evaluation Pipeline
 
 ```mermaid
 flowchart TD
@@ -59,7 +59,7 @@ flowchart TD
 
 ---
 
-## 3. Enforceable Rules
+## Enforceable Rules
 
 ---
 
@@ -712,7 +712,7 @@ ON import(payload):
 
 ---
 
-## 4. Exception and Override Handling
+## Exception and Override Handling
 
 ### Organization-Level Overrides
 
@@ -743,7 +743,7 @@ All emergency overrides MUST:
 
 ---
 
-## 5. Traceability Matrix
+## Traceability Matrix
 
 | Rule ID | Rule Name | Related Use Cases | Related Requirements | Enforcer Service |
 |---------|-----------|-------------------|---------------------|-----------------|

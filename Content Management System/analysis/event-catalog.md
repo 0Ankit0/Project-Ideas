@@ -17,7 +17,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This document catalogs all asynchronous domain events published by the Content Management System. Events enable reactive workflows, external integrations via webhooks, and internal system coordination (cache invalidation, search indexing, analytics aggregation).
 
@@ -33,7 +33,7 @@ Events are published to an event bus (Kafka/RabbitMQ/SQS) with at-least-once del
 
 ---
 
-## 2. Contract Conventions
+## Contract Conventions
 
 ### 2.1 Event Structure
 
@@ -96,7 +96,7 @@ All events include standard envelope fields:
 
 ---
 
-## 3. Domain Events
+## Domain Events
 
 ### 3.1 Event Catalog Table
 
@@ -593,7 +593,7 @@ All events include standard envelope fields:
 
 ---
 
-## 4. Publish and Consumption Sequence
+## Publish and Consumption Sequence
 
 ### 4.1 Entry Publish Flow
 
@@ -700,7 +700,7 @@ sequenceDiagram
 
 ---
 
-## 5. Operational SLOs
+## Operational SLOs
 
 ### 5.1 Event Publication
 
@@ -740,7 +740,7 @@ sequenceDiagram
 
 ---
 
-## 6. Event Schema Registry
+## Event Schema Registry
 
 All event schemas are versioned and stored in a centralized schema registry (Confluent Schema Registry or equivalent).
 

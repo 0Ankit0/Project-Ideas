@@ -17,7 +17,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This document provides comprehensive definitions for all persistent entities in the Content Management System. Each entity definition includes attribute specifications, data types, validation rules, relationships, and business context.
 
@@ -25,7 +25,7 @@ The data model supports multi-tenancy (Organization → Space → Content), flex
 
 ---
 
-## 2. Core Entities
+## Core Entities
 
 | Entity | Type | Description |
 |--------|------|-------------|
@@ -63,7 +63,7 @@ The data model supports multi-tenancy (Organization → Space → Content), flex
 
 ---
 
-## 3. Canonical Relationship Diagram
+## Canonical Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -117,7 +117,7 @@ erDiagram
 
 ---
 
-## 4. Entity Definitions
+## Entity Definitions
 
 ---
 
@@ -919,7 +919,7 @@ en-GB → en-US (default)
 
 ---
 
-## 5. Data Quality Controls
+## Data Quality Controls
 
 ### 5.1 Referential Integrity
 
@@ -980,7 +980,7 @@ Entities supporting soft delete (Organization, Space, Entry, Asset) use the `del
 
 ---
 
-## 6. Enumeration Catalogs
+## Enumeration Catalogs
 
 ### 6.1 Workflow States
 
