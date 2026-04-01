@@ -67,6 +67,14 @@ QUALITY_ENFORCED_PROJECTS = {
     "Customer Support and Contact Center Platform",
     "Identity and Access Management Platform",
     "Messaging and Notification Platform",
+    "Rental Management System",
+    "Employee Management System",
+    "E-Commerce",
+    "Restaurant Management System",
+    "Logistics Tracking System",
+    "Ticketing and Project Management System",
+    "Content Management System",
+    "Smart Recommendation Engine",
 }
 
 SINGULAR_TEMPLATE = {
