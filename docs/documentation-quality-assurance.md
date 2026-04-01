@@ -105,6 +105,14 @@ Validator checks include:
 | Smart Recommendation Engine | Covered by validator |
 | Student Information System | Covered by validator |
 | Ticketing and Project Management System | Covered by validator |
+| Fleet Management System | Covered by validator |
+| Real Estate Management System | Covered by validator |
+| Job Board and Recruitment Platform | Covered by validator |
+| Event Management and Ticketing Platform | Covered by validator |
+| Insurance Management System | Covered by validator |
+| IoT Device Management Platform | Covered by validator |
+| Supply Chain Management Platform | Covered by validator |
+| Social Networking Platform | Covered by validator |
 
 ## 6) Change Management Rules
 

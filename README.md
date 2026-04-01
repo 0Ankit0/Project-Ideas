@@ -30,6 +30,14 @@ This repository contains production-grade project blueprints with end-to-end doc
 - Smart Recommendation Engine
 - Student Information System
 - Ticketing and Project Management System
+- Fleet Management System
+- Real Estate Management System
+- Job Board and Recruitment Platform
+- Event Management and Ticketing Platform
+- Insurance Management System
+- IoT Device Management Platform
+- Supply Chain Management Platform
+- Social Networking Platform
 
 ## Documentation Completeness Guarantee
 
