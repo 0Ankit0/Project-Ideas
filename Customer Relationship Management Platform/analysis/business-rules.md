@@ -15,7 +15,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This document defines the enforceable business rules governing the CRM Platform's behavior. These rules are platform-level invariants that apply across all tenants and control critical workflows including lead lifecycle transitions, opportunity stage progression, territory assignments, forecast submissions, data deduplication, and compliance obligations. Rules are evaluated at specific pipeline stages (request validation, pre-commit check, post-commit event) and are enforced by designated services or database constraints.
 
@@ -38,7 +38,7 @@ This document defines the enforceable business rules governing the CRM Platform'
 
 ---
 
-## 2. Rule Evaluation Pipeline
+## Rule Evaluation Pipeline
 
 The following diagram illustrates how business rules are evaluated in sequence during API request processing:
 
@@ -83,7 +83,7 @@ flowchart TD
 
 ---
 
-## 3. Business Rules
+## Business Rules
 
 ## Enforceable Rules
 
@@ -896,7 +896,7 @@ ON email_sync_job_run():
 
 ---
 
-## 4. Traceability Table
+## Traceability Table
 
 | Rule ID | Rule Name | Category | Related FR | Related NFR | Enforcer |
 |---|---|---|---|---|---|
@@ -924,3 +924,14 @@ ON email_sync_job_run():
 ---
 
 *This Business Rules document is maintained by the Engineering and Product teams. All rule changes must be reviewed for compliance, performance, and security impact before implementation.*
+
+## Enforced Rule Summary
+
+1. Leads must be assigned within 24 hours of creation; unassigned leads auto-escalate to team lead.
+2. Opportunities cannot be closed-won without a validated quote and customer signature on file.
+3. SLA response time for support tickets is determined by account tier; breach triggers automated escalation.
+4. Contact deduplication runs on every import; duplicates require manual merge approval before activation.
+5. Customer data deletion requests must be processed within 30 days per GDPR; audit trail retained for 7 years.
+6. Deals above the defined value threshold require VP approval before stage advancement to negotiation.
+7. Email opt-outs must propagate to all marketing lists within 24 hours of preference update.
+8. Account health scores are recalculated nightly; red health triggers customer success team alert.
