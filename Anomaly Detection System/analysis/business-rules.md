@@ -17,7 +17,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This document defines the enforceable business rules governing the Anomaly Detection System's behavior. These rules are platform-level invariants that apply across all detection models, data sources, and alert channels. Rules are evaluated at specific pipeline stages (data ingestion, feature engineering, model scoring, alert generation, incident management) and are enforced by designated services.
 
@@ -33,7 +33,7 @@ Business rules provide deterministic policy-based decision making that augments,
 
 ---
 
-## 2. Rule Evaluation Pipeline
+## Rule Evaluation Pipeline
 
 ```mermaid
 flowchart TD
@@ -73,7 +73,7 @@ flowchart TD
 
 ---
 
-## 3. Enforceable Rules
+## Enforceable Rules
 
 ---
 
@@ -620,7 +620,7 @@ All model training jobs MUST:
 
 ---
 
-## 4. Exception and Override Handling
+## Exception and Override Handling
 
 **Override Authorization:**
 - Overrides require `platform:admin` or `tenant:admin` role
@@ -666,7 +666,7 @@ def request_rule_override(rule_id, reason, duration_hours):
 
 ---
 
-## 5. Rule Precedence Matrix
+## Rule Precedence Matrix
 
 When multiple rules apply to the same event, precedence is determined by:
 
@@ -687,7 +687,7 @@ When multiple rules apply to the same event, precedence is determined by:
 
 ---
 
-## 6. Traceability Table
+## Traceability Table
 
 | Rule ID | Related Requirements | Related Use Cases | Test Cases |
 |---------|---------------------|-------------------|------------|
@@ -709,7 +709,7 @@ When multiple rules apply to the same event, precedence is determined by:
 
 ---
 
-## 7. Rule Versioning and Lifecycle
+## Rule Versioning and Lifecycle
 
 **Version Control:**
 - All rules are stored in Git repository with semantic versioning
@@ -738,7 +738,7 @@ When multiple rules apply to the same event, precedence is determined by:
 
 ---
 
-## 8. Operational Runbooks and Observability
+## Operational Runbooks and Observability
 
 **Key Metrics:**
 - `rule_evaluation_latency_p99`: 99th percentile rule evaluation time (target: <5ms)
