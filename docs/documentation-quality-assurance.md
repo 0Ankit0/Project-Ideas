@@ -113,6 +113,12 @@ Validator checks include:
 | IoT Device Management Platform | Covered by validator |
 | Supply Chain Management Platform | Covered by validator |
 | Social Networking Platform | Covered by validator |
+| Digital Banking Platform | Covered by validator |
+| Video Streaming Platform | Covered by validator |
+| Hotel Property Management System | Covered by validator |
+| Telemedicine Platform | Covered by validator |
+| Manufacturing Execution System | Covered by validator |
+| Legal Case Management System | Covered by validator |
 
 ## 6) Change Management Rules
 

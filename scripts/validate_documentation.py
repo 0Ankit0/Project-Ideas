@@ -85,7 +85,7 @@ QUALITY_ENFORCED_PROJECTS = {
     "Backend as a Service Platform",
     "Resource Lifecycle Management Platform",
     "Slot Booking System",
-    # New projects
+    # New projects — wave 1
     "Fleet Management System",
     "Real Estate Management System",
     "Job Board and Recruitment Platform",
@@ -94,6 +94,13 @@ QUALITY_ENFORCED_PROJECTS = {
     "IoT Device Management Platform",
     "Supply Chain Management Platform",
     "Social Networking Platform",
+    # New projects — wave 2
+    "Digital Banking Platform",
+    "Video Streaming Platform",
+    "Hotel Property Management System",
+    "Telemedicine Platform",
+    "Manufacturing Execution System",
+    "Legal Case Management System",
 }
 
 SINGULAR_TEMPLATE = {
@@ -690,6 +697,97 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "feed-ranking.md",
             "notification-storms.md",
             "account-compromise.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    # ── New projects — wave 2 ─────────────────────────────────────────────────
+    "Digital Banking Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "core-banking-engine.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "account-lifecycle.md",
+            "transaction-processing.md",
+            "fraud-and-aml-compliance.md",
+            "kyc-and-customer-onboarding.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Video Streaming Platform": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "transcoding-and-delivery-pipeline.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "content-upload-and-processing.md",
+            "adaptive-streaming.md",
+            "live-streaming.md",
+            "drm-and-content-protection.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Hotel Property Management System": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "reservation-management.md",
+            "check-in-and-check-out.md",
+            "room-assignment-and-housekeeping.md",
+            "billing-and-invoicing.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Telemedicine Platform": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "video-consultation.md",
+            "prescription-management.md",
+            "patient-data-privacy.md",
+            "emergency-escalation.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Manufacturing Execution System": {
+        **PLURAL_TEMPLATE,
+        "detailed-design": [
+            *PLURAL_TEMPLATE["detailed-design"],
+            "production-scheduling-and-oee.md",
+        ],
+        "edge-cases": [
+            "README.md",
+            "production-order-management.md",
+            "quality-control.md",
+            "machine-downtime.md",
+            "material-shortage.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Legal Case Management System": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "case-lifecycle.md",
+            "document-management.md",
+            "billing-and-time-tracking.md",
+            "court-deadlines.md",
             "api-and-ui.md",
             "security-and-compliance.md",
             "operations.md",

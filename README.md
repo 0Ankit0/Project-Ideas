@@ -38,6 +38,12 @@ This repository contains production-grade project blueprints with end-to-end doc
 - IoT Device Management Platform
 - Supply Chain Management Platform
 - Social Networking Platform
+- Digital Banking Platform
+- Video Streaming Platform
+- Hotel Property Management System
+- Telemedicine Platform
+- Manufacturing Execution System
+- Legal Case Management System
 
 ## Documentation Completeness Guarantee
 
