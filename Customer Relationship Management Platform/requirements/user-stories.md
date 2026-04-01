@@ -1,655 +1,1189 @@
-# User Stories
+# User Stories — Customer Relationship Management Platform
 
-**Version:** 1.0 | **Status:** Approved | **Last Updated:** 2025-07-15
+**Version:** 1.0  
+**Status:** Approved  
+**Last Updated:** 2025-07-15
 
 ---
 
 ## Table of Contents
 
-1. [Sales Rep Stories](#1-sales-rep-stories)
-2. [Sales Manager Stories](#2-sales-manager-stories)
-3. [RevOps Analyst Stories](#3-revops-analyst-stories)
-4. [CRM Administrator Stories](#4-crm-administrator-stories)
-5. [Marketing Manager Stories](#5-marketing-manager-stories)
+1. [Introduction](#1-introduction)
+2. [Lead Management Stories](#2-lead-management-stories)
+3. [Contact and Account Management Stories](#3-contact-and-account-management-stories)
+4. [Opportunity and Pipeline Stories](#4-opportunity-and-pipeline-stories)
+5. [Activity and Communication Stories](#5-activity-and-communication-stories)
+6. [Campaign and Marketing Stories](#6-campaign-and-marketing-stories)
+7. [Forecasting and Territory Stories](#7-forecasting-and-territory-stories)
+8. [Configuration and Administration Stories](#8-configuration-and-administration-stories)
+9. [Integration and API Stories](#9-integration-and-api-stories)
+10. [Data Quality and Compliance Stories](#10-data-quality-and-compliance-stories)
+11. [Story Mapping](#11-story-mapping)
 
 ---
 
-## Overview
+## 1. Introduction
 
-This document captures all user stories for the CRM Platform organised by persona. Each story follows the format:
+### 1.1 Purpose
 
-> **US-XXX** | As a [Persona], I want to [action] so that [benefit].
+This document captures user stories for the CRM Platform from the perspective of each actor (Sales Rep, Sales Manager, Marketing Manager, CRM Administrator, RevOps Analyst, System Integrator). Each story follows the format: **As a [role], I want [capability] so that [benefit]**, with Given/When/Then acceptance criteria and priority classification.
 
-Acceptance criteria follow the Given/When/Then structure. Priority levels: **Must Have**, **Should Have**, **Nice to Have**.
+### 1.2 Story Prioritization
+
+| Priority | Label | Description |
+|---|---|---|
+| P0 | Must Have | Critical for MVP; system is unusable without this feature |
+| P1 | Should Have | High value; planned for v1.0 release |
+| P2 | Nice to Have | Lower value; may be deferred to v1.1+ |
+
+### 1.3 Acceptance Criteria Format
+
+All stories use **Given/When/Then** format:
+- **Given:** Preconditions and context
+- **When:** Action or event trigger
+- **Then:** Expected outcome and side effects
 
 ---
 
-## 1. Sales Rep Stories
+## 2. Lead Management Stories
 
----
+### US-001 — Capture Lead from Web Form
 
-**US-001** | As a **Sales Rep**, I want to capture a new lead directly from a prospect's website visit so that I can begin the qualification process without leaving the CRM.
+**As a** Marketing Manager  
+**I want** to embed a lead capture form on our website  
+**So that** prospects can submit their contact information and be automatically added to our CRM
 
-**Priority:** Must Have
+**Priority:** P0  
+**Story Points:** 5  
+**Related FR:** FR-001
 
 **Acceptance Criteria:**
 
-- **Given** I am logged in as a Sales Rep  
-  **When** I navigate to the Leads module and click "New Lead"  
-  **Then** a lead creation form is displayed with fields for first name, last name, email, phone, company, job title, and lead source
+**Given** I have configured a lead capture form with fields: First Name, Last Name, Email, Company, Phone  
+**When** a prospect visits the form, fills all required fields, and clicks "Submit"  
+**Then** the system creates a new Lead record with status "New", assigns it to the default queue, sends a confirmation email to the prospect, and triggers the lead scoring engine
 
-- **Given** I submit the form with all required fields populated  
-  **When** the form is submitted  
-  **Then** a Lead record is created with status `New`, assigned to me according to the territory rule, and I receive an in-app confirmation notification
+**Given** the form includes reCAPTCHA v3 integration  
+**When** a bot attempts to submit the form with a low reCAPTCHA score (< 0.5)  
+**Then** the submission is rejected with a user-friendly error message, and a security event is logged
 
-- **Given** I submit the form with the email field blank  
-  **When** the form is submitted  
-  **Then** the system returns a validation error highlighting the email field as required and no lead is created
+**Given** a prospect submits a form with an email address that already exists in the CRM  
+**When** the submission is processed  
+**Then** the system detects the duplicate, increments the lead_submission_count field on the existing Lead, and does NOT create a duplicate Lead record
 
 ---
 
-**US-002** | As a **Sales Rep**, I want to qualify a lead and convert it to a Contact, Account, and Deal in one step so that I do not have to manually create three separate records.
+### US-002 — Customize Web Form Fields
 
-**Priority:** Must Have
+**As a** Marketing Manager  
+**I want** to customize which fields appear on my lead capture form  
+**So that** I can collect the specific information relevant to my campaigns
+
+**Priority:** P1  
+**Story Points:** 3  
+**Related FR:** FR-001
 
 **Acceptance Criteria:**
 
-- **Given** a Lead with status `New` or `Contacted` exists in my queue  
-  **When** I click "Qualify & Convert" on the Lead record  
-  **Then** a conversion dialog opens pre-populated with the lead's company name (as Account name), contact details, and a new Deal name defaulting to "[Company] — [Lead Source]"
+**Given** I am logged into the CRM as a Marketing Manager  
+**When** I navigate to Settings → Lead Forms → Create Form  
+**Then** I see a form builder UI where I can drag-and-drop fields (text, email, phone, dropdown, checkbox, text area) onto the form canvas
 
-- **Given** I confirm the conversion with an existing Account selected  
-  **When** the conversion is submitted  
-  **Then** a new Contact is created linked to the existing Account, a Deal is created in the first stage of the default pipeline, and the Lead status is updated to `Converted` with links to all three created/associated records
+**Given** I have added fields to the form  
+**When** I mark a field as "Required"  
+**Then** the form displays a red asterisk next to the field label, and submission is blocked if the field is empty
 
-- **Given** the conversion operation encounters a database error mid-transaction  
-  **When** the error occurs  
-  **Then** the entire transaction is rolled back, no partial records are created, and an error message is displayed with a reference ID for support
+**Given** I have finished configuring the form  
+**When** I click "Save & Get Embed Code"  
+**Then** the system generates a JavaScript snippet that I can copy and paste into my website's HTML
 
 ---
 
-**US-003** | As a **Sales Rep**, I want to log a call with a prospect directly from the Contact record so that the interaction is immediately visible in the activity timeline.
+### US-003 — Submit Lead via API
 
-**Priority:** Must Have
+**As a** System Integrator  
+**I want** to submit leads to the CRM via a REST API  
+**So that** I can integrate our marketing automation platform with the CRM
+
+**Priority:** P0  
+**Story Points:** 3  
+**Related FR:** FR-002
 
 **Acceptance Criteria:**
 
-- **Given** I am viewing a Contact record  
-  **When** I click "Log Call" in the activity bar  
-  **Then** a log call panel opens with fields for call date/time, duration, outcome (Connected, Left Voicemail, No Answer, Wrong Number), call direction (Inbound/Outbound), and notes
+**Given** I have obtained an API key with "leads:write" scope  
+**When** I send a POST request to `/api/v1/leads` with JSON payload `{"first_name": "John", "last_name": "Doe", "email": "john@example.com", "company": "Acme Corp"}`  
+**Then** the system responds with HTTP 201, returns the created Lead ID, and includes a `Location` header pointing to the new resource
 
-- **Given** I save a completed call log with outcome "Connected" and notes  
-  **When** the log is saved  
-  **Then** the activity appears at the top of the Contact's timeline, the Contact's "Last Activity Date" field updates to today's date, and any associated open Deal's next activity date is updated
+**Given** I send a POST request with an invalid email format  
+**When** the request is processed  
+**Then** the system responds with HTTP 422 and a JSON error payload: `{"error": "VALIDATION_ERROR", "fields": {"email": "Invalid email format"}}`
 
-- **Given** I associate the call log to two records simultaneously (one Contact and one Deal)  
-  **When** the log is saved  
-  **Then** the activity appears on the timeline of both the Contact record and the Deal record
+**Given** I include an `Idempotency-Key` header in my request  
+**When** I retry the same request within 24 hours  
+**Then** the system returns the original Lead ID (HTTP 200) instead of creating a duplicate
 
 ---
 
-**US-004** | As a **Sales Rep**, I want to advance a deal from "Proposal Sent" to "Negotiation" in the pipeline so that the pipeline view accurately reflects my deal's progress.
+### US-004 — Bulk Import Leads from CSV
 
-**Priority:** Must Have
+**As a** RevOps Analyst  
+**I want** to bulk import leads from a CSV file  
+**So that** I can onboard large lead lists from trade shows or purchased databases
+
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-003
 
 **Acceptance Criteria:**
 
-- **Given** I have a Deal in "Proposal Sent" stage and all entry criteria for "Negotiation" are met (proposal document attached, minimum deal age 3 days elapsed)  
-  **When** I drag the Deal card to "Negotiation" or change the Stage field on the Deal record  
-  **Then** the Stage updates immediately, the stage probability populates automatically, a `DealStageChanged` event is fired, and a stage change activity log is created on the Deal's timeline
+**Given** I have a CSV file with 10,000 rows and columns: First Name, Last Name, Email, Company, Phone, Source  
+**When** I navigate to Leads → Import → Upload CSV, select the file, and map CSV columns to CRM fields  
+**Then** the system displays a preview of the first 10 rows with mapped values
 
-- **Given** the "Negotiation" stage requires a decision maker Contact to be linked but none is present  
-  **When** I attempt to advance the Deal  
-  **Then** a stage gate blocker modal lists the unmet criteria; the advance is blocked until criteria are satisfied or a manager override is applied
+**Given** the preview looks correct  
+**When** I click "Validate Import"  
+**Then** the system validates all 10,000 rows and displays a validation report showing: total rows, valid rows, invalid rows, and a list of errors (row number, field, error message)
 
-- **Given** a Sales Manager has applied a stage gate override  
-  **When** I view the Deal record  
-  **Then** a yellow "Stage Gate Overridden" badge is displayed with the manager's name and justification note visible on hover
+**Given** the validation report shows 9,500 valid rows and 500 invalid rows  
+**When** I click "Import Valid Rows" and confirm  
+**Then** the system creates a background job, imports the 9,500 valid rows, emails me a completion summary, and provides a downloadable CSV of the 500 failed rows with error details
 
 ---
 
-**US-005** | As a **Sales Rep**, I want to submit my monthly forecast so that my manager has visibility into my expected revenue for the period.
+### US-005 — View Lead Score
 
-**Priority:** Must Have
+**As a** Sales Rep  
+**I want** to see each lead's score (0-100) in the lead list view  
+**So that** I can prioritize my outreach to the hottest leads first
+
+**Priority:** P1  
+**Story Points:** 2  
+**Related FR:** FR-004
 
 **Acceptance Criteria:**
 
-- **Given** a forecast period is open and I have not yet submitted  
-  **When** I navigate to Forecasting and open the current period  
-  **Then** I see my deal pipeline grouped by forecast category (Committed, Best Case, Pipeline, Omitted) with deal-level amounts and close dates pre-populated from my open deals
+**Given** I am viewing the Leads list page  
+**When** the page loads  
+**Then** each lead row displays a score badge with color coding: 0-30 (red), 31-70 (yellow), 71-100 (green)
 
-- **Given** I enter a Committed amount of $50,000, Best Case of $75,000, and Pipeline of $120,000  
-  **When** I click "Submit Forecast"  
-  **Then** the submission is accepted, the forecast status changes to `Submitted`, my manager receives a notification, and my forecast is locked for editing pending manager review
-
-- **Given** I attempt to enter a Committed amount ($80,000) greater than my Best Case amount ($75,000)  
-  **When** I click "Submit Forecast"  
-  **Then** a validation error is displayed: "Committed amount cannot exceed Best Case amount" and the forecast is not submitted
+**Given** I click on a lead score badge  
+**When** the detail panel opens  
+**Then** I see a breakdown of how the score was calculated (e.g., "+20 Company Size > 1000 employees, +15 Industry Match, +10 Email Domain Match, +5 Page Visits = 50 total")
 
 ---
 
-**US-006** | As a **Sales Rep**, I want to see all email correspondence with a Contact in the CRM activity timeline so that I have full conversation context without switching to my email client.
+### US-006 — Configure Lead Scoring Rules
 
-**Priority:** Must Have
+**As a** RevOps Analyst  
+**I want** to configure the lead scoring rule set  
+**So that** the scoring algorithm reflects our ideal customer profile
+
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-004
 
 **Acceptance Criteria:**
 
-- **Given** I have connected my Google Workspace account via OAuth  
-  **When** I send an email to a Contact whose email address is registered in the CRM  
-  **Then** the email thread appears in the Contact's activity timeline within 5 minutes, showing subject, sender, recipient, timestamp, and a preview of the body
+**Given** I navigate to Settings → Lead Scoring → Rules  
+**When** the page loads  
+**Then** I see a list of existing scoring rules with columns: Rule Name, Condition, Points, Active (yes/no)
 
-- **Given** a Contact replies to my email  
-  **When** the reply is received in my Gmail inbox  
-  **Then** the reply is appended to the existing email thread in the CRM activity timeline within 5 minutes; the Contact's "Last Email Date" field is updated
+**Given** I click "Add Rule"  
+**When** I fill in: Rule Name = "Enterprise Size", Condition = "Company.employee_count > 1000", Points = 20, Active = Yes  
+**Then** the system saves the rule and immediately applies it to all existing leads (background job)
 
-- **Given** an email is received from an address that matches two different Contact records  
-  **When** the sync processes the email  
-  **Then** the email is associated to all matching Contact records and a triage notification indicates the multi-match association
+**Given** a new lead is created with company employee_count = 1500  
+**When** the lead scoring engine evaluates the rules  
+**Then** the lead receives +20 points from the "Enterprise Size" rule
 
 ---
 
-**US-007** | As a **Sales Rep**, I want to be notified when a prospect opens my email so that I can time a follow-up call while the deal is top of mind.
+### US-007 — Auto-Assign Lead to Sales Rep
 
-**Priority:** Should Have
+**As a** RevOps Analyst  
+**I want** to configure automatic lead assignment rules based on territory and lead attributes  
+**So that** leads are routed to the right rep without manual intervention
+
+**Priority:** P0  
+**Story Points:** 8  
+**Related FR:** FR-005
 
 **Acceptance Criteria:**
 
-- **Given** I send an email via the CRM email composer with tracking enabled  
-  **When** the recipient opens the email  
-  **Then** I receive an in-app notification and optionally an email alert (configurable in my notification preferences) within 60 seconds of the open event
+**Given** I configure an assignment rule: "If Lead.country = 'USA' AND Lead.state = 'California', assign to User 'John Smith'"  
+**When** a new lead is created with country = "USA" and state = "California"  
+**Then** the system sets lead.owner_id = John Smith's user ID, changes lead.status to "Assigned", and sends an email notification to John Smith
 
-- **Given** the same recipient opens the email five times  
-  **When** each open event is tracked  
-  **Then** the activity timeline shows all open events with individual timestamps; the notification is sent only for the first open event to avoid alert fatigue
+**Given** I configure a round-robin rule: "Distribute leads with source = 'Web Form' evenly among users in pool ['Alice', 'Bob', 'Carol']"  
+**When** three consecutive leads with source = "Web Form" are created  
+**Then** the system assigns them in order: Lead 1 → Alice, Lead 2 → Bob, Lead 3 → Carol, Lead 4 → Alice, etc.
 
-- **Given** I view the Deal associated with the tracked email  
-  **When** I open the Deal's engagement panel  
-  **Then** I see a summary showing total opens, total clicks, last opened timestamp, and links clicked
+**Given** a lead does not match any assignment rule  
+**When** the lead is created  
+**Then** the system leaves lead.owner_id as NULL and places the lead in the "Unassigned Leads" queue
 
 ---
 
-**US-008** | As a **Sales Rep**, I want to view all my tasks due today across all deals and contacts in a single view so that I can prioritise my day without navigating individual records.
+### US-008 — Convert Lead to Contact and Opportunity
 
-**Priority:** Must Have
+**As a** Sales Rep  
+**I want** to convert a qualified lead into a contact, account, and opportunity  
+**So that** I can begin managing the sales process in the pipeline
+
+**Priority:** P0  
+**Story Points:** 8  
+**Related FR:** FR-006
 
 **Acceptance Criteria:**
 
-- **Given** I am logged in as a Sales Rep  
-  **When** I navigate to the "My Tasks" view  
-  **Then** all tasks assigned to me and due today (or overdue) are listed, sorted by due date ascending, with the associated Contact or Deal name, task type, and priority displayed
+**Given** I am viewing a lead detail page for a qualified lead  
+**When** I click "Convert Lead"  
+**Then** the system displays a conversion wizard with steps: 1) Link or Create Account, 2) Create Opportunity (optional), 3) Map Custom Fields
 
-- **Given** I complete a task by clicking the checkmark  
-  **When** the task is marked complete  
-  **Then** it moves to a "Completed Today" section, the task count badge on the navigation icon decrements, and the completion timestamp is recorded on the task record
+**Given** I choose "Create New Account" and enter account name = "Acme Corp"  
+**And** I choose "Create Opportunity" with amount = $50,000, close date = 2025-12-31, stage = "Qualification"  
+**When** I click "Convert"  
+**Then** the system creates a Contact record (from lead data), an Account record, an Opportunity record, sets lead.status = "Converted", and redirects me to the new Contact detail page
 
-- **Given** I have no tasks due today  
-  **When** I open the "My Tasks" view  
-  **Then** a confirmation message is shown: "No tasks due today — great work!" and upcoming tasks (due in the next 7 days) are listed in a secondary section
-
----
-
-## 2. Sales Manager Stories
+**Given** the lead has custom field values: "Campaign Source" = "Trade Show 2025"  
+**When** I convert the lead and the field mapping includes "Campaign Source" → Opportunity.custom_fields  
+**Then** the new Opportunity has custom_field "Campaign Source" = "Trade Show 2025"
 
 ---
 
-**US-009** | As a **Sales Manager**, I want to view my entire team's pipeline on a single Kanban board so that I can identify stalled deals and intervene proactively.
+### US-009 — View Converted Lead History
 
-**Priority:** Must Have
+**As a** Sales Rep  
+**I want** to view the original lead record even after conversion  
+**So that** I can reference the lead source and initial touchpoint data
+
+**Priority:** P1  
+**Story Points:** 2  
+**Related FR:** FR-006
 
 **Acceptance Criteria:**
 
-- **Given** I am logged in as a Sales Manager  
-  **When** I navigate to the Team Pipeline view  
-  **Then** all open deals owned by my direct reports are displayed across pipeline stages, grouped by rep, with deal amount, close date, and days-in-stage visible on each card
+**Given** I have converted a lead to a contact  
+**When** I view the Contact detail page  
+**Then** I see a "Converted from Lead" section showing: lead source, lead created date, lead score at conversion, and a link to the archived lead record
 
-- **Given** a deal has been in the same stage for more than 14 days  
-  **When** I view the Kanban board  
-  **Then** that deal card is highlighted with a stagnation indicator showing the number of days in stage
-
-- **Given** I click on any deal card  
-  **When** the deal record opens  
-  **Then** I can view the full deal record, activity timeline, and add a coaching note without being redirected away from the Kanban board context
+**Given** I click the link to the archived lead record  
+**When** the lead detail page loads  
+**Then** I see a read-only view of the original lead data with a banner indicating "This lead was converted to Contact [Name] on [Date]"
 
 ---
 
-**US-010** | As a **Sales Manager**, I want to review and approve my team's forecast submissions so that the consolidated forecast accurately reflects my team's revenue commitment.
+## 3. Contact and Account Management Stories
 
-**Priority:** Must Have
+### US-010 — Create Contact Manually
+
+**As a** Sales Rep  
+**I want** to manually create a contact record  
+**So that** I can add prospects I met at events or through cold outreach
+
+**Priority:** P0  
+**Story Points:** 3  
+**Related FR:** FR-007
 
 **Acceptance Criteria:**
 
-- **Given** one or more of my direct reports have submitted their forecasts  
-  **When** I navigate to the Forecast Approval view  
-  **Then** I see a rollup table showing each rep's Committed, Best Case, and Pipeline amounts alongside their quota attainment percentage and prior period submission
+**Given** I navigate to Contacts → New Contact  
+**When** I fill in: First Name = "Jane", Last Name = "Smith", Email = "jane@example.com", Account = "Example Corp", Phone = "+1-555-0123"  
+**And** I click "Save"  
+**Then** the system creates the contact, assigns contact.owner_id = my user ID, and redirects me to the contact detail page
 
-- **Given** I approve a rep's forecast  
-  **When** I click "Approve"  
-  **Then** the forecast status changes to `Approved`, a point-in-time snapshot is locked, the rep receives a confirmation notification, and the approved amount is added to my team rollup
-
-- **Given** I reject a rep's forecast with the comment "Committed amount too aggressive given Q3 pipeline coverage"  
-  **When** I click "Reject with Comment"  
-  **Then** the forecast returns to `Draft` status, the rep sees the rejection and my comment, and the rep is required to revise and resubmit within 48 hours
+**Given** I attempt to create a contact with an email that already exists  
+**When** I click "Save"  
+**Then** the system displays an error: "A contact with this email already exists. View existing contact or merge duplicate."
 
 ---
 
-**US-011** | As a **Sales Manager**, I want to assign territories to new sales reps joining my team so that their accounts and leads are automatically routed to them.
+### US-011 — Edit Contact Information
 
-**Priority:** Must Have
+**As a** Sales Rep  
+**I want** to update contact details when I learn new information  
+**So that** the CRM data stays current and accurate
+
+**Priority:** P0  
+**Story Points:** 2  
+**Related FR:** FR-007
 
 **Acceptance Criteria:**
 
-- **Given** a new Sales Rep user has been created in the system  
-  **When** I navigate to Territory Management and assign the new rep to an existing territory  
-  **Then** all Accounts belonging to that territory are updated with the new rep as owner; all open Leads matching the territory criteria are reassigned to the new rep within 30 minutes
+**Given** I am viewing a contact detail page  
+**When** I click "Edit", update the phone number from "+1-555-0123" to "+1-555-9999", and click "Save"  
+**Then** the system updates the contact record, logs the change in the audit trail with my user ID and timestamp, and triggers a `ContactUpdated` domain event
 
-- **Given** the territory has Deals currently owned by the departing rep  
-  **When** the reassignment executes  
-  **Then** open Deals are transferred to the new rep; closed Deals retain the original owner for historical reporting; the new rep receives a summary notification listing all transferred records
-
-- **Given** a territory reassignment conflicts with an existing named-account assignment  
-  **When** the system detects the conflict  
-  **Then** the named-account exclusion is preserved, the conflicting record is flagged in the reassignment preview, and the manager must explicitly override or exclude the conflicting account before finalising
+**Given** another user is simultaneously editing the same contact  
+**When** I attempt to save my changes after the other user has saved  
+**Then** the system displays a conflict warning: "This record was modified by [User Name] at [Time]. Please refresh and reapply your changes."
 
 ---
 
-**US-012** | As a **Sales Manager**, I want to see a quota attainment dashboard for my team so that I can coach underperforming reps before the quarter closes.
+### US-012 — Create Account Record
 
-**Priority:** Must Have
+**As a** Sales Rep  
+**I want** to create an account (company) record  
+**So that** I can associate multiple contacts with their organization
+
+**Priority:** P0  
+**Story Points:** 3  
+**Related FR:** FR-008
 
 **Acceptance Criteria:**
 
-- **Given** quotas have been set for all my direct reports for the current quarter  
-  **When** I open the Team Quota Dashboard  
-  **Then** a table shows each rep's quarterly quota, closed won amount to date, attainment percentage, remaining days in quarter, and projected attainment based on current pipeline weighted by close date probability
+**Given** I navigate to Accounts → New Account  
+**When** I fill in: Account Name = "Global Tech Inc", Domain = "globaltech.com", Industry = "Technology", Employee Count = 5000, Annual Revenue = $500M  
+**And** I click "Save"  
+**Then** the system creates the account, auto-assigns account.territory_id based on territory rules, assigns account.owner_id = my user ID, and redirects me to the account detail page
 
-- **Given** a rep is below 50% attainment with less than 30 days remaining in the quarter  
-  **When** I view the dashboard  
-  **Then** that rep's row is highlighted in amber (50–74% attainment) or red (below 50% attainment) to draw my attention
-
-- **Given** I click on a rep's name in the dashboard  
-  **When** the drill-down opens  
-  **Then** I see the rep's deal-level breakdown showing each deal's stage, amount, close date, and probability contributing to the attainment calculation
+**Given** the account domain = "globaltech.com" matches an existing account  
+**When** I click "Save"  
+**Then** the system displays a warning: "An account with this domain already exists. View existing account or continue anyway."
 
 ---
 
-**US-013** | As a **Sales Manager**, I want to override a stage gate blocker for a deal so that I can unblock a rep when there is valid business justification.
+### US-013 — View Contact 360° Timeline
 
-**Priority:** Must Have
+**As a** Sales Rep  
+**I want** to see all activities, emails, meetings, and deals related to a contact on a single page  
+**So that** I have full context before my next interaction
+
+**Priority:** P1  
+**Story Points:** 5  
+**Related FR:** FR-009
 
 **Acceptance Criteria:**
 
-- **Given** a Deal is blocked from advancing due to an unmet stage gate criterion  
-  **When** I navigate to the Deal record and click "Manager Override"  
-  **Then** a mandatory justification text field is displayed; I must enter a minimum of 20 characters before the override can be applied
+**Given** I am viewing a contact detail page for a contact with 100 activities (calls, emails, meetings, notes)  
+**When** the page loads  
+**Then** the activity timeline displays the most recent 20 activities in reverse chronological order with infinite scroll for older items
 
-- **Given** I submit a valid justification  
-  **When** the override is applied  
-  **Then** the Deal advances to the target stage, an override event is logged in the audit trail with my name, timestamp, and justification, and the Deal record displays a persistent "Stage Gate Override" indicator
+**Given** the contact has activities of type: Call (10), Email (50), Meeting (5), Note (35)  
+**When** I filter the timeline by activity type = "Call"  
+**Then** the timeline displays only the 10 call activities
+
+**Given** the contact has 5 open deals and 3 closed deals  
+**When** I scroll to the "Related Deals" section  
+**Then** I see cards for all 8 deals with: deal name, amount, stage, close date, progress bar (for open deals), and win/loss reason (for closed deals)
 
 ---
 
-**US-014** | As a **Sales Manager**, I want to receive a weekly pipeline digest email so that I have a concise summary of my team's pipeline health before my Monday morning team meeting.
+## 4. Opportunity and Pipeline Stories
 
-**Priority:** Should Have
+### US-014 — Configure Sales Pipeline
+
+**As a** CRM Administrator  
+**I want** to create a custom sales pipeline with stages that match our sales process  
+**So that** reps can track deals through our standardized methodology
+
+**Priority:** P0  
+**Story Points:** 5  
+**Related FR:** FR-010
 
 **Acceptance Criteria:**
 
-- **Given** the weekly digest job runs every Monday at 07:00 in my configured timezone  
-  **When** the email is generated  
-  **Then** it includes: total pipeline value vs. prior week, new deals added, deals that advanced stages, deals that slipped their close date, deals stagnant > 14 days, and top 5 deals by amount with their current stage
+**Given** I navigate to Settings → Pipelines → New Pipeline  
+**When** I enter: Pipeline Name = "Enterprise Sales", Stages = ["Discovery", "Technical Evaluation", "Proposal", "Negotiation", "Closed Won", "Closed Lost"] with probabilities [20%, 40%, 60%, 80%, 100%, 0%]  
+**And** I click "Save"  
+**Then** the system creates the pipeline and makes it available for selection when creating new deals
 
-- **Given** I have opted out of the weekly digest in my notification preferences  
-  **When** Monday digest generation runs  
-  **Then** no email is sent to me but the digest remains available as an in-app report under Reports > Pipeline Digest
+**Given** the pipeline has stages with order: 1) Discovery, 2) Technical Evaluation, 3) Proposal  
+**When** a rep creates a new deal and selects stage = "Proposal"  
+**Then** the system allows this (stages can be entered at any point, not strictly sequential)
 
 ---
 
-**US-015** | As a **Sales Manager**, I want to set individual monthly and quarterly revenue quotas for each of my direct reports so that attainment can be tracked automatically.
+### US-015 — Create Opportunity
 
-**Priority:** Must Have
+**As a** Sales Rep  
+**I want** to create a new opportunity when a prospect expresses interest  
+**So that** I can track the deal through the pipeline and forecast revenue
+
+**Priority:** P0  
+**Story Points:** 3  
+**Related FR:** FR-011
 
 **Acceptance Criteria:**
 
-- **Given** I navigate to the Quota Management section  
-  **When** I select a rep and a quota period  
-  **Then** I can enter a monthly quota amount and a quarterly quota amount independently; existing quotas are editable until the period's start date after which they require RevOps Analyst approval to change
+**Given** I navigate to Opportunities → New Opportunity  
+**When** I fill in: Opportunity Name = "Acme Corp - Platform License", Account = "Acme Corp", Amount = $100,000, Currency = USD, Close Date = 2025-12-31, Stage = "Qualification", Pipeline = "Standard Sales"  
+**And** I click "Save"  
+**Then** the system creates the opportunity, sets opportunity.owner_id = my user ID, sets probability = stage default probability, and redirects me to the opportunity detail page
 
-- **Given** I save a quota change  
-  **When** the change is persisted  
-  **Then** the rep's home dashboard reflects the new quota immediately; the previous quota value is retained in the audit trail with the change timestamp and my user ID; the rep receives a notification of the updated quota
+**Given** I create an opportunity with amount = $100,000 and stage probability = 60%  
+**When** the opportunity is saved  
+**Then** the system calculates weighted_amount = $100,000 × 0.60 = $60,000 and stores it for forecast rollup calculations
 
 ---
 
-**US-016** | As a **Sales Manager**, I want to add a coaching note to a rep's deal so that my feedback is visible to the rep in context without requiring a separate meeting.
+### US-016 — Edit Opportunity Details
 
-**Priority:** Should Have
+**As a** Sales Rep  
+**I want** to update opportunity details as the deal progresses  
+**So that** my forecast and pipeline view reflect the current state
+
+**Priority:** P0  
+**Story Points:** 2  
+**Related FR:** FR-011
 
 **Acceptance Criteria:**
 
-- **Given** I am viewing a Deal owned by one of my direct reports  
-  **When** I click "Add Coaching Note"  
-  **Then** a note editor opens, prefixed with a "Coaching" badge, allowing rich text input; the note is visible to the deal owner and all managers in the hierarchy but not to other reps
+**Given** I am viewing an opportunity detail page  
+**When** I click "Edit", update amount from $100,000 to $120,000, update close date from 2025-12-31 to 2025-11-30, and click "Save"  
+**Then** the system updates the opportunity, recalculates weighted_amount, logs the changes in the audit trail, and triggers an `OpportunityUpdated` event
+
+**Given** the opportunity amount was changed  
+**When** the update is saved  
+**Then** the forecast rollup for my manager is automatically recalculated to include the new amount
 
 ---
 
-## 3. RevOps Analyst Stories
+### US-017 — Move Deal to Next Stage
 
----
+**As a** Sales Rep  
+**I want** to drag-and-drop deals between stages in a kanban view  
+**So that** I can quickly update deal progress
 
-**US-017** | As a **RevOps Analyst**, I want to configure pipeline stages with entry and exit gate criteria so that deals progress through a consistent, quality-controlled sales process.
-
-**Priority:** Must Have
+**Priority:** P0  
+**Story Points:** 5  
+**Related FR:** FR-012
 
 **Acceptance Criteria:**
 
-- **Given** I am in the Pipeline Configuration view  
-  **When** I add a new stage "Technical Evaluation" and configure entry criteria: "Technical Requirements Document attached" and "Minimum deal age: 5 days"  
-  **Then** the criteria are saved and enforced immediately for all new deal stage advancement attempts; existing deals in a prior stage are not retroactively affected
+**Given** I am viewing the Pipeline Kanban board with stages: Discovery, Qualification, Proposal, Negotiation, Closed Won  
+**When** I drag a deal card from "Qualification" column to "Proposal" column  
+**Then** the system updates opportunity.stage_id, updates opportunity.probability to the "Proposal" stage's default probability, creates a DealStageHistory record, and triggers a `DealStageChanged` event
 
-- **Given** I change the default probability of a stage from 50% to 60%  
-  **When** the change is saved  
-  **Then** all deals in that stage (that have not been manually overridden) update their probability to 60% within 5 minutes; weighted forecast values are recalculated
+**Given** I move a deal to the "Closed Won" stage  
+**When** the drop completes  
+**Then** the system validates that amount > 0 and close_date is set; if validation fails, the system reverts the drag and displays an error message
+
+**Given** I move a deal to the "Closed Lost" stage  
+**When** the drop completes  
+**Then** the system displays a modal prompting me to select a loss reason: ["Competitor", "Budget", "Timing", "No Decision", "Other"] and enter optional notes
 
 ---
 
-**US-018** | As a **RevOps Analyst**, I want to review and resolve duplicate Contact records identified by the deduplication engine so that the CRM data quality remains high.
+### US-018 — Submit Individual Forecast
 
-**Priority:** Must Have
+**As a** Sales Rep  
+**I want** to submit my revenue forecast for the current quarter  
+**So that** my manager can review and approve my commit
+
+**Priority:** P1  
+**Story Points:** 5  
+**Related FR:** FR-013
 
 **Acceptance Criteria:**
 
-- **Given** the dedup engine has flagged a Contact pair with 72% match confidence  
-  **When** I open the Dedup Review queue  
-  **Then** the pair is displayed side-by-side with all matching fields highlighted, a confidence score, and the matching criteria that triggered the flag (e.g., "Same email domain + 88% name similarity")
+**Given** I navigate to Forecasting → My Forecast → Q4 2025  
+**When** the page loads  
+**Then** the system displays three forecast categories with auto-calculated totals from my pipeline: Committed ($200K), Best Case ($350K), Pipeline ($500K)
 
-- **Given** I decide to merge the two records  
-  **When** I designate the master record and click "Merge"  
-  **Then** all activities, deals, and campaign memberships from the duplicate are transferred to the master; the duplicate is soft-deleted; the merge operation is recorded in the audit log with my user ID, timestamp, and the IDs of both records
+**Given** the auto-calculated Committed amount is $200K but I want to commit $180K  
+**When** I manually adjust the Committed field to $180K and click "Submit Forecast"  
+**Then** the system creates a ForecastSubmission record with status = "Submitted", locks my forecast from further edits, notifies my manager, and displays a confirmation message
 
-- **Given** I decide the two records are genuinely different people  
-  **When** I click "Not a Duplicate"  
-  **Then** the pair is marked as a confirmed non-duplicate and will not be surfaced again by the dedup engine; this decision is logged and can be reversed by a CRM Administrator
+**Given** I have already submitted my forecast  
+**When** my manager requests a revision  
+**Then** the system changes forecast status to "Revision Requested", allows me to edit the amounts, and I can re-submit
 
 ---
 
-**US-019** | As a **RevOps Analyst**, I want to define territory rules using multi-criteria logic so that accounts are automatically routed to the correct rep.
+### US-019 — Review Team Forecast as Manager
 
-**Priority:** Must Have
+**As a** Sales Manager  
+**I want** to review my team's submitted forecasts  
+**So that** I can approve them and roll them up into my own forecast
+
+**Priority:** P1  
+**Story Points:** 5  
+**Related FR:** FR-013
 
 **Acceptance Criteria:**
 
-- **Given** I create a territory rule: Industry = "Financial Services" AND Annual Revenue >= $10M AND Region = "North America"  
-  **When** the rule is activated  
-  **Then** all existing accounts matching the criteria are assigned to the territory within 1 hour; new accounts matching the criteria are assigned within 5 minutes of creation
+**Given** I navigate to Forecasting → Team Forecasts → Q4 2025  
+**When** the page loads  
+**Then** I see a table of all my direct reports with columns: Rep Name, Committed, Best Case, Pipeline, Status (Draft, Submitted, Approved)
 
-- **Given** an account matches two territory rules simultaneously  
-  **When** the assignment engine evaluates it  
-  **Then** the rule with the highest priority number (as configured in the territory rule ordering) wins; the conflict is logged; the RevOps Analyst receives a conflict notification
+**Given** one of my reps has submitted a forecast with Committed = $180K  
+**When** I click "Review" and examine the breakdown  
+**Then** I see a list of opportunities included in the Committed category with: opportunity name, amount, close date, stage, probability
+
+**Given** I agree with the rep's forecast  
+**When** I click "Approve"  
+**Then** the system changes forecast status to "Approved", locks the rep's forecast, includes it in my rolled-up forecast, and sends a confirmation email to the rep
 
 ---
 
-**US-020** | As a **RevOps Analyst**, I want to perform a bulk territory reassignment so that I can efficiently realign the sales organisation after a team restructure.
+## 5. Activity and Communication Stories
 
-**Priority:** Should Have
+### US-020 — Log a Call
+
+**As a** Sales Rep  
+**I want** to log a phone call with a contact  
+**So that** there's a record of our conversation and agreed-upon next steps
+
+**Priority:** P0  
+**Story Points:** 3  
+**Related FR:** FR-014
 
 **Acceptance Criteria:**
 
-- **Given** I navigate to the Territory Reassignment tool and select source territory "West Coast — Mid Market" and target territory "Pacific — Enterprise"  
-  **When** I click "Preview Reassignment"  
-  **Then** a summary shows: X Accounts, Y open Deals, Z active Leads, and W open Activities that will be reassigned; I can download this list as CSV before confirming
+**Given** I am viewing a contact detail page  
+**When** I click "Log Call", fill in: Subject = "Discovery Call", Duration = 30 minutes, Notes = "Discussed pricing and timeline. Next step: send proposal by Friday", and click "Save"  
+**Then** the system creates an Activity record with type = "Call", links it to the contact, adds it to the contact's timeline, and triggers an `ActivityLogged` event
 
-- **Given** I confirm the bulk reassignment  
-  **When** the operation processes more than 1,000 records  
-  **Then** it runs as a background job; I receive an in-app notification and email when complete; the job status is visible in the Operations log; all reassigned records show the new territory and owner in the audit trail
+**Given** the call notes mention a next step  
+**When** I save the call log  
+**Then** the system prompts me: "Create a follow-up task?" with options [Yes, No]; if I click Yes, it opens a task creation form pre-filled with due_date = 3 days from now
 
 ---
 
-**US-021** | As a **RevOps Analyst**, I want to build a custom report on opportunity pipeline coverage by territory so that I can advise leadership on territory balance.
+### US-021 — Create Task with Reminder
 
-**Priority:** Should Have
+**As a** Sales Rep  
+**I want** to create a task with a due date and reminder  
+**So that** I don't forget to follow up on important action items
+
+**Priority:** P0  
+**Story Points:** 3  
+**Related FR:** FR-014
 
 **Acceptance Criteria:**
 
-- **Given** I open the Report Builder  
-  **When** I select Deals as the primary object and add dimensions: Territory, Pipeline Stage, Close Month and metrics: Count of Deals, Sum of Amount, Average Days in Stage  
-  **Then** the report query executes and returns results within 10 seconds; results are displayed as a pivot table and optionally as a stacked bar chart
+**Given** I navigate to Tasks → New Task  
+**When** I fill in: Subject = "Send Proposal to Acme Corp", Related To = Opportunity "Acme Corp - Platform License", Due Date = 2025-08-01, Reminder = 1 day before, Assigned To = Me  
+**And** I click "Save"  
+**Then** the system creates the task, sets task.status = "Open", and schedules a reminder notification for 2025-07-31
 
-- **Given** I save the report and schedule it to run every Monday at 06:00  
-  **When** the scheduled run executes  
-  **Then** an email with the report attached as CSV and PDF is sent to the distribution list I configured; the report run history shows the last 10 executions with run time and row count
+**Given** the task due date is 2025-08-01 and today is 2025-07-31  
+**When** the reminder scheduler runs  
+**Then** I receive a browser notification and an email: "Task Reminder: Send Proposal to Acme Corp is due tomorrow"
+
+**Given** the task is completed  
+**When** I check the "Mark Complete" checkbox on the task detail page  
+**Then** the system sets task.status = "Completed", task.completed_at = current timestamp, and removes the task from my "Open Tasks" list
 
 ---
 
-**US-022** | As a **RevOps Analyst**, I want to track GDPR erasure requests through a managed workflow so that compliance obligations are met within the 30-day window.
+### US-022 — Sync Emails from Gmail
 
-**Priority:** Must Have
+**As a** Sales Rep  
+**I want** my Gmail emails to sync automatically with the CRM  
+**So that** all client communications are logged without manual data entry
+
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-015
 
 **Acceptance Criteria:**
 
-- **Given** a GDPR erasure request is submitted via the compliance portal  
-  **When** the request is received  
-  **Then** an erasure task is created in the Compliance Workflow queue with a 30-day due date countdown; all records linked to the subject's email address across Leads, Contacts, Email Activities, and Campaign Memberships are identified and listed on the task
+**Given** I navigate to Settings → Integrations → Email → Connect Gmail  
+**When** I authorize the CRM to access my Gmail via OAuth  
+**Then** the system stores my OAuth token, starts polling my inbox every 5 minutes, and displays "Gmail connected" status
 
-- **Given** the erasure is executed  
-  **When** I click "Execute Erasure"  
-  **Then** all PII fields are irreversibly overwritten with anonymised tokens; the Contact record is retained as a shell for audit trail continuity; a completion timestamp and operator ID are recorded in the immutable erasure log; a confirmation is sent to the requester
+**Given** I send an email from Gmail to jane@example.com (a known contact in the CRM)  
+**When** the email sync job runs  
+**Then** the system creates an Activity record with type = "Email", subject = email subject, description = email body, linked to Contact "Jane Smith", and displays it on her timeline
+
+**Given** I receive an email reply from jane@example.com  
+**When** the email sync job runs  
+**Then** the system matches the email thread by subject and In-Reply-To header, groups it with the original email, and marks it as an inbound email
+
+**Given** my Gmail OAuth token expires  
+**When** the system attempts to sync emails  
+**Then** the sync fails, the system sends me a notification: "Gmail sync failed: Re-authorize your account", and displays a "Re-connect" button in the UI
 
 ---
 
-## 4. CRM Administrator Stories
+### US-023 — Create Meeting from CRM and Sync to Calendar
 
----
+**As a** Sales Rep  
+**I want** to create a meeting in the CRM and have it automatically added to my Google Calendar  
+**So that** I don't have to duplicate data entry across systems
 
-**US-023** | As a **CRM Administrator**, I want to create a custom picklist field "Customer Success Tier" on the Account object so that Sales Reps can categorise accounts for prioritisation.
-
-**Priority:** Must Have
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-016
 
 **Acceptance Criteria:**
 
-- **Given** I navigate to Settings > Custom Fields > Account  
-  **When** I create a new picklist field named "Customer Success Tier" with options: Platinum, Gold, Silver, Bronze  
-  **Then** the field appears in the Account form, list view columns (configurable), API responses, and the Report Builder within 60 seconds of saving; no deployment is required
+**Given** I navigate to Calendar → New Meeting  
+**When** I fill in: Title = "Product Demo with Acme Corp", Start Time = 2025-08-05 10:00 AM, Duration = 60 minutes, Attendees = ["jane@example.com"], Related To = Opportunity "Acme Corp"  
+**And** I click "Save"  
+**Then** the system creates a Meeting activity in the CRM, sends a calendar invite to jane@example.com, and adds the meeting to my Google Calendar via the Google Calendar API
 
-- **Given** I mark the field as required  
-  **When** a Sales Rep attempts to save an Account record without selecting a value  
-  **Then** the form returns a validation error and the record is not saved
+**Given** I update the meeting time in the CRM from 10:00 AM to 11:00 AM  
+**When** I save the update  
+**Then** the system updates the Google Calendar event, sends an updated calendar invite to all attendees, and logs the change in the activity timeline
 
-- **Given** I later deprecate the "Bronze" picklist option  
-  **When** the option is marked inactive  
-  **Then** existing records with "Bronze" retain their value but "Bronze" is no longer available as a selection for new or edited records
+**Given** I cancel the meeting in the CRM  
+**When** I click "Cancel Meeting" and confirm  
+**Then** the system marks the activity as cancelled, sends a cancellation notice to attendees, and removes the event from my Google Calendar
 
 ---
 
-**US-024** | As a **CRM Administrator**, I want to configure an integration with our Slack workspace so that Sales Reps receive deal stage change notifications in their designated Slack channel.
+## 6. Campaign and Marketing Stories
 
-**Priority:** Should Have
+### US-024 — Create Email Campaign
+
+**As a** Marketing Manager  
+**I want** to create an email campaign targeting a segment of contacts  
+**So that** I can nurture leads and drive engagement
+
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-017
 
 **Acceptance Criteria:**
 
-- **Given** I enter the Slack Incoming Webhook URL in the Integrations settings  
-  **When** I test the connection  
-  **Then** a test message "CRM Platform connected" appears in the configured Slack channel within 30 seconds
+**Given** I navigate to Campaigns → New Campaign  
+**When** I enter: Campaign Name = "Q3 Product Launch", Segment = "Enterprise Prospects", Template = "Product Announcement", Subject = "Introducing Our New Platform", Scheduled Send = 2025-08-15 09:00 AM  
+**And** I click "Save"  
+**Then** the system creates the campaign with status = "Scheduled", validates that the segment has > 0 contacts, and displays a preview of the email
 
-- **Given** the integration is active and a Deal advances to "Closed Won"  
-  **When** the stage change is saved  
-  **Then** a Slack message is posted to the configured channel within 60 seconds, containing: deal name, amount, account name, rep name, and a deep link to the Deal record
+**Given** the scheduled send time is 2025-08-15 09:00 AM  
+**When** the campaign scheduler runs at that time  
+**Then** the system changes campaign status to "Sending", creates a CampaignSend record for each contact in the segment, and begins sending emails in batches of 1000 per minute
+
+**Given** a contact in the segment has email_opt_out = true  
+**When** the campaign send job processes that contact  
+**Then** the system skips sending the email to that contact and logs a "Skipped - Opted Out" status in the CampaignSend record
 
 ---
 
-**US-025** | As a **CRM Administrator**, I want to manage user roles and permissions so that each persona has access only to the CRM objects and actions appropriate to their function.
+### US-025 — Preview Email with Merge Fields
 
-**Priority:** Must Have
+**As a** Marketing Manager  
+**I want** to preview how merge fields will render in my campaign emails  
+**So that** I can ensure personalization is correct before sending
+
+**Priority:** P1  
+**Story Points:** 3  
+**Related FR:** FR-017
 
 **Acceptance Criteria:**
 
-- **Given** I create a new role "Junior Sales Rep" with read/write access to Leads and Contacts but read-only access to Deals, and no access to Territory or Forecast modules  
-  **When** I assign this role to a user  
-  **Then** the user's navigation menu only shows permitted modules; API calls to restricted endpoints return HTTP 403; the permission change is logged in the audit trail
+**Given** I am editing an email template with merge fields: "Hi {{first_name}}, we noticed you work at {{company}}..."  
+**When** I click "Preview"  
+**Then** the system displays the email with sample data: "Hi John, we noticed you work at Acme Corp..."
 
-- **Given** a user's role is changed from "Sales Rep" to "Sales Manager"  
-  **When** the change is saved  
-  **Then** the new permissions take effect on the user's next page load or API request, without requiring re-authentication; all previously permitted actions remain auditable under their original role context
+**Given** I select a specific contact from the segment for preview  
+**When** I click "Preview with Contact: Jane Smith"  
+**Then** the system renders the email with Jane Smith's actual data: "Hi Jane, we noticed you work at Global Tech Inc..."
 
 ---
 
-**US-026** | As a **CRM Administrator**, I want to perform a bulk data import of Contacts from a CSV file so that I can migrate data from a legacy system.
+### US-026 — Build Dynamic Segment with Filters
 
-**Priority:** Must Have
+**As a** Marketing Manager  
+**I want** to create a dynamic segment of contacts based on filter criteria  
+**So that** my campaign always targets the most up-to-date audience
+
+**Priority:** P1  
+**Story Points:** 5  
+**Related FR:** FR-018
 
 **Acceptance Criteria:**
 
-- **Given** I upload a CSV file with 25,000 Contact rows  
-  **When** the file is uploaded  
-  **Then** a pre-import validation report identifies: missing required fields (row-level), malformed email addresses, duplicate emails within the file, and emails already existing in the CRM — all before any records are created
+**Given** I navigate to Segments → New Segment  
+**When** I select: Segment Type = "Dynamic", Filters = "Contact.title CONTAINS 'VP' AND Contact.account.industry = 'Technology' AND Contact.lead_score >= 70"  
+**And** I click "Preview"  
+**Then** the system displays a count of matching contacts (e.g., "125 contacts match this segment") and shows the first 10 contacts
 
-- **Given** I confirm the import after reviewing the validation report  
-  **When** the import executes  
-  **Then** valid rows create Contact records; rows with errors are skipped; a completion report shows created count, skipped count, and a downloadable error CSV with per-row error messages; duplicate detection runs on each imported contact
+**Given** the segment is saved as "High-Value Tech VPs"  
+**When** I use this segment in a campaign 7 days later  
+**Then** the system re-evaluates the filters and includes any newly created contacts that now match the criteria
+
+**Given** I want to create a static segment (snapshot)  
+**When** I select Segment Type = "Static" and apply the same filters  
+**Then** the system saves a snapshot of the current matching contact IDs and does NOT re-evaluate on future use
 
 ---
 
-**US-027** | As a **CRM Administrator**, I want to view and query the audit log so that I can investigate suspicious activity and respond to security incidents.
+### US-027 — Track Campaign Email Metrics
 
-**Priority:** Must Have
+**As a** Marketing Manager  
+**I want** to see open rates, click rates, and bounce rates for my campaigns  
+**So that** I can measure campaign effectiveness and optimize future sends
+
+**Priority:** P1  
+**Story Points:** 5  
+**Related FR:** FR-019
 
 **Acceptance Criteria:**
 
-- **Given** I navigate to the Audit Log viewer  
-  **When** I filter by user "john.doe@company.com", object type "Contact", and date range "2025-07-01 to 2025-07-15"  
-  **Then** all audit events matching the criteria are returned and displayed in a paginated table showing timestamp, operation, object ID, changed fields (before/after values), and source IP
+**Given** I have sent a campaign to 1,000 contacts  
+**When** I navigate to Campaigns → "Q3 Product Launch" → Metrics  
+**Then** I see a dashboard with: Sent (1,000), Delivered (980), Bounced (20), Opened (350, 35.7% open rate), Clicked (75, 7.7% click rate), Unsubscribed (5)
 
-- **Given** I attempt to delete an audit log entry  
-  **When** the delete is attempted via API or UI  
-  **Then** HTTP 405 (Method Not Allowed) is returned and the entry is not modified; this restriction applies to all user roles including CRM Administrator
+**Given** a contact opens the email  
+**When** the email client loads the embedded tracking pixel  
+**Then** the system logs an "Email Opened" event, increments the campaign's open count, and updates the CampaignSend record with opened_at timestamp
+
+**Given** a contact clicks a link in the email  
+**When** the link redirects through the CRM's tracking URL (e.g., crm.example.com/r/abc123)  
+**Then** the system logs an "Email Clicked" event, increments the campaign's click count, records the clicked URL, and redirects the contact to the destination URL
+
+**Given** a contact clicks the "Unsubscribe" link  
+**When** the unsubscribe page loads  
+**Then** the system sets contact.email_opt_out = true, logs an "Unsubscribed" event, and displays a confirmation message: "You have been unsubscribed from future emails"
 
 ---
 
-**US-028** | As a **CRM Administrator**, I want to configure the lead scoring model so that the scoring rules reflect our current ideal customer profile.
+## 7. Forecasting and Territory Stories
 
-**Priority:** Must Have
+### US-028 — Create Territory with Assignment Rules
+
+**As a** RevOps Analyst  
+**I want** to create a territory and define assignment rules  
+**So that** accounts are automatically assigned to the correct sales rep
+
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-020
 
 **Acceptance Criteria:**
 
-- **Given** I navigate to Settings > Lead Scoring  
-  **When** I add a new rule "Job Title contains 'VP' or 'Director': +15 points"  
-  **Then** the rule is saved and applied to all future lead scoring evaluations; I can optionally trigger a retroactive rescore of all existing open leads
+**Given** I navigate to Settings → Territories → New Territory  
+**When** I enter: Territory Name = "West Coast Enterprise", Owner = "John Smith", Assignment Rules = "Account.billing_address.state IN ['CA', 'WA', 'OR'] AND Account.employee_count > 1000"  
+**And** I click "Save"  
+**Then** the system creates the territory and triggers a background job to re-evaluate all existing accounts against the new rule
 
-- **Given** I deactivate a scoring rule  
-  **When** the rule is marked inactive  
-  **Then** it no longer contributes to lead scores on new evaluations; existing lead scores are not immediately changed but will update on the next evaluation trigger
+**Given** a new account is created with billing_address.state = "CA" and employee_count = 1500  
+**When** the account is saved  
+**Then** the system auto-assigns account.territory_id = "West Coast Enterprise" and account.owner_id = John Smith's user ID
+
+**Given** an account's employee count is updated from 500 to 1200  
+**When** the update is saved  
+**Then** the territory assignment rules are re-evaluated, the account is reassigned to "West Coast Enterprise", and the previous owner receives a notification
 
 ---
 
-## 5. Marketing Manager Stories
+### US-029 — Rebalance Territories Annually
 
----
+**As a** RevOps Analyst  
+**I want** to preview and execute a territory rebalancing plan  
+**So that** I can reassign accounts fairly at the start of each fiscal year
 
-**US-029** | As a **Marketing Manager**, I want to create a dynamic segment of Contacts based on industry, company size, and engagement score so that I can target the right audience for a product launch campaign.
-
-**Priority:** Must Have
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-020
 
 **Acceptance Criteria:**
 
-- **Given** I navigate to Segments and create a new segment with criteria: Industry = "Technology" AND Employee Count >= 500 AND Lead Score >= 60  
-  **When** the segment is saved  
-  **Then** the estimated member count is displayed immediately; the segment is dynamic and membership updates automatically as contact data changes; I can preview the first 50 members before creating a campaign
+**Given** I navigate to Settings → Territories → Rebalance  
+**When** I update assignment rules and click "Preview Rebalance"  
+**Then** the system runs a dry-run simulation and displays: "120 accounts will be reassigned: 45 from Territory A to Territory B, 75 from Territory C to Territory D"
 
-- **Given** I add a new criterion "No email activity in last 90 days"  
-  **When** the segment recalculates  
-  **Then** the estimated member count updates within 30 seconds reflecting the additional filter
+**Given** the preview looks correct  
+**When** I click "Execute Rebalance" and set effective_date = 2026-01-01  
+**Then** the system creates TerritoryReassignment records for each affected account, schedules the reassignments to take effect on 2026-01-01, and sends email notifications to affected reps
 
----
-
-**US-030** | As a **Marketing Manager**, I want to launch a 3-step email drip campaign so that I can nurture leads over a 2-week period without manual intervention.
-
-**Priority:** Must Have
-
-**Acceptance Criteria:**
-
-- **Given** I create a campaign with three email steps: Step 1 sends immediately, Step 2 sends 5 days after Step 1 if the contact has not replied, Step 3 sends 7 days after Step 2 if the contact has not clicked a link  
-  **When** the campaign is activated  
-  **Then** Step 1 sends to all eligible segment members at the scheduled time; Steps 2 and 3 respect the conditional delays and exclusion rules; contacts who reply before Step 2 are automatically removed from the remaining sequence
-
-- **Given** I click "Launch Campaign"  
-  **When** the launch is confirmed  
-  **Then** a pre-send checklist validates: segment not empty, email steps all have subject lines and body content, sender address is authenticated (SPF/DKIM verified), and unsubscribe link is present in each email step
+**Given** the effective date has arrived  
+**When** the rebalancing job runs  
+**Then** the system updates account.territory_id and account.owner_id for all affected accounts, logs the changes in the audit trail, and notifies reps of their new account assignments
 
 ---
 
-**US-031** | As a **Marketing Manager**, I want to view real-time campaign analytics so that I can adjust messaging based on engagement data.
+### US-030 — View Forecast Rollup as VP
 
-**Priority:** Must Have
+**As a** VP of Sales  
+**I want** to view a rolled-up forecast across all teams  
+**So that** I can understand total pipeline and commit for the quarter
+
+**Priority:** P1  
+**Story Points:** 5  
+**Related FR:** FR-021
 
 **Acceptance Criteria:**
 
-- **Given** a campaign is active and sending  
-  **When** I open the Campaign Analytics dashboard  
-  **Then** I see metrics updated within 5 minutes: emails sent, delivered, bounced (soft/hard), open rate, unique open rate, click rate, click-to-open rate, unsubscribes, and spam complaints, displayed as both numbers and percentages
+**Given** I navigate to Forecasting → Rollup View → Q4 2025  
+**When** the page loads  
+**Then** I see a hierarchical view: VP Total → Director 1 Total, Director 2 Total → Manager 1 Total, Manager 2 Total, ... → Rep 1, Rep 2, ...
 
-- **Given** the open rate for Step 1 is below 20%  
-  **When** I identify this in the analytics  
-  **Then** I can pause the campaign to create an A/B variant of Step 1 subject line; pausing is reflected in the campaign status within 60 seconds; contacts who have already received Step 1 are not re-sent
+**Given** the rollup shows: Total Committed = $5M, Total Best Case = $8M, Total Pipeline = $12M  
+**When** one of my managers approves a rep's revised forecast with Committed increased by $100K  
+**Then** the rollup updates in real-time to show: Total Committed = $5.1M
+
+**Given** I want to see variance vs. quota  
+**When** I toggle "Show Quota Comparison"  
+**Then** the system displays an additional column: Quota ($6M), Committed ($5M), Variance (-$1M, -16.7%)
 
 ---
 
-**US-032** | As a **Marketing Manager**, I want to ensure unsubscribe requests are processed immediately so that we remain CAN-SPAM and GDPR compliant.
+## 8. Configuration and Administration Stories
 
-**Priority:** Must Have
+### US-031 — Define Custom Field on Contact
+
+**As a** CRM Administrator  
+**I want** to create a custom field on the Contact entity  
+**So that** we can track industry-specific data unique to our business
+
+**Priority:** P1  
+**Story Points:** 5  
+**Related FR:** FR-022
 
 **Acceptance Criteria:**
 
-- **Given** a Contact clicks the unsubscribe link in a campaign email  
-  **When** the link is clicked  
-  **Then** the Contact's `unsubscribed` flag is set to `true` within 10 seconds; a `ContactUnsubscribed` event is fired; the contact is excluded from all future campaign sends immediately; a confirmation page is displayed to the contact confirming their unsubscribe
+**Given** I navigate to Settings → Custom Fields → Contact → New Field  
+**When** I enter: Field Label = "Customer Segment", Field Type = "Picklist", Options = ["Enterprise", "Mid-Market", "SMB"], Required = Yes  
+**And** I click "Save"  
+**Then** the system creates the custom field with API name = "customer_segment_c", adds it to the Contact create/edit forms, and displays it on the Contact detail page
 
-- **Given** I attempt to manually add an unsubscribed Contact to a new campaign segment  
-  **When** the campaign launches  
-  **Then** the contact is automatically excluded from the send; a warning appears in the campaign pre-send checklist noting that X contacts in the segment are unsubscribed and will be excluded
+**Given** the custom field is created  
+**When** a user creates a new Contact  
+**Then** the "Customer Segment" dropdown appears on the form and is required before saving
+
+**Given** I want to delete the custom field  
+**When** I navigate to Settings → Custom Fields → Contact → "Customer Segment" → Delete  
+**Then** the system prompts: "This field is used on 1,500 Contact records. Deleting it will permanently remove all data. Are you sure?" and requires confirmation
 
 ---
 
-**US-033** | As a **Marketing Manager**, I want to coordinate the lead handoff threshold with the Sales team so that Marketing-qualified leads are only passed to Sales when they meet the agreed-upon criteria.
+### US-032 — Create Lookup Custom Field
 
-**Priority:** Should Have
+**As a** CRM Administrator  
+**I want** to create a custom field that references another entity  
+**So that** users can link related records (e.g., Contact → Contract)
+
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-022
 
 **Acceptance Criteria:**
 
-- **Given** I navigate to Lead Handoff Settings  
-  **When** I set the MQL (Marketing Qualified Lead) threshold to "Lead Score >= 75 AND Job Title contains VP/Director/C-Level AND Company Size >= 100 employees"  
-  **Then** leads meeting all criteria are automatically promoted to MQL status and appear in the Sales team's lead assignment queue; leads not meeting the threshold remain in the Marketing nurture segment
+**Given** I navigate to Settings → Custom Fields → Opportunity → New Field  
+**When** I enter: Field Label = "Related Contract", Field Type = "Lookup", Related Entity = "Contract"  
+**And** I click "Save"  
+**Then** the system creates the custom field, and when users edit an Opportunity, they see a "Related Contract" field with typeahead search to select a Contract record
 
-- **Given** a lead's score increases from 70 to 78 due to new behavioural signals  
-  **When** the scoring engine runs  
-  **Then** if all MQL criteria are now met, the lead is immediately re-evaluated and promoted to MQL status; the assigned Sales Rep receives a notification of the MQL conversion
+**Given** I select a Contract in the lookup field  
+**When** I save the Opportunity  
+**Then** the system stores the foreign key (contract_id) and displays the linked Contract name as a clickable link on the Opportunity detail page
 
 ---
 
-**US-034** | As a **Marketing Manager**, I want to manage the global email suppression list so that known-invalid and opted-out addresses are never sent campaign emails.
+### US-033 — Review Duplicate Contact Queue
 
-**Priority:** Must Have
+**As a** RevOps Analyst  
+**I want** to review potential duplicate contacts flagged by the system  
+**So that** I can merge them and maintain data quality
+
+**Priority:** P1  
+**Story Points:** 5  
+**Related FR:** FR-023
 
 **Acceptance Criteria:**
 
-- **Given** I navigate to Email Settings > Suppression List  
-  **When** I upload a CSV of email addresses to suppress  
-  **Then** all uploaded addresses are added to the global suppression list within 60 seconds; any campaign send to these addresses is automatically blocked regardless of the contact's individual unsubscribe status
+**Given** the duplicate detection engine has flagged 50 potential duplicate pairs  
+**When** I navigate to Data Quality → Duplicate Contacts  
+**Then** I see a list of duplicate pairs with: Contact A name, Contact A email, Contact B name, Contact B email, Confidence Score (50-100%), Actions [Merge, Not a Duplicate]
 
-- **Given** a campaign results in a hard bounce for a specific email address  
-  **When** the bounce is processed  
-  **Then** the address is automatically added to the suppression list and the Contact's `email_deliverable` field is set to `false`; a suppression event is logged in the contact's activity timeline
+**Given** I click "Merge" on a duplicate pair  
+**When** the merge UI loads  
+**Then** I see a side-by-side comparison of all fields (name, email, phone, title, account, custom fields) with radio buttons to select the winning value for each field
+
+**Given** I select the winning values and click "Confirm Merge"  
+**When** the merge executes  
+**Then** the system creates a MergeHistory record, soft-deletes the losing Contact, updates all related activities and deals to point to the winning Contact, and removes the pair from the duplicate queue
 
 ---
 
-**US-035** | As a **Marketing Manager**, I want to track which campaign influenced a closed-won deal so that I can report on marketing ROI.
+### US-034 — Auto-Merge High-Confidence Duplicates
 
-**Priority:** Should Have
+**As a** RevOps Analyst  
+**I want** to configure automatic merging of high-confidence duplicates  
+**So that** obvious duplicates are handled without manual review
+
+**Priority:** P2  
+**Story Points:** 8  
+**Related FR:** FR-023
 
 **Acceptance Criteria:**
 
-- **Given** a Contact is a member of an active campaign and is also associated with a Deal that closes as Won  
-  **When** the deal is marked Closed Won  
-  **Then** the campaign is recorded as a "campaign influence" on the Deal record with the touch date and campaign name; a Deal can have multiple campaign influences (first touch, last touch, multi-touch attribution)
+**Given** I navigate to Settings → Data Quality → Duplicate Rules  
+**When** I enable "Auto-merge duplicates with confidence >= 95%"  
+**And** I save the setting  
+**Then** the duplicate detection engine automatically merges any future duplicate pairs with confidence >= 95% and sends me a daily summary email
 
-- **Given** I open the Campaign Analytics for a specific campaign  
-  **When** I view the "Pipeline Influence" tab  
-  **Then** I see total influenced pipeline value, total influenced closed-won amount, and a list of influenced deals with amounts and close dates, allowing me to calculate the campaign's contribution to revenue
+**Given** two contacts are created with identical email addresses (100% confidence duplicate)  
+**When** the duplicate detection job runs  
+**Then** the system automatically merges the newer contact into the older contact, retaining all activities from both, and logs the merge in the MergeHistory table
+
+---
+
+## 9. Integration and API Stories
+
+### US-035 — Obtain OAuth Access Token
+
+**As a** System Integrator  
+**I want** to authenticate with the CRM API using OAuth 2.0  
+**So that** I can securely access CRM data on behalf of a user
+
+**Priority:** P0  
+**Story Points:** 5  
+**Related FR:** FR-024
+
+**Acceptance Criteria:**
+
+**Given** I have registered an OAuth application in the CRM and obtained a client_id and client_secret  
+**When** I redirect the user to the CRM's OAuth authorization URL with my client_id and requested scopes  
+**Then** the user sees a consent screen: "Application X is requesting access to your CRM data: Read Contacts, Write Leads. Allow or Deny?"
+
+**Given** the user clicks "Allow"  
+**When** the OAuth flow completes  
+**Then** the CRM redirects back to my application's redirect_uri with an authorization code
+
+**Given** I exchange the authorization code for an access token  
+**When** I POST to `/api/v1/oauth/token` with code, client_id, client_secret, and grant_type = "authorization_code"  
+**Then** the system responds with HTTP 200 and JSON: `{"access_token": "...", "refresh_token": "...", "expires_in": 3600}`
+
+**Given** my access token has expired  
+**When** I POST to `/api/v1/oauth/token` with refresh_token and grant_type = "refresh_token"  
+**Then** the system issues a new access token and a new refresh token, invalidates the old refresh token, and responds with HTTP 200
+
+---
+
+### US-036 — Subscribe to Webhook Events
+
+**As a** System Integrator  
+**I want** to receive real-time notifications when CRM events occur  
+**So that** I can trigger workflows in external systems
+
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-025
+
+**Acceptance Criteria:**
+
+**Given** I navigate to Settings → Webhooks → New Webhook  
+**When** I enter: URL = "https://myapp.example.com/webhooks/crm", Events = ["LeadCaptured", "DealStageChanged"], Secret = "my-secret-key"  
+**And** I click "Save"  
+**Then** the system creates the webhook subscription and sends a test payload to my URL to verify connectivity
+
+**Given** a new lead is captured in the CRM  
+**When** the `LeadCaptured` event is emitted  
+**Then** the system sends an HTTP POST to my webhook URL with JSON payload: `{"event": "LeadCaptured", "lead_id": "...", "email": "...", "timestamp": "..."}` and an `X-CRM-Signature` header with HMAC-SHA256 signature
+
+**Given** my webhook URL is temporarily unavailable (HTTP 503)  
+**When** the webhook delivery fails  
+**Then** the system retries 3 times with exponential backoff (1s, 5s, 25s), logs the failure, and marks the webhook as "Failed" in the UI
+
+**Given** I want to manually retry a failed webhook  
+**When** I navigate to Webhooks → "My Webhook" → Failed Deliveries → "Retry"  
+**Then** the system re-sends the webhook payload immediately
+
+---
+
+## 10. Data Quality and Compliance Stories
+
+### US-037 — Import Contacts with Field Mapping
+
+**As a** RevOps Analyst  
+**I want** to import a CSV of contacts with custom field mapping  
+**So that** I can onboard data from external systems
+
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-026
+
+**Acceptance Criteria:**
+
+**Given** I have a CSV file with columns: "Full Name", "Email Address", "Company Name", "Job Title"  
+**When** I navigate to Contacts → Import, upload the file, and map: "Full Name" → first_name + last_name, "Email Address" → email, "Company Name" → account.name, "Job Title" → title  
+**Then** the system displays a preview showing: "John Doe" split into first_name = "John", last_name = "Doe", email = "john@example.com", account lookup by name = "Acme Corp", title = "VP of Sales"
+
+**Given** the CSV has 5,000 rows and the validation passes  
+**When** I click "Import"  
+**Then** the system creates a background job, imports the contacts, and emails me a summary: "Import completed: 4,950 contacts created, 50 errors. Download error report."
+
+---
+
+### US-038 — Assign Role-Based Permissions
+
+**As a** CRM Administrator  
+**I want** to assign users to roles with specific permissions  
+**So that** I can control who can view, edit, or delete CRM data
+
+**Priority:** P0  
+**Story Points:** 5  
+**Related FR:** FR-027
+
+**Acceptance Criteria:**
+
+**Given** I navigate to Settings → Users → "John Smith" → Edit  
+**When** I assign Role = "Sales Rep"  
+**And** the "Sales Rep" role has permissions: Leads (Create, Read, Update), Contacts (Read Own, Update Own), Deals (Read Own, Update Own)  
+**Then** John Smith can create leads, read and update his own contacts and deals, but cannot view other reps' data
+
+**Given** I assign Role = "Sales Manager" to Jane Doe  
+**When** the "Sales Manager" role has permissions: Contacts (Read Team, Update Team), Deals (Read Team, Update Team)  
+**Then** Jane Doe can view and edit all contacts and deals owned by her team members
+
+---
+
+### US-039 — View Audit Log for Record Changes
+
+**As a** CRM Administrator  
+**I want** to view the audit log for a specific record  
+**So that** I can see who made changes and when
+
+**Priority:** P0  
+**Story Points:** 3  
+**Related FR:** FR-028
+
+**Acceptance Criteria:**
+
+**Given** I am viewing a Contact detail page  
+**When** I click "View Audit Log"  
+**Then** I see a table of all changes: Date/Time, User, Field Changed, Old Value, New Value
+
+**Given** the contact's email was changed from "old@example.com" to "new@example.com" by John Smith on 2025-07-10  
+**When** I view the audit log  
+**Then** I see an entry: "2025-07-10 14:23:45 | John Smith | email | old@example.com | new@example.com"
+
+---
+
+### US-040 — Export Audit Log for Compliance
+
+**As a** CRM Administrator  
+**I want** to export the audit log for a date range  
+**So that** I can provide it to auditors for compliance reviews
+
+**Priority:** P0  
+**Story Points:** 3  
+**Related FR:** FR-028
+
+**Acceptance Criteria:**
+
+**Given** I navigate to Settings → Audit Log  
+**When** I select date range = 2025-01-01 to 2025-12-31, entity type = "All", and click "Export"  
+**Then** the system creates a background job, generates a CSV file with all audit log entries, and emails me a download link
+
+**Given** the exported CSV is opened in Excel  
+**When** I review the columns  
+**Then** I see: Timestamp, User ID, User Name, Entity Type, Entity ID, Event Type, IP Address, Old Values (JSON), New Values (JSON)
+
+---
+
+### US-041 — Process GDPR Data Erasure Request
+
+**As a** CRM Administrator  
+**I want** to permanently erase a contact's personal data upon request  
+**So that** we comply with GDPR right to be forgotten
+
+**Priority:** P0  
+**Story Points:** 8  
+**Related FR:** FR-029
+
+**Acceptance Criteria:**
+
+**Given** I receive a GDPR erasure request for contact email = "jane@example.com"  
+**When** I navigate to Contacts → Search "jane@example.com" → Actions → Request Erasure  
+**Then** the system displays a confirmation dialog: "This will permanently delete all personal data for Jane Smith. This action cannot be undone. Continue?"
+
+**Given** I confirm the erasure  
+**When** the erasure job runs  
+**Then** the system deletes the Contact record, deletes related Activities, anonymizes audit log entries (replaces name/email with "REDACTED"), retains Deal records but removes contact association, and sends a confirmation email to the requester
+
+**Given** the contact has open deals worth $500K  
+**When** I attempt to erase the contact  
+**Then** the system warns: "This contact has 2 open deals totaling $500K. Proceed with erasure?" and requires explicit confirmation
+
+---
+
+### US-042 — Export CRM Data for Portability
+
+**As a** CRM Administrator  
+**I want** to export all CRM data for our tenant  
+**So that** we can migrate to another system or comply with GDPR data portability
+
+**Priority:** P1  
+**Story Points:** 8  
+**Related FR:** FR-030
+
+**Acceptance Criteria:**
+
+**Given** I navigate to Settings → Data Export → Full Export  
+**When** I select entities = ["Leads", "Contacts", "Accounts", "Deals", "Activities"], format = "JSON", and click "Export"  
+**Then** the system creates a background job, exports all data with relationships intact, and emails me a download link (expires in 7 days)
+
+**Given** the export file is downloaded  
+**When** I open the JSON file  
+**Then** I see nested objects: each Contact includes embedded activities array, each Deal includes related account and contact objects
+
+---
+
+## 11. Story Mapping
+
+### Story Mapping to Requirements
+
+| User Story ID | Requirement ID | Priority | Story Points |
+|---|---|---|---|
+| US-001 | FR-001 | P0 | 5 |
+| US-002 | FR-001 | P1 | 3 |
+| US-003 | FR-002 | P0 | 3 |
+| US-004 | FR-003 | P1 | 8 |
+| US-005 | FR-004 | P1 | 2 |
+| US-006 | FR-004 | P1 | 8 |
+| US-007 | FR-005 | P0 | 8 |
+| US-008 | FR-006 | P0 | 8 |
+| US-009 | FR-006 | P1 | 2 |
+| US-010 | FR-007 | P0 | 3 |
+| US-011 | FR-007 | P0 | 2 |
+| US-012 | FR-008 | P0 | 3 |
+| US-013 | FR-009 | P1 | 5 |
+| US-014 | FR-010 | P0 | 5 |
+| US-015 | FR-011 | P0 | 3 |
+| US-016 | FR-011 | P0 | 2 |
+| US-017 | FR-012 | P0 | 5 |
+| US-018 | FR-013 | P1 | 5 |
+| US-019 | FR-013 | P1 | 5 |
+| US-020 | FR-014 | P0 | 3 |
+| US-021 | FR-014 | P0 | 3 |
+| US-022 | FR-015 | P1 | 8 |
+| US-023 | FR-016 | P1 | 8 |
+| US-024 | FR-017 | P1 | 8 |
+| US-025 | FR-017 | P1 | 3 |
+| US-026 | FR-018 | P1 | 5 |
+| US-027 | FR-019 | P1 | 5 |
+| US-028 | FR-020 | P1 | 8 |
+| US-029 | FR-020 | P1 | 8 |
+| US-030 | FR-021 | P1 | 5 |
+| US-031 | FR-022 | P1 | 5 |
+| US-032 | FR-022 | P1 | 8 |
+| US-033 | FR-023 | P1 | 5 |
+| US-034 | FR-023 | P2 | 8 |
+| US-035 | FR-024 | P0 | 5 |
+| US-036 | FR-025 | P1 | 8 |
+| US-037 | FR-026 | P1 | 8 |
+| US-038 | FR-027 | P0 | 5 |
+| US-039 | FR-028 | P0 | 3 |
+| US-040 | FR-028 | P0 | 3 |
+| US-041 | FR-029 | P0 | 8 |
+| US-042 | FR-030 | P1 | 8 |
+
+**Total User Stories:** 42  
+**Total Story Points:** 233
+
+### Epic Summary
+
+| Epic | User Stories | Total Story Points |
+|---|---|---|
+| Lead Management | US-001 to US-009 | 49 |
+| Contact and Account Management | US-010 to US-013 | 13 |
+| Opportunity and Pipeline | US-014 to US-019 | 25 |
+| Activity and Communication | US-020 to US-023 | 22 |
+| Campaign and Marketing | US-024 to US-027 | 21 |
+| Forecasting and Territory | US-028 to US-030 | 21 |
+| Configuration and Administration | US-031 to US-034 | 26 |
+| Integration and API | US-035 to US-036 | 13 |
+| Data Quality and Compliance | US-037 to US-042 | 43 |
+
+---
+
+*This user story document is maintained by the Product Management team in collaboration with Sales, Marketing, and RevOps stakeholders. All stories are validated against real user workflows and are sized for implementation in 2-week sprints.*

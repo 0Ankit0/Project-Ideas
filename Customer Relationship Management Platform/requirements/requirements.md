@@ -1,6 +1,8 @@
-# Requirements Specification
+# Requirements Specification — Customer Relationship Management Platform
 
-**Version:** 1.0 | **Status:** Approved | **Last Updated:** 2025-07-15
+**Version:** 1.0  
+**Status:** Approved  
+**Last Updated:** 2025-07-15
 
 ---
 
@@ -14,7 +16,12 @@
    - 2.4 Activity and Communication
    - 2.5 Campaign Management
    - 2.6 Forecasting and Territory Management
+   - 2.7 Custom Fields and Data Model
+   - 2.8 Integrations and API
+   - 2.9 Deduplication and Data Quality
+   - 2.10 Security and Access Control
 3. [Non-Functional Requirements](#3-non-functional-requirements)
+4. [Traceability Matrix](#4-traceability-matrix)
 
 ---
 
@@ -28,7 +35,28 @@ This document defines the complete set of functional and non-functional requirem
 
 The CRM Platform encompasses lead lifecycle management from initial capture through qualification and conversion; contact and account relationship management; opportunity tracking within configurable sales pipelines; activity logging across calls, emails, meetings, and tasks; revenue forecasting with manager approval workflows; territory assignment and rebalancing; and multi-channel campaign execution. The platform exposes a REST API and a web-based UI, and integrates with external systems including email providers, calendar services, ERP systems, identity providers, and communication tools.
 
-Out of scope for v1.0: native mobile applications, AI-generated deal coaching recommendations, and CPQ (Configure Price Quote) integration.
+**In Scope for v1.0:**
+- Web-based UI with responsive design
+- RESTful API with OAuth 2.0 authentication
+- Lead capture via web forms, API, and CSV import
+- Lead scoring using rule-based and ML-enhanced models
+- Contact and account 360° view with activity timeline
+- Multi-pipeline opportunity management with drag-drop stage progression
+- Email and calendar bidirectional sync with Gmail and Outlook
+- Automated email campaigns with A/B testing
+- Territory management with rule-based assignment
+- Revenue forecasting with multi-level rollups
+- Duplicate detection and merge workflow
+- Custom fields on core entities
+- Integration framework with webhooks
+- Audit logging and GDPR compliance
+
+**Out of Scope for v1.0:**
+- Native mobile applications (iOS/Android)
+- AI-generated deal coaching recommendations
+- CPQ (Configure Price Quote) integration
+- Social media monitoring and engagement
+- Telephony/VoIP integration
 
 ### 1.3 Definitions
 
@@ -45,6 +73,9 @@ Out of scope for v1.0: native mobile applications, AI-generated deal coaching re
 | Forecast | A rep's or manager's revenue estimate for a future period, expressed as Committed, Best Case, and Pipeline amounts. |
 | Segment | A dynamic or static list of Contacts or Accounts that satisfy a set of filter criteria, used for campaigns. |
 | CustomField | A tenant-defined metadata field appended to a core CRM object. |
+| Tenant | The top-level organizational entity representing a customer company using the CRM platform. |
+| MQL | Marketing Qualified Lead — a lead that meets defined criteria for sales engagement. |
+| SQL | Sales Qualified Lead — a lead accepted by sales for active pursuit. |
 
 ---
 
@@ -52,88 +83,862 @@ Out of scope for v1.0: native mobile applications, AI-generated deal coaching re
 
 ### 2.1 Lead Management
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|---|---|---|---|
-| FR-001 | The system shall capture lead records via an embeddable web form that posts to the ingest API endpoint. | Must Have | A web form submission creates a Lead record with status `New` within 2 seconds; all mandatory fields (first name, last name, email, company) are validated server-side; invalid submissions return HTTP 422 with field-level error details. |
-| FR-002 | The system shall accept lead creation via the `POST /api/v1/leads` REST endpoint, supporting JSON payloads with custom field values. | Must Have | Authenticated API requests with a valid payload create a Lead record; the response includes the new Lead ID and a `201 Created` status; missing mandatory fields return HTTP 400 with a structured error body. |
-| FR-003 | The system shall support bulk lead import via CSV upload with up to 50,000 rows per file. | Must Have | A CSV upload initiates a background import job; the UI displays real-time progress; upon completion a summary reports created, updated, and rejected row counts; rejected rows are downloadable with per-row error reasons. |
-| FR-004 | The system shall score each Lead on a 0–100 scale using a tenant-configurable rule engine evaluating firmographic signals (company size, industry, job title), demographic signals (email domain, geography), and behavioural signals (web page visits, form interactions). | Must Have | Scoring runs within 500ms of lead creation or update; score changes are logged in the activity timeline; the scoring formula is editable in the admin console and changes take effect on the next lead evaluation without requiring a deployment. |
-| FR-005 | The system shall automatically assign a Lead to a Sales Rep based on round-robin, territory-match, or workload-balance rules configured per pipeline. | Must Have | An unassigned Lead triggers the assignment engine within 30 seconds of creation; the assigned rep receives an in-app notification and email alert; the assignment rule applied is recorded on the Lead record's audit log. |
-| FR-006 | The system shall provide a Lead qualification workflow allowing Sales Reps to mark a Lead as `Qualified`, `Disqualified`, or `Nurture`, with a mandatory disqualification reason from a picklist. | Must Have | Transitioning a Lead to `Disqualified` requires a reason code selection; the Lead cannot be reassigned while in `Disqualified` status unless a manager overrides; the transition fires a `LeadStatusChanged` event consumed by the notification service. |
-| FR-007 | The system shall convert a Qualified Lead into a Contact, Account (or link to an existing Account), and an optional Deal with a single atomic operation. | Must Have | The conversion creates all three records transactionally; if the operation partially fails, all changes are rolled back; the original Lead record is retained with status `Converted` and links to the created Contact, Account, and Deal IDs. |
-| FR-007a | The system shall deduplicate incoming leads by comparing email address (exact match), phone number (normalised), and company name plus contact name (fuzzy match with configurable similarity threshold). | Must Have | Exact email duplicates are flagged automatically and routed to a dedup review queue; fuzzy matches with confidence >= 85% trigger an auto-merge; matches between 60–84% create a human-review task; the dedup engine processes each lead within 10 seconds of ingest. |
+#### FR-001 — Lead Capture via Web Form
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST provide an embeddable JavaScript snippet that renders a configurable lead capture form on external websites. Forms submit to a public API endpoint that creates a Lead record in the tenant's database.
+
+**Acceptance Criteria:**
+- Form fields are configurable per tenant (name, email, phone, company, custom fields)
+- Form validation runs client-side and server-side
+- reCAPTCHA v3 integration prevents bot submissions (score threshold configurable)
+- Submission triggers `LeadCaptured` domain event
+- Submission response includes tracking ID for subsequent API calls
+- Form styling is customizable via CSS variables
+
+**Validation Rules:**
+- Email field MUST match RFC 5321 format
+- Phone field MUST match E.164 international format or tenant-specific regex
+- Required fields are enforced before submission
+- Duplicate email within same tenant triggers deduplication workflow (see FR-022)
+
+**Related Use Cases:** UC-001, UC-002  
+**Related NFRs:** NFR-002 (API latency)
+
+---
+
+#### FR-002 — Lead Capture via REST API
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST expose a `POST /api/v1/leads` endpoint that accepts JSON lead payloads authenticated via API key or OAuth 2.0 access token.
+
+**Acceptance Criteria:**
+- Endpoint accepts standard lead fields (first_name, last_name, email, phone, company, source, custom fields)
+- Response includes created Lead ID and HTTP 201 status
+- Invalid payloads return HTTP 422 with field-level error details
+- Endpoint enforces tenant isolation (authenticated principal's tenant)
+- Endpoint rate limit: 100 requests per minute per API key
+- Idempotency key header (`Idempotency-Key`) prevents duplicate submissions within 24-hour window
+
+**Related Use Cases:** UC-001  
+**Related NFRs:** NFR-001 (multi-tenancy), NFR-002 (performance)
+
+---
+
+#### FR-003 — Lead Bulk Import via CSV
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST provide a CSV import wizard that maps CSV columns to Lead fields, validates rows, and creates Leads in batches.
+
+**Acceptance Criteria:**
+- Import wizard allows file upload (max 10 MB, max 50,000 rows)
+- User maps CSV headers to system fields (drag-drop or dropdown)
+- Preview displays first 10 rows with mapped values
+- Validation report shows errors per row (invalid email, missing required field, etc.)
+- User can skip invalid rows or abort entire import
+- Import creates background job with progress tracking
+- Import completion triggers email notification to user
+- Import creates audit log entry with file name, row count, success count, failure count
+
+**Validation Rules:**
+- Email field required and must be valid
+- Duplicate emails within same CSV file are flagged
+- Import aborts if >20% of rows fail validation
+
+**Related Use Cases:** UC-001  
+**Related NFRs:** NFR-003 (scalability)
+
+---
+
+#### FR-004 — Lead Scoring Engine
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST automatically assign a numeric score (0-100) to each Lead upon creation and update the score when Lead attributes change.
+
+**Acceptance Criteria:**
+- Scoring engine evaluates rule-based criteria (firmographic, demographic, behavioral)
+- Rules are configurable per tenant (weighted sum of conditions)
+- Default rules: company size (+20 if >1000 employees), industry match (+15), email domain match (+10), page visit count (+1 per visit up to 20)
+- Score computation completes within 5 seconds of Lead creation
+- Score updates trigger `LeadScoreUpdated` event
+- Lead list UI displays score with color coding (0-30 red, 31-70 yellow, 71-100 green)
+- Historical score changes are logged in activity timeline
+
+**Extensibility:** ML-based scoring model integration point (v1.1)
+
+**Related Use Cases:** UC-002  
+**Related NFRs:** NFR-002 (performance)
+
+---
+
+#### FR-005 — Lead Assignment Rules
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST support configurable assignment rules that automatically assign Leads to Sales Reps based on criteria such as geography, industry, company size, or lead source.
+
+**Acceptance Criteria:**
+- Assignment rules are evaluated in priority order (rank 1, 2, 3, ...)
+- First matching rule assigns the Lead to the specified User or Territory
+- Rules support AND/OR conditions (e.g., "Country = USA AND Industry = Technology")
+- Rules support round-robin assignment within a pool of eligible reps
+- Assignment triggers `LeadAssigned` event and email notification to assigned rep
+- Manual override allows reassignment to different rep with reason code
+- Unmatched Leads are assigned to a default queue or left unassigned
+
+**Related Use Cases:** UC-002  
+**Related NFRs:** NFR-004 (configurability)
+
+---
+
+#### FR-006 — Lead Conversion to Contact and Opportunity
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST provide a "Convert Lead" action that creates a Contact record, optionally an Account record, and optionally an Opportunity record, then marks the Lead as converted.
+
+**Acceptance Criteria:**
+- Conversion wizard prompts for: create new Account or link to existing Account, create Opportunity (yes/no), Opportunity details (amount, close date, stage)
+- Conversion is atomic: all records are created in a single database transaction
+- Lead status changes to "Converted" (immutable)
+- Lead's custom field values are copied to Contact and Opportunity based on tenant-defined field mapping
+- Conversion triggers `LeadConverted` event
+- Converted Lead remains viewable but is excluded from active lead lists
+
+**Related Use Cases:** UC-003  
+**Related NFRs:** NFR-001 (data integrity)
+
+---
 
 ### 2.2 Contact and Account Management
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|---|---|---|---|
-| FR-008 | The system shall provide full CRUD operations for Contact records with fields: first name, last name, email (unique per tenant), phone, job title, department, Account association, Contact owner, lifecycle stage, and GDPR consent status. | Must Have | Contact creation validates email uniqueness within the tenant; updates are persisted within 500ms; soft-delete marks the Contact as `Inactive` and removes it from active pipeline views while retaining audit history. |
-| FR-009 | The system shall support Account hierarchy with parent-child relationships allowing up to five levels of nesting, enabling subsidiary and division tracking within enterprise accounts. | Should Have | Parent Account assignment is optional; the Account record displays all child accounts and aggregated Deal amounts across the hierarchy; circular parent-child references are rejected with HTTP 409. |
-| FR-010 | The system shall display a 360-degree view for each Contact and Account showing: all associated Deals (open and closed), email thread history, meeting logs, call logs, tasks (open and completed), notes, campaign memberships, and custom field values. | Must Have | The 360 view loads in under 1 second for records with up to 500 associated activities; pagination is applied beyond 500 items; the view is filterable by activity type and date range. |
-| FR-011 | The system shall allow authorised users to merge two Contact records, designating one as the master, with automatic reassignment of all associated Activities, Deals, and Campaign memberships to the master record and soft-deletion of the duplicate. | Must Have | The merge operation is atomic; a pre-merge diff shows field-level conflicts for manual resolution; the audit log records the operator, timestamp, source record ID, and master record ID; merged records cannot be un-merged but can be restored by a CRM Administrator. |
-| FR-012 | The system shall allow CRM Administrators to define up to 200 custom fields per object type (Lead, Contact, Account, Deal) with types: single-line text, multi-line text, integer, decimal, date, datetime, boolean, picklist (up to 200 options), multi-select picklist, percentage, currency, URL, email, phone, lookup (to another CRM object), and formula (read-only computed field). | Must Have | Custom fields appear in object forms, list views, and API responses within 60 seconds of creation; formula fields recalculate on every record save; custom field definitions are versioned and deletion is soft (data retained for 90 days). |
+#### FR-007 — Contact CRUD Operations
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST provide Create, Read, Update, Delete operations for Contact records via UI and API.
+
+**Acceptance Criteria:**
+- Contact fields: first_name, last_name, email, phone, mobile, title, account_id, owner_id, lead_source, custom fields
+- Email field is unique per tenant (validation enforced)
+- Update triggers `ContactUpdated` event
+- Delete is soft delete (deleted_at timestamp); Contact is excluded from UI but retained for audit trail
+- Contact detail page shows: basic info, related Deals, activity timeline, custom fields, email threads
+
+**Related Use Cases:** UC-004  
+**Related NFRs:** NFR-001 (multi-tenancy)
+
+---
+
+#### FR-008 — Account CRUD Operations
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST provide Create, Read, Update, Delete operations for Account (organization) records via UI and API.
+
+**Acceptance Criteria:**
+- Account fields: name, domain, industry, employee_count, annual_revenue, billing_address, shipping_address, account_owner_id, territory_id, custom fields
+- Account detail page shows: basic info, contacts list, open deals, closed deals, activity timeline, custom fields
+- Update triggers `AccountUpdated` event
+- Delete is soft delete; Account deletion also soft-deletes all child Contacts and Deals (cascade)
+- Account merge capability (see FR-023)
+
+**Related Use Cases:** UC-004  
+**Related NFRs:** NFR-001 (multi-tenancy)
+
+---
+
+#### FR-009 — Contact and Account 360° View
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST provide a unified detail page for each Contact and Account that aggregates all related data: activities, deals, emails, notes, tasks, custom fields, and change history.
+
+**Acceptance Criteria:**
+- Page layout: left column (basic info, custom fields), center column (activity timeline), right column (related deals, quick actions)
+- Activity timeline displays all logged activities (calls, emails, meetings, notes) in reverse chronological order
+- Timeline is filterable by activity type and date range
+- Email threads are grouped and expandable
+- Deal cards show stage, amount, probability, close date, and progress bar
+- Page loads within 2 seconds for accounts with up to 1000 activities
+
+**Related Use Cases:** UC-005  
+**Related NFRs:** NFR-002 (performance)
+
+---
 
 ### 2.3 Opportunity and Deal Management
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|---|---|---|---|
-| FR-013 | The system shall provide full CRUD operations for Deal records with fields: name, Account, primary Contact, Pipeline, Stage, amount, close date, probability (auto-populated from Stage, overridable), deal owner, deal source, and custom fields. | Must Have | Deal creation requires Account, Pipeline, and Stage; the stage probability populates automatically but can be overridden within a ±20% range by the deal owner; amounts are stored in the tenant's base currency with multi-currency conversion support. |
-| FR-014 | The system shall enforce stage-gate progression rules, preventing a Deal from advancing to the next stage unless all configured entry criteria (mandatory fields, required activities, minimum deal age) are met. | Must Have | Attempting to move a Deal to a stage with unmet entry criteria displays a blocker list with specific unmet criteria; Sales Managers can override stage gates and must provide a written justification; the override and justification are recorded in the audit log. |
-| FR-015 | The system shall track close date slippage, automatically flagging Deals whose close date has passed without resolution and notifying the deal owner and their manager via in-app alert and email. | Must Have | Deals with a past close date and open status are surfaced in a dedicated "Past Due" pipeline view; an automated nightly job sends a digest email to deal owners listing all past-due deals; the notification frequency is configurable per tenant. |
-| FR-016 | The system shall capture a structured deal loss reason (from a configurable picklist with optional free-text elaboration) when a Deal is moved to `Closed Lost` status. | Must Have | Transitioning to `Closed Lost` without selecting a loss reason returns HTTP 422; loss reason data is aggregated in the Win/Loss analysis report; loss reasons are configurable by the CRM Administrator and changes apply immediately. |
-| FR-017 | The system shall allow users to clone an existing Deal, creating a new Deal record with all field values copied except deal status (reset to first pipeline stage), close date (reset to 90 days from today), and creation metadata. | Should Have | Cloned deals appear immediately in the pipeline with a "Clone of [original deal name]" prefix; custom field values are copied verbatim; associated contacts and account links are preserved; activities are not copied to the clone. |
-| FR-018 | The system shall allow Deal owners to manually override the stage probability between 0% and 100% with a justification note, while preserving the stage's default probability as a separate reference field. | Should Have | Overriding probability updates the weighted deal amount in forecast calculations immediately; the override is visually distinguished from the stage default in the UI; a RevOps Analyst can run a report of all probability overrides within a date range. |
+#### FR-010 — Pipeline Configuration
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST allow CRM Administrators to create and configure multiple named Pipelines, each with custom Stages.
+
+**Acceptance Criteria:**
+- Pipeline fields: name, description, is_default, stages array
+- Stage fields: name, probability_percent, is_closed_won, is_closed_lost, order_index
+- Stage order is user-defined (drag-drop in UI)
+- Each Pipeline must have exactly one "Closed Won" stage and one "Closed Lost" stage
+- Pipeline cannot be deleted if any active Deals reference it
+- Pipeline changes trigger `PipelineConfigured` event
+
+**Related Use Cases:** UC-006  
+**Related NFRs:** NFR-004 (configurability)
+
+---
+
+#### FR-011 — Deal Creation and Management
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST provide Create, Read, Update, Delete operations for Deal (Opportunity) records via UI and API.
+
+**Acceptance Criteria:**
+- Deal fields: name, account_id, contact_id (primary), amount, currency, probability, close_date, stage_id, pipeline_id, owner_id, description, custom fields
+- Amount field supports multiple currencies (USD, EUR, GBP, etc.) with exchange rate lookup
+- Probability is auto-populated from Stage configuration but can be manually overridden
+- Deal list view supports filtering by stage, owner, close date range, amount range
+- Deal detail page shows: basic info, activity timeline, stage history, quote lines (if applicable)
+- Update triggers `DealUpdated` event
+
+**Related Use Cases:** UC-006  
+**Related NFRs:** NFR-001 (multi-tenancy)
+
+---
+
+#### FR-012 — Deal Stage Progression
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST allow users to move Deals between Stages via drag-drop in a kanban board UI or via a dropdown selector in the detail page.
+
+**Acceptance Criteria:**
+- Stage change updates deal.stage_id, deal.probability, and deal.stage_changed_at
+- Stage change creates a DealStageHistory record (deal_id, from_stage_id, to_stage_id, changed_by, changed_at)
+- Stage change triggers `DealStageChanged` event
+- Moving to "Closed Won" stage requires validation: amount > 0, close_date <= today
+- Moving to "Closed Lost" stage prompts for loss reason (competitor, budget, timing, no decision, other)
+- Closed deals are excluded from active pipeline views but remain in reporting
+
+**Related Use Cases:** UC-006  
+**Related NFRs:** NFR-002 (performance)
+
+---
+
+#### FR-013 — Deal Forecasting
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST provide a forecasting module where Sales Reps submit Committed, Best Case, and Pipeline forecast amounts for each fiscal period.
+
+**Acceptance Criteria:**
+- Forecast periods are monthly or quarterly (tenant-configurable)
+- Forecast categories: Committed (high confidence, close_date in period, probability >= 80%), Best Case (includes Committed + probable deals), Pipeline (all open deals in period)
+- Rep submits forecast via UI form; submission creates ForecastSubmission record with status "Draft"
+- Rep can edit draft forecast until "Submit" action, which changes status to "Submitted"
+- Manager reviews submitted forecasts and can "Approve" or "Request Revision"
+- Approved forecasts are locked and included in manager's rollup forecast
+- Forecast dashboard shows: submitted amount, approved amount, actual closed amount (updated real-time), variance
+
+**Related Use Cases:** UC-007  
+**Related NFRs:** NFR-004 (configurability)
+
+---
 
 ### 2.4 Activity and Communication
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|---|---|---|---|
-| FR-019 | The system shall allow Sales Reps to manually log activities (call log, meeting log, email log, note) against any Contact, Account, or Deal record with a subject, description, duration (for calls and meetings), outcome, date/time, and associations to up to 10 CRM records simultaneously. | Must Have | Activity records are created within 500ms; they appear immediately on the activity timeline of all associated records; the timeline is sorted descending by activity date with configurable date range filters; activity body supports rich-text formatting. |
-| FR-020 | The system shall sync inbound and outbound email with Google Workspace and Microsoft 365 via OAuth 2.0, automatically associating emails to matching Contact and Deal records based on email address and subject-line thread ID. | Must Have | OAuth authorisation flow completes within 30 seconds; new emails appear in the CRM activity timeline within 5 minutes of receipt or send in the external mailbox; emails matching multiple Contact records are associated to all matches; unmatched emails are surfaced in an inbox triage view. |
-| FR-021 | The system shall sync meetings from Google Calendar and Microsoft Outlook Calendar, creating Activity records of type `Meeting` linked to CRM Contact records whose email addresses appear on the calendar invite. | Must Have | Calendar events created or updated in the external calendar are reflected in the CRM within 10 minutes via push notification or polling fallback; meetings deleted in the external calendar are marked `Cancelled` in the CRM activity timeline; attendee lists are captured and linked to matching Contact records. |
-| FR-022 | The system shall track email open events and link click events for emails sent via the CRM's email composer, updating the Contact's engagement score and logging an activity event per open/click. | Should Have | Email open tracking uses a 1x1 tracking pixel embedded on send; click tracking wraps all hyperlinks in a redirect URL; tracking data is available in the activity timeline within 60 seconds of the open or click event; tracking can be disabled per-tenant for privacy compliance. |
+#### FR-014 — Activity Logging (Calls, Emails, Meetings, Notes, Tasks)
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST allow users to log activities associated with Contacts, Accounts, and Deals. Activity types: Call, Email, Meeting, Note, Task.
+
+**Acceptance Criteria:**
+- Activity fields: type, subject, description, related_to_type, related_to_id, created_by, created_at, completed_at (for tasks), attendees (for meetings), call_duration_seconds (for calls)
+- Activities appear on the related entity's timeline
+- Tasks have status: Open, In Progress, Completed, Cancelled
+- Tasks have due_date field; overdue tasks are highlighted in UI
+- Activity creation triggers `ActivityLogged` event
+
+**Related Use Cases:** UC-005  
+**Related NFRs:** NFR-002 (performance)
+
+---
+
+#### FR-015 — Email Sync (Gmail and Outlook)
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST support bidirectional email synchronization with Gmail (via Gmail API) and Outlook (via Microsoft Graph API) using OAuth 2.0 authentication.
+
+**Acceptance Criteria:**
+- User authorizes email access via OAuth flow
+- System polls user's inbox every 5 minutes for new emails
+- Emails with recognized Contact email addresses are automatically associated with that Contact's timeline
+- User can manually associate emails with Contacts, Accounts, or Deals from within the CRM
+- Sent emails from CRM are logged in the Activity timeline
+- Email threads are grouped by subject and In-Reply-To header
+- Email sync errors (OAuth token expiry, API quota exceeded) trigger user notification
+
+**Related Use Cases:** UC-005  
+**Related NFRs:** NFR-009 (integration), NFR-010 (reliability)
+
+---
+
+#### FR-016 — Calendar Sync (Google Calendar and Outlook Calendar)
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST support bidirectional calendar synchronization with Google Calendar and Outlook Calendar using OAuth 2.0 authentication.
+
+**Acceptance Criteria:**
+- User authorizes calendar access via OAuth flow
+- Meetings created in CRM are added to user's calendar with attendees
+- Meetings created in external calendar are imported to CRM if attendees include known Contacts
+- Meeting updates (time, attendees, location) are bidirectionally synced
+- Meeting cancellations are synced and marked as cancelled in CRM
+- Calendar sync errors trigger user notification
+
+**Related Use Cases:** UC-005  
+**Related NFRs:** NFR-009 (integration), NFR-010 (reliability)
+
+---
 
 ### 2.5 Campaign Management
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|---|---|---|---|
-| FR-023 | The system shall allow Marketing Managers to create multi-step email campaigns with a name, associated Segment, scheduled send date/time, and a sequence of email steps with configurable delays between steps. | Must Have | Campaign creation validates that the target segment is not empty; campaigns cannot be activated without at least one email step; the estimated recipient count is displayed before launch; campaign records are versioned so edits to a live campaign create a new draft version. |
-| FR-024 | The system shall send campaign emails to all members of the target Segment at the scheduled time, respecting per-Contact email frequency caps, unsubscribe status, and GDPR consent flags. | Must Have | Contacts with `unsubscribed = true` or `gdpr_consent = false` are excluded from all campaign sends; the send engine processes up to 100,000 recipients per hour; delivery rate, bounce rate, open rate, and click rate are updated in near-real-time (within 5 minutes) in the campaign analytics dashboard. |
-| FR-025 | The system shall provide per-campaign analytics showing: sent count, delivered count, soft bounce count, hard bounce count, open count, unique open rate, click count, click-to-open rate, unsubscribe count, and spam complaint count. | Must Have | Analytics data is available for download as CSV; the analytics dashboard refreshes every 5 minutes; hard bounces automatically update the Contact's `email_deliverable` field to `false`; spam complaints trigger an automatic unsubscribe. |
-| FR-026 | The system shall process unsubscribe requests (from one-click unsubscribe links in campaign emails) within 10 seconds, setting the Contact's `unsubscribed` flag and logging a `ContactUnsubscribed` event. | Must Have | Unsubscribe links use a signed token to prevent forgery; processing the unsubscribe link does not require the recipient to be logged into the CRM; re-subscribe can only be initiated by the Contact themselves via a confirmed opt-in flow; all unsubscribe events are retained permanently for compliance auditing. |
+#### FR-017 — Email Campaign Creation
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST provide a campaign builder UI that allows Marketing Managers to create email campaigns with audience segments, email templates, and send schedules.
+
+**Acceptance Criteria:**
+- Campaign fields: name, description, segment_id, template_id, from_name, from_email, subject, scheduled_send_at, status (draft, scheduled, sending, sent, paused, cancelled)
+- Campaign builder includes WYSIWYG email editor with merge fields (e.g., {{first_name}}, {{company}})
+- User can preview email with sample Contact data
+- User can schedule immediate send or future send date/time
+- Campaign execution creates CampaignSend record per recipient Contact
+- Send respects Contact's email_opt_out flag (no emails to opted-out Contacts)
+
+**Related Use Cases:** UC-008  
+**Related NFRs:** NFR-003 (scalability)
+
+---
+
+#### FR-018 — Campaign Segment Builder
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST provide a segment builder UI that allows users to create dynamic or static Contact/Account lists based on filter criteria.
+
+**Acceptance Criteria:**
+- Segment types: Dynamic (re-evaluated on each use), Static (snapshot at creation time)
+- Filter criteria: field comparisons (equals, not equals, contains, greater than, less than, in, not in), date ranges, custom field values
+- Filters support AND/OR logic with grouping (nested conditions)
+- Segment preview shows matching record count and first 10 records
+- Segments can be saved and reused across campaigns
+- Segment modification triggers re-evaluation for dynamic segments
+
+**Related Use Cases:** UC-008  
+**Related NFRs:** NFR-004 (configurability)
+
+---
+
+#### FR-019 — Campaign Email Tracking (Opens, Clicks, Bounces, Unsubscribes)
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST track email engagement metrics for each campaign: opens, clicks, bounces, and unsubscribes.
+
+**Acceptance Criteria:**
+- Email open tracking via 1x1 pixel image embed (tracks first open per recipient)
+- Link click tracking via redirect URL with unique tracking token
+- Bounce handling via SMTP bounce message parsing or webhook from email service provider
+- Unsubscribe link included in every campaign email (footer)
+- Unsubscribe action sets Contact.email_opt_out = true and logs unsubscribe event
+- Campaign dashboard shows: sent count, delivered count, open rate, click rate, bounce rate, unsubscribe count
+
+**Compliance:**
+- Unsubscribe link must be visible and functional (CAN-SPAM Act compliance)
+- Unsubscribe must be honored immediately (GDPR compliance)
+
+**Related Use Cases:** UC-008  
+**Related NFRs:** NFR-012 (compliance)
+
+---
 
 ### 2.6 Forecasting and Territory Management
 
-| ID | Requirement | Priority | Acceptance Criteria |
-|---|---|---|---|
-| FR-027 | The system shall allow Sales Reps to submit a forecast for each active forecast period, specifying Committed amount, Best Case amount, and Pipeline amount, with optional notes. | Must Have | Forecast submission validates that Committed <= Best Case <= Pipeline; submitted forecasts are locked for editing once the manager begins review; the UI displays a comparison to the rep's prior period submission and their quota. |
-| FR-028 | The system shall roll up individual rep forecasts to Sales Manager level and from manager level to VP level, providing a consolidated forecast view showing each contributor's submission and the aggregate total per forecast category. | Must Have | Rollup calculations complete within 30 seconds of any underlying submission change; the rollup view is read-only for reps and editable (with override capability) for managers; managers can add a manager-layer adjustment amount with a justification note. |
-| FR-029 | The system shall support territory assignment by defining Territory rules based on one or more criteria: geographic region (country, state/province, postal code range), industry vertical, account annual revenue range, and named account lists. | Must Have | Territory rule evaluation assigns each Account to exactly one Territory; Accounts matching no territory rules are assigned to a default "Unmanaged" territory; territory assignment is re-evaluated nightly and on-demand by a RevOps Analyst. |
-| FR-030 | The system shall support quota tracking by allowing Sales Managers to set monthly and quarterly revenue quotas per Sales Rep, with real-time attainment calculated as (Closed Won amount in period) / quota * 100%. | Must Have | Quota data is visible to the rep themselves and their direct manager; attainment percentage is displayed on the rep's home dashboard; quota changes are logged in the audit trail with the previous and new values; attainment can be exported to CSV for compensation processing. |
-| FR-031 | The system shall provide a forecast approval workflow where a Sales Manager reviews a rep's submitted forecast and either approves it (locking the snapshot) or rejects it with a written comment requiring the rep to revise and resubmit. | Must Have | Approval or rejection fires a `ForecastDecisionRecorded` event; approved forecasts are immutable and create a point-in-time snapshot stored for 7 years; rejected forecasts return to `Draft` status with the manager's comment displayed prominently; the workflow supports a maximum of three rejection/resubmit cycles before escalating to the RevOps Analyst. |
-| FR-032 | The system shall provide a bulk territory reassignment tool that allows a RevOps Analyst to reassign all Accounts and their associated Contacts, Deals, and open Activities from one Territory to another in a single operation. | Should Have | The bulk reassignment previews the number of affected records before execution; the operation runs asynchronously for batches over 1,000 records; all reassigned records are updated within 60 minutes; a completion notification is sent to the initiating analyst; all reassignments are recorded in the audit log. |
-| FR-033 | The system shall support multi-currency deal amounts, storing all values in the tenant's base currency while displaying them in the deal owner's preferred currency using configurable exchange rates updated daily. | Should Have | Exchange rates are configurable by the CRM Administrator; deal amounts converted from a non-base currency display a conversion tooltip showing the rate used and effective date; forecast rollups always use base currency; exchange rate history is retained for audit purposes. |
-| FR-034 | The system shall generate a weekly pipeline health digest email for each Sales Manager summarising: new deals added, deals advanced by stage, deals stagnant over 14 days, deals with past-due close dates, and total pipeline value change versus prior week. | Should Have | The digest is generated every Monday at 07:00 in the manager's configured timezone; managers can opt out via notification preferences; the digest is also available as an in-app report; deal-level drill-down links are included in the email. |
-| FR-035 | The system shall provide an immutable audit log recording every create, update, delete, and permission change on all CRM objects, capturing: timestamp (UTC), actor user ID, actor IP address, object type, object ID, changed fields with before and after values, and the request trace ID. | Must Have | Audit log entries cannot be modified or deleted by any user including administrators; the log is queryable by object, actor, date range, and operation type; audit log data is exported to the tenant's configured SIEM or storage bucket within 15 minutes of each event. |
+#### FR-020 — Territory Hierarchy and Assignment
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST support a hierarchical territory structure where Accounts are assigned to Territories based on configurable rules, and Territories are owned by Sales Reps.
+
+**Acceptance Criteria:**
+- Territory fields: name, description, parent_territory_id, owner_id (Sales Rep or Manager), assignment_rules
+- Assignment rules: geographic (country, state, city, postal code), firmographic (industry, employee count, annual revenue), custom field conditions
+- Territory hierarchy supports unlimited depth (e.g., Global > North America > USA > West > California)
+- Account.territory_id is auto-assigned when Account is created or updated based on matching rules
+- Territory reassignment (annual rebalancing) creates TerritoryReassignment records with old_territory_id, new_territory_id, effective_date
+- Reassignment can be previewed (dry-run mode) before committing
+
+**Related Use Cases:** UC-009  
+**Related NFRs:** NFR-004 (configurability)
+
+---
+
+#### FR-021 — Revenue Forecast Rollup
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST aggregate individual rep forecasts into manager and VP-level rollups based on reporting hierarchy.
+
+**Acceptance Criteria:**
+- Forecast rollup is computed hierarchically: Rep → Manager → Director → VP → CRO
+- Rollup includes: total committed, total best case, total pipeline, number of deals, weighted probability sum
+- Rollup updates in real-time as reps submit or revise forecasts
+- Rollup dashboard shows breakdown by rep with variance vs. quota
+- Forecast snapshots are saved at period-end (immutable historical record)
+
+**Related Use Cases:** UC-007  
+**Related NFRs:** NFR-002 (performance), NFR-011 (data accuracy)
+
+---
+
+### 2.7 Custom Fields and Data Model
+
+#### FR-022 — Custom Field Definition
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST allow CRM Administrators to define custom fields on core entities: Lead, Contact, Account, Deal, Activity.
+
+**Acceptance Criteria:**
+- Custom field types: Text (single line), Text Area (multi-line), Number, Currency, Date, Picklist (single-select), Multi-select Picklist, Checkbox, URL, Email, Lookup (foreign key to another entity)
+- Custom field attributes: label, API name, required (yes/no), default value, help text, visibility (all users or specific roles)
+- Custom field API name auto-generated from label (e.g., "Customer Segment" → "customer_segment_c")
+- Custom fields appear in create/edit forms, detail pages, and list views
+- Custom fields are searchable and filterable
+- Custom field values are stored in JSONB column (flexible schema) or EAV model (normalized schema)
+
+**Related Use Cases:** UC-010  
+**Related NFRs:** NFR-004 (configurability)
+
+---
+
+#### FR-023 — Duplicate Detection and Merge
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST automatically detect potential duplicate Contact and Account records using fuzzy matching on name, email, phone, and domain fields.
+
+**Acceptance Criteria:**
+- Duplicate detection runs on record creation and update
+- Matching algorithm: email exact match (100% confidence), phone exact match (90% confidence), name + company fuzzy match (Levenshtein distance < 3, 70% confidence)
+- High-confidence duplicates (>= 90%) are automatically merged (configurable)
+- Medium-confidence duplicates (50-89%) are flagged in a manual review queue
+- Merge UI shows side-by-side comparison of field values with user-selectable "winning" values
+- Merge operation creates MergeHistory record with merged_record_id, surviving_record_id, merged_at, merged_by
+- Merged record is soft-deleted; all related activities and deals are reassigned to surviving record
+
+**Related Use Cases:** UC-011  
+**Related NFRs:** NFR-011 (data accuracy)
+
+---
+
+### 2.8 Integrations and API
+
+#### FR-024 — REST API with OAuth 2.0 Authentication
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST expose a RESTful API for all CRUD operations on core entities, authenticated via OAuth 2.0 (Authorization Code flow for user context, Client Credentials flow for server-to-server).
+
+**Acceptance Criteria:**
+- API versioning via URL path (e.g., /api/v1/leads)
+- Authentication via JWT access token in Authorization header
+- Access token TTL: 1 hour (configurable)
+- Refresh token TTL: 30 days (configurable)
+- Token introspection endpoint: `POST /api/v1/oauth/introspect`
+- Token revocation endpoint: `POST /api/v1/oauth/revoke`
+- API responses use standard HTTP status codes (200, 201, 400, 401, 403, 404, 422, 500)
+- Error responses include structured JSON with error code, message, and field-level details (if applicable)
+
+**Related Use Cases:** All  
+**Related NFRs:** NFR-001 (multi-tenancy), NFR-002 (performance), NFR-007 (security)
+
+---
+
+#### FR-025 — Webhook Subscriptions
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST allow users to create webhook subscriptions that post domain event payloads to external URLs when specified events occur.
+
+**Acceptance Criteria:**
+- Webhook fields: url, events (array of event types), secret (for HMAC signature), status (active, paused)
+- Supported events: LeadCaptured, LeadConverted, ContactCreated, ContactUpdated, DealStageChanged, ActivityLogged, CampaignSent
+- Webhook delivery: HTTP POST to configured URL with JSON payload
+- Webhook signature: HMAC-SHA256 of payload body using webhook secret, sent in X-CRM-Signature header
+- Retry policy: 3 attempts with exponential backoff (1s, 5s, 25s)
+- Failed webhooks are logged with failure reason; user can manually retry from UI
+- Webhook delivery logs are retained for 30 days
+
+**Related Use Cases:** UC-012  
+**Related NFRs:** NFR-009 (integration), NFR-010 (reliability)
+
+---
+
+### 2.9 Deduplication and Data Quality
+
+#### FR-026 — Data Import with Field Mapping
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST provide a data import wizard for bulk import of Contacts, Accounts, and Deals from CSV or Excel files with user-defined field mapping.
+
+**Acceptance Criteria:**
+- Supported file formats: CSV, XLS, XLSX (max 10 MB, max 50,000 rows)
+- Import wizard steps: 1) Upload file, 2) Map columns to fields, 3) Preview, 4) Validate, 5) Import
+- User can map columns to standard fields or custom fields
+- Validation rules: required fields, data type checks, foreign key validation (e.g., Account lookup by name)
+- Import creates background job with progress updates
+- Import summary: total rows, success count, error count, skipped count
+- Import errors are downloadable as CSV with row number and error message per row
+
+**Related Use Cases:** UC-013  
+**Related NFRs:** NFR-003 (scalability), NFR-011 (data accuracy)
+
+---
+
+### 2.10 Security and Access Control
+
+#### FR-027 — Role-Based Access Control (RBAC)
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST enforce role-based access control where Users are assigned Roles, and Roles define permissions for each entity and operation.
+
+**Acceptance Criteria:**
+- Default roles: System Admin, Sales Manager, Sales Rep, Marketing Manager, Read-Only User
+- Permissions: Create, Read, Update, Delete, Export for each entity type (Lead, Contact, Account, Deal, Activity, Campaign, etc.)
+- Object-level permissions: "View All" (all records), "View Team" (records owned by user or team members), "View Own" (records owned by user only)
+- Field-level permissions: read-only or hidden for sensitive fields (e.g., Deal.amount hidden from Marketing Manager)
+- Permission checks enforced at API layer and UI layer
+- Permission denial returns HTTP 403 with explanation
+
+**Related Use Cases:** All  
+**Related NFRs:** NFR-007 (security), NFR-001 (multi-tenancy)
+
+---
+
+#### FR-028 — Audit Logging
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST log all create, update, delete, and export operations on core entities to an immutable audit log.
+
+**Acceptance Criteria:**
+- Audit log fields: event_type, entity_type, entity_id, user_id, timestamp, ip_address, user_agent, old_values (JSON), new_values (JSON)
+- Audit log entries are append-only (no updates or deletes)
+- Audit log is queryable via UI (Admin only) and API
+- Audit log retention: minimum 1 year, configurable up to 7 years
+- Audit log export to CSV or JSON for compliance audits
+
+**Related Use Cases:** All  
+**Related NFRs:** NFR-012 (compliance), NFR-007 (security)
+
+---
+
+#### FR-029 — GDPR Data Erasure
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST provide a "Right to be Forgotten" workflow that permanently deletes all personal data for a Contact upon request.
+
+**Acceptance Criteria:**
+- Erasure request initiated by Admin user via UI or API
+- Erasure request creates ErasureRequest record with status "Pending", "In Progress", "Completed", "Failed"
+- Erasure deletes: Contact record, related Activities, email history, Campaign interactions
+- Erasure anonymizes: Audit log entries (replace name/email with "REDACTED"), Deal history (retain deal amount but remove contact association)
+- Erasure completion triggers email confirmation to requester
+- Erasure cannot be undone (irreversible)
+
+**Compliance:** GDPR Article 17 (Right to Erasure)
+
+**Related Use Cases:** UC-014  
+**Related NFRs:** NFR-012 (compliance)
+
+---
+
+#### FR-030 — Data Export (for portability)
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST allow users to export their CRM data (Leads, Contacts, Accounts, Deals, Activities) in CSV or JSON format.
+
+**Acceptance Criteria:**
+- Export UI allows user to select entity type, fields to include, and date range filter
+- Export creates background job with progress tracking
+- Export file is downloadable from UI or sent via email link (expires in 7 days)
+- Export includes all accessible records based on user's role permissions
+- Export file format: CSV (flat), JSON (nested relationships), or Excel (multi-sheet)
+
+**Compliance:** GDPR Article 20 (Right to Data Portability)
+
+**Related Use Cases:** UC-015  
+**Related NFRs:** NFR-012 (compliance), NFR-003 (scalability)
 
 ---
 
 ## 3. Non-Functional Requirements
 
-| ID | Requirement | Category | Acceptance Criteria |
-|---|---|---|---|
-| NFR-001 | API response time at the 95th percentile must be less than 300ms for all read endpoints under a load of 500 concurrent users making 60 requests per minute per user. | Performance | Load tests executed with k6 or Locust must demonstrate P95 < 300ms; P99 < 800ms; error rate < 0.1% under the specified load profile. Degraded response time triggers an automated PagerDuty alert at P95 > 500ms. |
-| NFR-002 | The platform shall maintain 99.9% monthly uptime availability (measured as HTTP 2xx or 3xx response rate from external health-check probes) excluding planned maintenance windows of no more than 4 hours per month. | Availability | Downtime is calculated as minutes in a calendar month with availability < 99.9%; breaching SLA triggers a service credit per the SLA schedule; uptime metrics are published on a public status page updated every 60 seconds. |
-| NFR-003 | All data at rest must be encrypted using AES-256; all data in transit must use TLS 1.3 or higher with forward secrecy; TLS 1.1 and 1.2 are prohibited on all public endpoints. | Security | Annual penetration test must find no critical or high-severity encryption findings; TLS configuration is validated using SSL Labs and must achieve an A+ rating; database encryption is verified via storage-level inspection during security audits. |
-| NFR-004 | The platform shall comply with GDPR Article 17 (Right to Erasure): a verified erasure request must result in the irreversible anonymisation of all personally identifiable data for the subject within 30 calendar days. | Compliance | An erasure request triggers a workflow that anonymises PII across Lead, Contact, Email, Activity, and Campaign member records; the erasure operation is logged in an immutable erasure audit table; post-erasure, search queries must not return the subject's PII; a completion confirmation is sent to the requester. |
-| NFR-005 | The platform shall scale horizontally to support 10,000 concurrently active users without degradation below NFR-001 thresholds, achieved via stateless API servers behind a load balancer and auto-scaling policies on the compute layer. | Scalability | Horizontal scaling is demonstrated in a load test simulating 10,000 concurrent users; the auto-scaling policy triggers within 90 seconds of CPU or request-queue threshold breach; no manual intervention is required for scaling events during normal operating hours. |
-| NFR-006 | The audit log (FR-035) shall be stored in an append-only data store and retained for a minimum of 7 years in compliance with SOX and enterprise data retention policies. | Compliance | Audit records older than 90 days are archived to cold storage (e.g., S3 Glacier) but remain queryable via the audit log API within 60 seconds; no DELETE or UPDATE operations are permitted on the audit log table at the database level (enforced by row-level security); annual retention review confirms no records have been purged before the 7-year threshold. |
-| NFR-007 | The platform shall enforce strict multi-tenant data isolation: no API endpoint, database query, or background job may return or process data belonging to a different tenant, even for system-level operations. | Security | Tenant ID is derived from the authenticated JWT and injected as a mandatory predicate on all database queries via a shared query filter middleware; row-level security policies are enforced at the PostgreSQL level as a defence-in-depth measure; automated cross-tenant isolation tests are run as part of the CI/CD pipeline on every merge to main. |
-| NFR-008 | The platform shall achieve a Recovery Point Objective (RPO) of 1 hour and a Recovery Time Objective (RTO) of 4 hours for a full database loss event. | Reliability | Point-in-time recovery (PITR) backups are taken every 15 minutes; full backups daily; restore drills are conducted quarterly and must demonstrate RTO compliance; backup integrity is verified daily via automated restore-and-checksum validation on a standby environment. |
-| NFR-009 | The web UI shall conform to WCAG 2.1 Level AA accessibility guidelines across all primary user workflows. | Accessibility | Automated axe-core scans must report zero critical accessibility violations on all primary views; manual keyboard navigation testing is conducted quarterly; screen reader compatibility is verified with NVDA (Windows) and VoiceOver (macOS/iOS) for core workflows. |
-| NFR-010 | All user authentication must use OAuth 2.0 with OIDC for SSO integration and support SAML 2.0 as an alternative for enterprise identity providers; internal service-to-service calls must use mTLS with short-lived certificates. | Security | JWT access tokens expire after 15 minutes; refresh tokens expire after 8 hours idle or 30 days absolute; SAML assertions are validated for signature, audience, and expiry; failed authentication attempts are rate-limited and logged; MFA enforcement is configurable per tenant. |
-| NFR-011 | The platform shall enforce per-tenant rate limits of 1,000 API requests per minute for standard tenants and 5,000 requests per minute for enterprise tenants, returning HTTP 429 with a `Retry-After` header when limits are exceeded. | Performance | Rate limiting is implemented at the API gateway layer using a sliding window algorithm; rate limit headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`) are included on every API response; burst allowance of 20% above the per-minute limit is permitted for up to 10 seconds. |
-| NFR-012 | Full-text search across Contact names, email addresses, Account names, and Deal names must return results in under 500ms at the 95th percentile for indexes with up to 10 million records. | Performance | Search is implemented using an Elasticsearch or PostgreSQL `pg_trgm` index; search response time is validated in load tests; index lag must not exceed 30 seconds; search results are scoped to the tenant and the user's object-level permissions. |
-| NFR-013 | Campaign email deliverability must achieve a delivery rate greater than 95% (delivered / (sent - bounced)) as measured over any rolling 30-day period. | Reliability | Dedicated sending IPs are warmed before use; SPF, DKIM, and DMARC records are configured per sending domain; bounce handling automatically suppresses hard-bounced addresses; the system monitors sender reputation via Postmaster Tools integration and alerts the CRM Administrator when the spam rate exceeds 0.1%. |
-| NFR-014 | The web UI shall be fully functional and usable on mobile browsers (iOS Safari 16+, Android Chrome 110+) with a responsive layout that adapts to viewport widths from 320px to 2560px. | Usability | Core workflows (lead qualification, deal stage update, activity logging) are completable on a 375px viewport without horizontal scrolling; touch targets meet the 44x44px minimum size guideline; UI regression tests include mobile viewport snapshots. |
-| NFR-015 | The platform shall maintain backwards-compatible support for API version N-1 (one major version prior to the current release) for a minimum of 12 months following the release of a new major API version. | Maintainability | API version is specified in the URL path (`/api/v1/`, `/api/v2/`); deprecated endpoints return a `Deprecation` header with the sunset date; breaking changes are only introduced in new major versions; the API changelog documents all breaking changes per version; N-1 version tests run in the CI pipeline until the sunset date. |
+### NFR-001 — Multi-Tenancy and Data Isolation
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST enforce strict tenant isolation. No API request or database query may access or return data belonging to a different tenant.
+
+**Acceptance Criteria:**
+- All database tables include tenant_id column (UUID, indexed)
+- All database queries include WHERE tenant_id = :current_tenant_id
+- Tenant context is derived from authenticated user's session
+- Cross-tenant access attempts are logged as security events
+
+**Validation:** Penetration testing with multi-tenant scenarios
+
+---
+
+### NFR-002 — Performance and Latency
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST meet the following performance targets under normal load:
+
+| Operation | Target Latency (p95) | Target Latency (p99) |
+|---|---|---|
+| API read request (single record) | < 200 ms | < 500 ms |
+| API write request (single record) | < 500 ms | < 1 s |
+| List view page load (50 records) | < 1 s | < 2 s |
+| Detail page load (360° view) | < 2 s | < 4 s |
+| Search query (full-text) | < 1 s | < 2 s |
+
+**Acceptance Criteria:**
+- Performance is measured in production-like environment with representative data volume (1M Contacts, 500K Deals)
+- Performance is measured under load (100 concurrent users per tenant)
+
+---
+
+### NFR-003 — Scalability
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST support the following scale targets:
+
+| Metric | Target |
+|---|---|
+| Tenants | 10,000+ |
+| Users per tenant | 1,000+ |
+| Contacts per tenant | 10M+ |
+| Deals per tenant | 5M+ |
+| Activities per tenant | 50M+ |
+| API requests per second (global) | 10,000+ |
+
+**Acceptance Criteria:**
+- Horizontal scaling: system can scale by adding compute and database nodes
+- Database partitioning by tenant_id for large tenants (> 1M contacts)
+- Caching layer (Redis) for frequently accessed data (user sessions, lookup tables)
+
+---
+
+### NFR-004 — Configurability
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST support tenant-level configuration for: custom fields, pipelines, stages, assignment rules, lead scoring rules, territory rules, email templates, and workflow automations.
+
+**Acceptance Criteria:**
+- Configuration changes take effect immediately (no application restart required)
+- Configuration changes are versioned (audit trail of config changes)
+- Configuration can be exported and imported (for migration or backup)
+
+---
+
+### NFR-005 — Availability and Uptime
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST achieve 99.9% uptime (monthly basis), measured as (total minutes - downtime minutes) / total minutes.
+
+**Acceptance Criteria:**
+- Scheduled maintenance windows are excluded from uptime calculation
+- Unplanned downtime is minimized via redundancy and automated failover
+- System status page publicly displays uptime and incident history
+
+---
+
+### NFR-006 — Disaster Recovery
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST support disaster recovery with the following targets:
+
+| Metric | Target |
+|---|---|
+| Recovery Time Objective (RTO) | < 4 hours |
+| Recovery Point Objective (RPO) | < 1 hour |
+
+**Acceptance Criteria:**
+- Automated daily backups of database and file storage
+- Backups are stored in geographically separate region
+- Restore procedure is documented and tested quarterly
+- Database uses continuous replication to standby instance
+
+---
+
+### NFR-007 — Security
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST implement industry-standard security controls:
+
+- Data in transit: TLS 1.3 encryption for all HTTP traffic
+- Data at rest: AES-256 encryption for database and file storage
+- Authentication: OAuth 2.0 with multi-factor authentication (MFA) support
+- Password policy: minimum 12 characters, complexity requirements, bcrypt hashing (cost factor 12)
+- API rate limiting: 100 requests per minute per user, 1000 requests per minute per tenant
+- SQL injection prevention: parameterized queries only
+- XSS prevention: output encoding, Content Security Policy headers
+- CSRF prevention: CSRF tokens for state-changing requests
+
+**Validation:** Annual third-party security audit
+
+---
+
+### NFR-008 — Observability
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST provide comprehensive observability through logs, metrics, and traces.
+
+**Acceptance Criteria:**
+- Structured JSON logs (correlation ID, timestamp, severity, service name, user ID, tenant ID)
+- Metrics: request rate, error rate, latency percentiles (p50, p95, p99), database query duration, queue depth
+- Distributed tracing: OpenTelemetry-compatible trace spans for all API requests
+- Dashboards: service health, API performance, database performance, queue health, error rate trends
+- Alerting: automated alerts for error rate > 1%, latency p99 > 5s, queue depth > 10000
+
+---
+
+### NFR-009 — Integration Compatibility
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST integrate with:
+
+- Email providers: Gmail (via Gmail API), Outlook (via Microsoft Graph API)
+- Calendar providers: Google Calendar, Outlook Calendar
+- Identity providers: Okta, Auth0, Azure AD (via SAML 2.0 or OIDC)
+- Communication tools: Slack, Microsoft Teams (via webhooks and bot APIs)
+- Data warehouses: Snowflake, BigQuery, Redshift (via data export connectors)
+
+**Acceptance Criteria:**
+- Integration setup requires minimal configuration (OAuth flow, API keys)
+- Integration errors are user-visible with actionable error messages
+
+---
+
+### NFR-010 — Reliability and Error Handling
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST handle transient errors gracefully with retries and circuit breakers.
+
+**Acceptance Criteria:**
+- API client errors (4xx) are not retried
+- API server errors (5xx) and network errors are retried up to 3 times with exponential backoff
+- External API calls use circuit breaker pattern (open circuit after 5 consecutive failures, half-open after 60s)
+- Failed background jobs are retried up to 5 times before moving to dead-letter queue
+- User-visible errors include correlation ID for support troubleshooting
+
+---
+
+### NFR-011 — Data Accuracy and Consistency
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST maintain data accuracy and consistency across all operations.
+
+**Acceptance Criteria:**
+- Database transactions use SERIALIZABLE isolation level for financial calculations (forecast rollups, deal amount summations)
+- Optimistic locking for concurrent updates (version field on all mutable entities)
+- Idempotency keys for write operations to prevent duplicate submissions
+- Data validation at API layer, service layer, and database layer (constraints)
+
+---
+
+### NFR-012 — Compliance (GDPR, CAN-SPAM, SOC 2)
+
+**Priority:** P0 (Must Have)  
+**Description:** The system MUST comply with GDPR (data protection), CAN-SPAM (email marketing), and SOC 2 Type II (security and availability) standards.
+
+**Acceptance Criteria:**
+- GDPR: data processing agreement, data erasure workflow (FR-029), data portability (FR-030), consent management, breach notification procedure
+- CAN-SPAM: unsubscribe link in all marketing emails, unsubscribe honored within 10 days, physical address in email footer
+- SOC 2 Type II: annual audit, access controls, encryption, incident response plan, change management process
+
+**Validation:** Annual compliance audits by certified third parties
+
+---
+
+### NFR-013 — Internationalization (i18n)
+
+**Priority:** P2 (Nice to Have)  
+**Description:** The system SHOULD support multiple languages and locales in the UI.
+
+**Acceptance Criteria:**
+- UI text is externalized in language files (English, Spanish, French, German)
+- User can select preferred language in settings
+- Date, time, number, and currency formats respect user's locale
+- Right-to-left (RTL) language support (Arabic, Hebrew)
+
+---
+
+### NFR-014 — Accessibility (WCAG 2.1 Level AA)
+
+**Priority:** P1 (Should Have)  
+**Description:** The system SHOULD comply with WCAG 2.1 Level AA accessibility standards.
+
+**Acceptance Criteria:**
+- All interactive elements are keyboard navigable
+- Color contrast ratio meets minimum 4.5:1 for text
+- Images include alt text
+- Form fields include labels and ARIA attributes
+- Screen reader compatible
+
+**Validation:** Automated accessibility testing (axe-core) and manual testing with screen reader
+
+---
+
+### NFR-015 — Documentation
+
+**Priority:** P1 (Should Have)  
+**Description:** The system MUST include comprehensive documentation for developers, administrators, and end users.
+
+**Acceptance Criteria:**
+- API documentation: OpenAPI 3.0 specification with request/response examples
+- Admin documentation: setup guide, configuration guide, troubleshooting guide
+- User documentation: feature guides, video tutorials, FAQ
+- Developer documentation: architecture overview, code conventions, deployment guide, runbook
+
+---
+
+## 4. Traceability Matrix
+
+| Requirement ID | Requirement Name | Related Use Cases | Related User Stories | Priority |
+|---|---|---|---|---|
+| FR-001 | Lead Capture via Web Form | UC-001 | US-001, US-002 | P0 |
+| FR-002 | Lead Capture via REST API | UC-001 | US-003 | P0 |
+| FR-003 | Lead Bulk Import via CSV | UC-001 | US-004 | P1 |
+| FR-004 | Lead Scoring Engine | UC-002 | US-005, US-006 | P1 |
+| FR-005 | Lead Assignment Rules | UC-002 | US-007 | P0 |
+| FR-006 | Lead Conversion to Contact and Opportunity | UC-003 | US-008, US-009 | P0 |
+| FR-007 | Contact CRUD Operations | UC-004 | US-010, US-011 | P0 |
+| FR-008 | Account CRUD Operations | UC-004 | US-012 | P0 |
+| FR-009 | Contact and Account 360° View | UC-005 | US-013 | P1 |
+| FR-010 | Pipeline Configuration | UC-006 | US-014 | P0 |
+| FR-011 | Deal Creation and Management | UC-006 | US-015, US-016 | P0 |
+| FR-012 | Deal Stage Progression | UC-006 | US-017 | P0 |
+| FR-013 | Deal Forecasting | UC-007 | US-018, US-019 | P1 |
+| FR-014 | Activity Logging | UC-005 | US-020, US-021 | P0 |
+| FR-015 | Email Sync | UC-005 | US-022 | P1 |
+| FR-016 | Calendar Sync | UC-005 | US-023 | P1 |
+| FR-017 | Email Campaign Creation | UC-008 | US-024, US-25 | P1 |
+| FR-018 | Campaign Segment Builder | UC-008 | US-026 | P1 |
+| FR-019 | Campaign Email Tracking | UC-008 | US-027 | P1 |
+| FR-020 | Territory Hierarchy and Assignment | UC-009 | US-028, US-029 | P1 |
+| FR-021 | Revenue Forecast Rollup | UC-007 | US-030 | P1 |
+| FR-022 | Custom Field Definition | UC-010 | US-031, US-032 | P1 |
+| FR-023 | Duplicate Detection and Merge | UC-011 | US-033, US-034 | P1 |
+| FR-024 | REST API with OAuth 2.0 | All | US-035 | P0 |
+| FR-025 | Webhook Subscriptions | UC-012 | US-036 | P1 |
+| FR-026 | Data Import with Field Mapping | UC-013 | US-037 | P1 |
+| FR-027 | Role-Based Access Control | All | US-038, US-39 | P0 |
+| FR-028 | Audit Logging | All | US-040 | P0 |
+| FR-029 | GDPR Data Erasure | UC-014 | US-041 | P0 |
+| FR-030 | Data Export | UC-015 | US-042 | P1 |
+
+---
+
+**Total Functional Requirements:** 30  
+**Total Non-Functional Requirements:** 15  
+**Total Requirements:** 45
+
+---
+
+*This document is maintained by the Product Management team. All requirement changes must be reviewed and approved by stakeholders before implementation.*
