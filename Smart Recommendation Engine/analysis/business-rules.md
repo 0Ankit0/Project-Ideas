@@ -16,7 +16,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 The Smart Recommendation Engine operates under a strict set of enforceable business rules that govern every phase of the recommendation lifecycle — from real-time request serving and model promotion to experiment management, fairness auditing, and GDPR compliance. These rules are not advisory guidelines; they are machine-enforced constraints embedded in the API gateway, model registry, feature store, A/B service, and the training pipeline.
 
@@ -34,7 +34,7 @@ Rules are grouped into five categories:
 
 ---
 
-## 2. Enforceable Rules
+## Enforceable Rules
 
 ---
 
@@ -569,7 +569,7 @@ assign_user_to_experiment(user_id, experiment):
 
 ---
 
-## 3. Rule Evaluation Pipeline
+## Rule Evaluation Pipeline
 
 Every incoming recommendation request passes through a deterministic evaluation pipeline before a response is generated. The pipeline is structured as a series of gates: early gates are fast and cheap (auth, cache lookup), later gates involve heavier computation (model inference, diversity re-ranking).
 
@@ -627,7 +627,7 @@ flowchart TD
 
 ---
 
-## 4. Exception and Override Handling
+## Exception and Override Handling
 
 ### 4.1 Override Governance Matrix
 
@@ -686,7 +686,7 @@ Audit logs are **immutable** (append-only) and retained for **7 years** in compl
 
 ---
 
-## 5. Traceability Table
+## Traceability Table
 
 | Rule ID | Rule Name | Related Use Cases | Related FRs | Enforcer Service | Business Justification |
 |---|---|---|---|---|---|

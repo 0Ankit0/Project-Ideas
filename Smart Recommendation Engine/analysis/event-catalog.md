@@ -16,7 +16,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 The Smart Recommendation Engine is built on an event-driven architecture where every significant state change in the system is expressed as a durable, versioned domain event. This catalog is the authoritative reference for all events produced and consumed by platform services. It defines the schema, delivery semantics, topic routing, idempotency strategy, and SLOs for every event.
 
@@ -26,7 +26,7 @@ The Smart Recommendation Engine is built on an event-driven architecture where e
 
 ---
 
-## 2. Contract Conventions
+## Contract Conventions
 
 ### 2.1 Event Naming Convention
 
@@ -112,7 +112,7 @@ Examples:
 
 ---
 
-## 3. Domain Events
+## Domain Events
 
 ---
 
@@ -613,7 +613,7 @@ Examples:
 
 ---
 
-## 4. Publish and Consumption Sequence
+## Publish and Consumption Sequence
 
 The following sequence diagram illustrates the complete event flow for a real-time recommendation request that triggers multiple downstream events — from initial request receipt through model serving, interaction recording, A/B attribution, and an eventual fairness check.
 
@@ -699,7 +699,7 @@ sequenceDiagram
 
 ---
 
-## 5. Operational SLOs
+## Operational SLOs
 
 ### 5.1 Event Delivery SLOs
 

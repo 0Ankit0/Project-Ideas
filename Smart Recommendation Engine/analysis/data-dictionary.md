@@ -16,7 +16,7 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This data dictionary is the canonical reference for all persistent data structures in the Smart Recommendation Engine platform. Every attribute is defined with its semantic type, nullability, validation constraints, and owning service. Teams must refer to this dictionary when building new API endpoints, analytics queries, ML feature pipelines, or data migrations.
 
@@ -34,7 +34,7 @@ This data dictionary is the canonical reference for all persistent data structur
 
 ---
 
-## 2. Core Entities
+## Core Entities
 
 ---
 
@@ -570,7 +570,7 @@ This data dictionary is the canonical reference for all persistent data structur
 
 ---
 
-## 3. Canonical Relationship Diagram
+## Canonical Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -623,7 +623,7 @@ erDiagram
 
 ---
 
-## 4. Data Quality Controls
+## Data Quality Controls
 
 ### 4.1 Write-Path Validation
 
@@ -680,7 +680,7 @@ Before publishing a `FeatureVectorUpdated` event or triggering a training pipeli
 
 ---
 
-## 5. Retention and PII Classification
+## Retention and PII Classification
 
 ### 5.1 Retention Policy Summary
 
