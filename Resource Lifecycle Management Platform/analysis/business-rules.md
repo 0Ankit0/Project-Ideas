@@ -10,7 +10,7 @@ This document defines all enforceable policy and process rules for the **Resourc
 
 ---
 
-## Enforceable Business Rules
+## Enforceable Rules
 
 | Rule ID | Category | Rule | Enforcement Point |
 |---|---|---|---|
@@ -85,3 +85,14 @@ flowchart TD
 - State machine: [../detailed-design/state-machine-diagrams.md](../detailed-design/state-machine-diagrams.md)
 - Lifecycle orchestration: [../detailed-design/lifecycle-orchestration.md](../detailed-design/lifecycle-orchestration.md)
 - Edge cases: [../edge-cases/README.md](../edge-cases/README.md)
+
+## Enforced Rule Summary
+
+1. Resources cannot be reserved beyond their maximum concurrent allocation limit defined per resource type.
+2. Booking conflicts are resolved by priority tier; lower-priority reservations are automatically waitlisted.
+3. Resource check-out must be confirmed within 15 minutes of scheduled time; unconfirmed bookings are released.
+4. Maintenance windows block all reservations for the affected resource; existing bookings are notified immediately.
+5. Resources with utilisation below 20% over 90 days are flagged for decommission review.
+6. Allocation requests above defined thresholds require manager approval before confirmation is issued.
+7. Resource state transitions (available→reserved→in-use→maintenance) follow strict workflow with audit logging.
+8. Expired resources trigger automatic end-of-life workflow; active allocations are migrated to replacement resources.

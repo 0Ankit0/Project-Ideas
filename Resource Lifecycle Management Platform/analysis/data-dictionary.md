@@ -177,3 +177,64 @@ Immutable log entry for every state-changing operation.
 - ERD with table relationships: [../detailed-design/erd-database-schema.md](../detailed-design/erd-database-schema.md)
 - Event payload schemas: [event-catalog.md](./event-catalog.md)
 - API request/response schemas: [../detailed-design/api-design.md](../detailed-design/api-design.md)
+
+## Canonical Relationship Diagram
+
+```mermaid
+erDiagram
+    RESOURCE_PROFILE ||--o{ RESOURCE_INSTANCE : "defines"
+    RESOURCE_INSTANCE ||--o{ ALLOCATION : "fulfills"
+    ALLOCATION }o--|| REQUESTER : "requested by"
+    RESOURCE_INSTANCE ||--o{ MAINTENANCE_WINDOW : "scheduled for"
+    RESOURCE_INSTANCE ||--o{ LIFECYCLE_EVENT : "emits"
+    ALLOCATION ||--o{ BILLING_RECORD : "generates"
+    RESOURCE_PROFILE }o--|| CATEGORY : "belongs to"
+
+    RESOURCE_PROFILE {
+        uuid id PK
+        string name
+        string category
+        int max_concurrent_allocations
+        json cost_model
+        string lifecycle_policy
+    }
+
+    RESOURCE_INSTANCE {
+        uuid id PK
+        uuid profile_id FK
+        string serial_number
+        string status
+        string location
+        timestamptz commissioned_at
+        timestamptz decommissioned_at
+    }
+
+    ALLOCATION {
+        uuid id PK
+        uuid resource_instance_id FK
+        uuid requester_id FK
+        timestamptz start_at
+        timestamptz end_at
+        string status
+        string return_condition
+    }
+
+    REQUESTER {
+        uuid id PK
+        string name
+        string department
+        string tier
+        int allocation_limit
+    }
+```
+
+## Data Quality Controls
+
+| Control | Description | Enforcement Point |
+|---|---|---|
+| Resource status consistency | Instance status must match active allocation count | Database trigger + daily reconciliation job |
+| Allocation overlap prevention | No two active allocations for same exclusive resource | Unique constraint + row-level lock |
+| Lifecycle event completeness | All state transitions must produce an event record | Application-level validation before commit |
+| Cost model validation | Cost model JSON must match schema on profile update | JSON Schema validation at API layer |
+| Decommission safety check | Instance cannot be decommissioned with active allocations | Pre-condition check in LifecycleService |
+| Audit trail immutability | Lifecycle event records are append-only; no updates allowed | Database role permissions + application constraint |

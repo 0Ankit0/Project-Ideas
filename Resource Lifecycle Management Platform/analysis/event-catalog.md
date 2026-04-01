@@ -1,3 +1,29 @@
+## Contract Conventions
+
+All events follow the CloudEvents 1.0 specification with the following envelope:
+- `specversion`: "1.0"
+- `type`: `rlmp.{domain}.{event_name}` (lowercase, dot-separated)
+- `source`: `/services/{service-name}`
+- `id`: UUID v4 (unique per event instance)
+- `time`: ISO 8601 UTC timestamp
+- `datacontenttype`: "application/json"
+- `data`: domain-specific payload (schema versioned)
+
+Retry policy: 3 attempts with exponential backoff (1s, 4s, 16s) before DLQ.
+
+## Domain Events
+
+| Event | Producer | Consumer(s) | Trigger | Key Payload |
+|---|---|---|---|---|
+| `rlmp.resource.provisioned` | ProvisioningService | BillingService, AuditWriter | New resource instance created | `resource_id`, `profile_id`, `location`, `commissioned_at` |
+| `rlmp.resource.decommissioned` | LifecycleService | BillingService, AuditWriter | Resource end-of-life reached | `resource_id`, `reason`, `decommissioned_at` |
+| `rlmp.allocation.created` | AllocationService | BillingService, NotificationService | Reservation confirmed | `allocation_id`, `resource_id`, `requester_id`, `start_at`, `end_at` |
+| `rlmp.allocation.returned` | AllocationService | BillingService, InventoryService | Resource returned | `allocation_id`, `resource_id`, `return_condition`, `returned_at` |
+| `rlmp.allocation.overdue` | SchedulerService | NotificationService, EscalationService | Return deadline passed | `allocation_id`, `resource_id`, `requester_id`, `overdue_since` |
+| `rlmp.maintenance.scheduled` | MaintenanceService | AllocationService, NotificationService | Maintenance window created | `resource_id`, `window_start`, `window_end`, `maintenance_type` |
+| `rlmp.incident.raised` | MonitoringService | EscalationService, AuditWriter | Resource incident detected | `resource_id`, `incident_type`, `severity`, `detected_at` |
+| `rlmp.billing.finalized` | BillingService | FinanceSystem, AuditWriter | Billing period closed | `allocation_id`, `amount`, `currency`, `period_end` |
+
 # Event Catalog
 
 All domain events emitted by the **Resource Lifecycle Management Platform**. Each event is versioned, schema-validated, and published via the transactional outbox to the platform event bus. Consumers subscribe by event type and tenant.
@@ -128,3 +154,43 @@ All events share a common envelope:
 - Event envelope schema details: [data-dictionary.md](./data-dictionary.md)
 - State transitions that emit events: [../detailed-design/state-machine-diagrams.md](../detailed-design/state-machine-diagrams.md)
 - Outbox pattern implementation: [../detailed-design/lifecycle-orchestration.md](../detailed-design/lifecycle-orchestration.md)
+
+## Publish and Consumption Sequence
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant APIGateway
+    participant LifecycleService
+    participant EventBus
+    participant AllocationService
+    participant BillingService
+    participant NotificationService
+
+    Client->>APIGateway: POST /resources/{id}/allocate
+    APIGateway->>LifecycleService: Process allocation request
+    LifecycleService->>EventBus: publish ResourceAllocated
+    EventBus->>BillingService: start billing period
+    EventBus->>NotificationService: notify requester
+    EventBus->>AllocationService: update availability map
+
+    Note over LifecycleService: Allocation confirmed
+
+    Client->>APIGateway: POST /allocations/{id}/return
+    LifecycleService->>EventBus: publish ResourceReturned
+    EventBus->>BillingService: finalize billing period
+    EventBus->>NotificationService: confirm return receipt
+    EventBus->>AllocationService: restore availability
+
+    Note over EventBus: All events delivered<br/>within SLA window
+```
+
+## Operational SLOs
+
+| Event Type | Max publish latency | Consumer max lag | Availability SLO |
+|---|---|---|---|
+| Allocation events | 500ms | 2s | 99.9% |
+| Overdue detection | 10min from breach | 60s | 99.5% |
+| Maintenance window | 1s from creation | 5s | 99.9% |
+| Billing events | 30s from return | 10s | 99.9% |
+| Audit events | 1s from action | 5s | 99.99% |
