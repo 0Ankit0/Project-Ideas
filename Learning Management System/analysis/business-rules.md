@@ -16,13 +16,13 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This document defines the enforceable business rules governing the Learning Management System. These rules are platform-level invariants — they apply across all tenants and cannot be overridden by individual course or cohort configuration unless explicitly noted. Rules are evaluated at specific pipeline stages (enrollment, assessment, grading, certificate issuance) and are enforced by designated services.
 
 ---
 
-## 2. Rule Evaluation Pipeline
+## Rule Evaluation Pipeline
 
 ```mermaid
 flowchart TD
@@ -80,7 +80,7 @@ flowchart TD
 
 ---
 
-## 3. Enforceable Rules
+## Enforceable Rules
 
 ---
 
@@ -490,7 +490,7 @@ function evaluateCompletion(enrollment_id, course_version_id, tenant_id): Comple
 
 ---
 
-## 4. Exception and Override Handling
+## Exception and Override Handling
 
 All exceptions to the above rules MUST follow this protocol:
 
@@ -502,7 +502,7 @@ All exceptions to the above rules MUST follow this protocol:
 
 ---
 
-## 5. Traceability Table
+## Traceability Table
 
 | Rule ID | Rule Name | Category | Enforcer Service | Related Entities | Override Allowed |
 |---------|-----------|----------|-----------------|-----------------|-----------------|

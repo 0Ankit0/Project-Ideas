@@ -19,13 +19,13 @@
 
 ---
 
-## 1. Overview
+## Overview
 
 This data dictionary is the canonical reference for the Learning Management System database schema. It defines all core entities, their fields, relationships, constraints, and data governance controls. All teams (backend, frontend, analytics, operations) must treat this document as the authoritative source for entity semantics and field-level contracts.
 
 ---
 
-## 2. Core Entities
+## Core Entities
 
 ---
 
@@ -297,7 +297,7 @@ Append-only record of all state-changing operations. No `UPDATE` or `DELETE` pri
 
 ---
 
-## 3. Canonical Relationship Diagram
+## Canonical Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -329,7 +329,7 @@ erDiagram
 
 ---
 
-## 4. Index Definitions
+## Index Definitions
 
 ```sql
 -- tenants
@@ -384,7 +384,7 @@ CREATE INDEX idx_audit_occurred        ON audit_logs(occurred_at);
 
 ---
 
-## 5. Foreign Key Relationships
+## Foreign Key Relationships
 
 | Child Table | Child Column | Parent Table | Parent Column | On Delete |
 |-------------|-------------|--------------|--------------|-----------|
@@ -424,7 +424,7 @@ CREATE INDEX idx_audit_occurred        ON audit_logs(occurred_at);
 
 ---
 
-## 6. Data Quality Controls
+## Data Quality Controls
 
 1. **Required-field validation**: All NOT NULL constraints are enforced at the database layer in addition to application-layer validation. Application validation is first-line; DB constraints are the safety net.
 2. **Controlled vocabularies**: All `status`, `role`, `state`, `type`, and `policy` fields use `CHECK` constraints with explicit allowed values. Unknown values are rejected at the database; no silent coercion.
@@ -438,7 +438,7 @@ CREATE INDEX idx_audit_occurred        ON audit_logs(occurred_at);
 
 ---
 
-## 7. Data Classification
+## Data Classification
 
 | Table | Column | Classification | Notes |
 |-------|--------|----------------|-------|
@@ -459,7 +459,7 @@ CREATE INDEX idx_audit_occurred        ON audit_logs(occurred_at);
 
 ---
 
-## 8. Retention Policies
+## Retention Policies
 
 | Table | Online Retention | Archive Tier | Hard Delete |
 |-------|-----------------|--------------|-------------|
