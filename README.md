@@ -4,47 +4,82 @@ This repository contains production-grade project blueprints with end-to-end doc
 
 ## Included Projects
 
-- Anomaly Detection System
-- Backend as a Service Platform
-- Content Management System
+### Core Business & Enterprise
+
 - Customer Relationship Management Platform
-- Subscription Billing and Entitlements Platform
-- Payment Orchestration and Wallet Platform
-- Warehouse Management System
-- Hospital Information System
-- Customer Support and Contact Center Platform
-- Identity and Access Management Platform
-- Messaging and Notification Platform
-- Document Intelligence System
-- E-Commerce Platform
 - Employee Management System
 - Finance Management Platform
-- Healthcare Appointment System
-- Learning Management System
-- Library Management System
-- Logistics Tracking System
-- Rental Management System
-- Resource Lifecycle Management Platform
-- Restaurant Management System
-- Slot Booking System
-- Smart Recommendation Engine
-- Student Information System
-- Ticketing and Project Management System
-- Fleet Management System
-- Real Estate Management System
-- Job Board and Recruitment Platform
-- Event Management and Ticketing Platform
-- Insurance Management System
-- IoT Device Management Platform
-- Supply Chain Management Platform
-- Social Networking Platform
-- Digital Banking Platform
-- Video Streaming Platform
-- Hotel Property Management System
-- Telemedicine Platform
-- Manufacturing Execution System
 - Legal Case Management System
+- Insurance Management System
+- Resource Lifecycle Management Platform
+- Ticketing and Project Management System
+
+### Education & Knowledge
+
+- Education Management Information System (EMIS)
+- Learning Management System
+- Student Information System
+- Knowledge Base Platform
+
+### Healthcare & Wellness
+
+- Healthcare Appointment System
+- Hospital Information System
+- Telemedicine Platform
+
+### E-Commerce & Retail
+
+- E-Commerce Platform
+- Restaurant Management System
+- Rental Management System
+- Slot Booking System
+
+### Finance & Payments
+
+- Digital Banking Platform
+- Payment Orchestration and Wallet Platform
+- Subscription Billing and Entitlements Platform
+
+### Supply Chain & Operations
+
+- Warehouse Management System
+- Supply Chain Management Platform
+- Logistics Tracking System
+- Fleet Management System
+- Manufacturing Execution System
+- Inventory Management (see Warehouse Management System)
+
+### Real Estate & Hospitality
+
+- Real Estate Management System
+- Hotel Property Management System
+
+### Technology Platforms
+
+- API Gateway and Developer Portal
 - Application Hosting Platform
+- Backend as a Service Platform
+- Identity and Access Management Platform
+- Messaging and Notification Platform
+- Anomaly Detection System
+- Smart Recommendation Engine
+- Document Intelligence System
+- IoT Device Management Platform
+- Video Streaming Platform
+
+### Customer & Community
+
+- Customer Support and Contact Center Platform
+- Social Networking Platform
+- Survey and Feedback Platform
+- Event Management and Ticketing Platform
+- Job Board and Recruitment Platform
+
+### Infrastructure & Content
+
+- Content Management System
+- Library Management System
+- Government Services Portal
 
 ## Documentation Completeness Guarantee
 
