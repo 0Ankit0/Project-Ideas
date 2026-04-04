@@ -68,6 +68,13 @@ Examples:
 | `admissions.application.rejected.v1` | `application_id, applicant_user_id, rejection_reason_code` | notifications (rejection email) |
 | `admissions.merit_list.published.v1` | `merit_list_id, program_id, intake_year, total_candidates, published_by_id` | notifications (bulk email to shortlisted candidates), analytics |
 | `admissions.enrollment.initiated.v1` | `student_id, user_id, program_id, batch, enrollment_date` | students app (profile creation), users app (portal access activation), finance app (initial invoice generation) |
+| `admissions.cycle.published.v1` | `cycle_id, program_id, open_date, close_date, seat_limit, published_by_id` | student portal (display open admissions), notifications (announcement to prospective students), analytics |
+| `admissions.cycle.closed.v1` | `cycle_id, program_id, total_applications_received, closed_by_id` | student portal (remove from active admissions), notifications, analytics |
+| `admissions.entrance_exam.scheduled.v1` | `exam_id, cycle_id, exam_date, start_time, venue_count, applicant_count` | notifications (exam schedule email to applicants), calendar app |
+| `admissions.entrance_exam.completed.v1` | `exam_id, cycle_id, total_applicants, scores_finalized, average_score` | merit list generation task, analytics, notifications (results available) |
+| `admissions.merit_list.generated.v1` | `merit_list_id, cycle_id, total_ranked, cutoff_score, generated_by_id` | admin dashboard, analytics |
+| `admissions.scholarship.auto_awarded.v1` | `merit_list_id, scholarship_program_id, awards_count, total_amount, top_n_students` | finance (create scholarship ledger entries), notifications (award emails to students), analytics |
+| `admissions.applicant.converted_to_student.v1` | `application_id, student_id, user_id, program_id, semester_id, classroom_id, converted_by_id, enrollment_type` | students app (profile creation), users app (portal access activation), finance app (initial invoice generation), notifications (welcome email) |
 
 ---
 
@@ -84,6 +91,11 @@ Examples:
 | `academic.attendance.threshold_breached.v1` | `student_id, section_id, attendance_percentage, threshold, breach_type (WARNING/HOLD)` | notifications (student warning email), academic hold service |
 | `academic.timetable.published.v1` | `semester_id, published_by_id, sections_count, published_at` | notifications (bulk email to students and faculty), portal (timetable update), calendar app |
 | `academic.exam.scheduled.v1` | `exam_id, section_id, scheduled_date, start_time, hall_id, published_at` | notifications (exam schedule email), calendar app |
+| `enrollment.semester_progression.assigned.v1` | `student_id, from_semester_id, target_semester_id, classroom_id, is_repeat, assigned_by_id` | finance (generate next semester invoice), notifications (enrollment confirmation), timetable, student portal |
+| `enrollment.semester.repeated.v1` | `student_id, enrollment_id, repeat_of_semester_number, target_semester_id, classroom_id, reason` | academic standing (flag repeat), notifications (repeat notification to student and advisor), analytics |
+| `enrollment.classroom.assigned.v1` | `student_id, classroom_id, semester_id, assigned_by_id` | timetable (update student schedule), notifications (classroom assignment email), student portal |
+| `course.faculty.assigned_to_classroom.v1` | `faculty_id, subject_id, classroom_id, semester_id, assigned_by_id` | timetable (generate/update schedule), notifications (assignment notification to faculty), faculty portal |
+| `course.faculty.load_exceeded_warning.v1` | `faculty_id, current_credits, max_credits, department_id` | department head (review assignment), notifications (warning to admin), analytics |
 
 ---
 
@@ -201,6 +213,115 @@ sequenceDiagram
 - `finance.invoice.payment_received.v1` — triggers receipt generation and hold release
 - `academic.grade.published.v1` — triggers GPA recalculation and student notification
 - `hr.payroll.processed.v1` — triggers payslip generation
+
+---
+
+### 2.7 Academic Session Events
+
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `session.academic_year.activated.v1` | `academic_year_id`, `name`, `start_date`, `end_date` | All modules, Calendar |
+| `session.semester.status_changed.v1` | `semester_id`, `old_status`, `new_status`, `academic_year_id` | Enrollment, Finance, LMS, Notifications |
+| `session.semester.registration_opened.v1` | `semester_id`, `registration_start`, `registration_end` | Student Portal, Notifications, Enrollment |
+| `session.semester.closed.v1` | `semester_id`, `academic_year_id` | Grades, Standing, Finance, Analytics |
+| `session.blackout_period.started.v1` | `period_type`, `start_date`, `end_date`, `blocked_operations` | All modules |
+| `session.course_offering.published.v1` | `semester_id`, `course_count`, `section_count` | Student Portal, Enrollment |
+
+---
+
+### 2.8 Graduation Events
+
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `graduation.application.submitted.v1` | `application_id`, `student_id`, `program_id` | Registrar, Degree Audit |
+| `graduation.audit.completed.v1` | `audit_id`, `student_id`, `status` (PASSED/FAILED), `missing_requirements` | Graduation Workflow, Notifications |
+| `graduation.application.approved.v1` | `application_id`, `student_id`, `honors_classification` | Finance (clearance), Diploma Gen, Notifications |
+| `graduation.degree.conferred.v1` | `student_id`, `diploma_number`, `program_id`, `honors`, `conferred_at` | Alumni, Transcript, Notifications, Analytics |
+| `graduation.diploma.generated.v1` | `diploma_number`, `student_id`, `file_id` | Notifications, Student Portal |
+| `graduation.degree.revoked.v1` | `student_id`, `diploma_number`, `reason`, `revoked_by_id` | All modules, Legal, Audit |
+
+---
+
+### 2.9 Discipline Events
+
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `discipline.case.created.v1` | `case_id`, `student_id`, `severity`, `violation_category` | Discipline Committee, Notifications |
+| `discipline.hearing.scheduled.v1` | `case_id`, `hearing_date`, `panel_members` | Notifications, Calendar |
+| `discipline.decision.issued.v1` | `case_id`, `student_id`, `sanction`, `appeal_deadline` | Enrollment (holds), Notifications, Audit |
+| `discipline.appeal.submitted.v1` | `appeal_id`, `case_id`, `student_id`, `grounds` | Appeals Board, Notifications |
+| `discipline.appeal.decided.v1` | `appeal_id`, `case_id`, `outcome`, `modified_sanction` | Enrollment, Notifications, Audit |
+| `discipline.sanction.enforced.v1` | `case_id`, `student_id`, `sanction_type`, `effective_date` | Enrollment, Access Control, Finance |
+| `discipline.record.sealed.v1` | `case_id`, `student_id`, `sealed_at` | Audit (internal only) |
+
+---
+
+### 2.10 Academic Standing Events
+
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `standing.determined.v1` | `student_id`, `semester_id`, `standing`, `semester_gpa`, `cgpa` | Student Portal, Notifications, Advisor |
+| `standing.probation.applied.v1` | `student_id`, `semester_id`, `restrictions` | Enrollment (credit limit), Advisor, Notifications |
+| `standing.suspension.applied.v1` | `student_id`, `effective_date`, `return_eligible_date` | Enrollment (block), Notifications, Access Control |
+| `standing.deans_list.awarded.v1` | `student_id`, `semester_id`, `semester_gpa` | Notifications, Analytics, Student Portal |
+| `standing.improvement_plan.created.v1` | `student_id`, `plan_details`, `advisor_id` | Advisor, Student Portal |
+
+---
+
+### 2.11 Grade Appeal Events
+
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `appeal.grade.submitted.v1` | `appeal_id`, `student_id`, `enrollment_id`, `original_grade` | Faculty, Notifications |
+| `appeal.grade.escalated.v1` | `appeal_id`, `from_level`, `to_level`, `reason` | Next-level reviewer, Notifications |
+| `appeal.grade.resolved.v1` | `appeal_id`, `student_id`, `outcome`, `new_grade` | Grades (recalculate GPA), Notifications, Audit |
+
+---
+
+### 2.12 Recruitment Events
+
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `recruitment.posting.published.v1` | `posting_id`, `department_id`, `title`, `deadline` | Career Portal, Notifications |
+| `recruitment.application.received.v1` | `application_id`, `posting_id`, `applicant_email` | HR, Auto-Screening |
+| `recruitment.application.screened.v1` | `application_id`, `screening_passed`, `score` | HR Dashboard |
+| `recruitment.interview.scheduled.v1` | `application_id`, `interview_date`, `panel_members` | Notifications, Calendar, Room Booking |
+| `recruitment.offer.extended.v1` | `application_id`, `offer_details`, `deadline` | Notifications, HR |
+| `recruitment.candidate.hired.v1` | `application_id`, `employee_id`, `joining_date` | HR Onboarding, IT (account creation), Payroll |
+| `recruitment.posting.closed.v1` | `posting_id`, `total_applications`, `hired_count` | Analytics, HR |
+
+---
+
+### 2.13 Transfer Credit Events
+
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `transfer.credit.submitted.v1` | `transfer_id`, `student_id`, `source_institution` | Registrar, Notifications |
+| `transfer.credit.evaluated.v1` | `transfer_id`, `status`, `credits_awarded` | Degree Audit, Student Portal, Notifications |
+| `transfer.credit.appealed.v1` | `transfer_id`, `student_id`, `appeal_reason` | Registrar, Notifications |
+
+---
+
+### 2.14 Scholarship Events
+
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `scholarship.application.submitted.v1` | `award_id`, `student_id`, `scholarship_id` | Financial Aid Office, Notifications |
+| `scholarship.awarded.v1` | `award_id`, `student_id`, `amount`, `scholarship_name` | Finance (invoice adjustment), Notifications, Student Portal |
+| `scholarship.disbursed.v1` | `award_id`, `student_id`, `amount`, `method` | Finance, Notifications |
+| `scholarship.renewal.warning.v1` | `award_id`, `student_id`, `reason` | Student Portal, Notifications, Advisor |
+| `scholarship.revoked.v1` | `award_id`, `student_id`, `reason`, `effective_date` | Finance (reverse adjustment), Notifications |
+| `scholarship.fund.depleted.v1` | `scholarship_id`, `fund_total`, `fund_utilized` | Financial Aid Admin, Notifications |
+
+---
+
+### 2.15 Facility Events
+
+| Event Name | Payload Highlights | Typical Consumers |
+|---|---|---|
+| `facility.room.booked.v1` | `booking_id`, `room_id`, `date`, `start_time`, `end_time` | Calendar, Notifications |
+| `facility.booking.cancelled.v1` | `booking_id`, `room_id`, `cancelled_by_id` | Calendar, Notifications |
+| `facility.maintenance.scheduled.v1` | `room_id`, `start_date`, `end_date` | Timetable (reschedule), Notifications |
 
 ---
 
