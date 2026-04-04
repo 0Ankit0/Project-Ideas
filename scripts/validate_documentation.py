@@ -103,6 +103,7 @@ QUALITY_ENFORCED_PROJECTS = {
     "Legal Case Management System",
     # New projects — wave 3
     "Application Hosting Platform",
+    "Order Management and Delivery System",
 }
 
 SINGULAR_TEMPLATE = {
@@ -813,6 +814,19 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "scaling-and-resource-limits.md",
             "build-pipeline-errors.md",
             "custom-domains-and-ssl.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Order Management and Delivery System": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "order-lifecycle-and-payment.md",
+            "inventory-and-fulfillment.md",
+            "delivery-and-proof.md",
+            "returns-and-refunds.md",
             "api-and-ui.md",
             "security-and-compliance.md",
             "operations.md",
