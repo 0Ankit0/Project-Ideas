@@ -502,3 +502,709 @@ classDiagram
     PaymentTransaction "1" --> "0..1" Refund : may have
     Scholarship "many" --> "many" FeeInvoice : applied to
 ```
+
+---
+
+### Graduation & Degree Management
+
+```mermaid
+classDiagram
+    class GraduationApplication {
+        +UUID id
+        +str application_number
+        +UUID student_id
+        +UUID program_id
+        +date expected_graduation_date
+        +GraduationStatus status
+        +UUID degree_audit_id
+        +HonorsClassification honors_classification
+        +str diploma_number
+        +datetime applied_at
+        +UUID approved_by_id
+        +datetime conferred_at
+        +str rejection_reason
+        +submit() GraduationApplication
+        +run_audit() DegreeAudit
+        +approve(approver_id: UUID) None
+        +reject(reason: str) None
+        +confer_degree() None
+    }
+
+    class DegreeAudit {
+        +UUID id
+        +UUID student_id
+        +UUID program_id
+        +AuditType audit_type
+        +AuditStatus status
+        +int total_credits_required
+        +int total_credits_completed
+        +int total_credits_transferred
+        +bool required_courses_met
+        +bool elective_credits_met
+        +bool cgpa_requirement_met
+        +bool residency_requirement_met
+        +bool holds_cleared
+        +list missing_requirements
+        +run_audit() AuditStatus
+        +check_credits() bool
+        +check_courses() bool
+        +check_gpa() bool
+        +check_residency() bool
+        +check_holds() bool
+    }
+
+    class GraduationStatus {
+        <<enumeration>>
+        SUBMITTED
+        UNDER_REVIEW
+        AUDIT_PASSED
+        AUDIT_FAILED
+        APPROVED
+        REJECTED
+        CONFERRED
+    }
+
+    class HonorsClassification {
+        <<enumeration>>
+        SUMMA_CUM_LAUDE
+        MAGNA_CUM_LAUDE
+        CUM_LAUDE
+        NONE
+    }
+
+    GraduationApplication --> GraduationStatus
+    GraduationApplication --> HonorsClassification
+    GraduationApplication "1" --> "1" DegreeAudit : linked to
+```
+
+### Student Discipline
+
+```mermaid
+classDiagram
+    class DisciplinaryCase {
+        +UUID id
+        +str case_number
+        +UUID student_id
+        +UUID reported_by_id
+        +date incident_date
+        +ViolationCategory violation_category
+        +Severity severity
+        +CaseStatus status
+        +str description
+        +list evidence_file_ids
+        +UUID assigned_committee_id
+        +Sanction sanction
+        +dict sanction_details
+        +date decision_date
+        +str decision_rationale
+        +date appeal_deadline
+        +bool is_sealed
+        +create_case() DisciplinaryCase
+        +assign_committee(committee_id: UUID) None
+        +schedule_hearing(date: date, panel: list) None
+        +issue_decision(sanction: Sanction, rationale: str) None
+        +enforce_sanction() None
+        +seal_record() None
+    }
+
+    class DisciplinaryAppeal {
+        +UUID id
+        +UUID case_id
+        +UUID student_id
+        +AppealGrounds grounds
+        +str appeal_statement
+        +list evidence_file_ids
+        +AppealStatus status
+        +AppealOutcome outcome
+        +Sanction modified_sanction
+        +str decision_rationale
+        +UUID decided_by_id
+        +submit() DisciplinaryAppeal
+        +decide(outcome: AppealOutcome) None
+    }
+
+    class ViolationCategory {
+        <<enumeration>>
+        ACADEMIC_INTEGRITY
+        MISCONDUCT
+        HARASSMENT
+        PROPERTY_DAMAGE
+        SUBSTANCE_ABUSE
+        OTHER
+    }
+
+    class Severity {
+        <<enumeration>>
+        MINOR
+        MAJOR
+        SEVERE
+    }
+
+    class Sanction {
+        <<enumeration>>
+        WARNING
+        PROBATION
+        SUSPENSION
+        EXPULSION
+        FINE
+        COMMUNITY_SERVICE
+    }
+
+    class CaseStatus {
+        <<enumeration>>
+        REPORTED
+        UNDER_INVESTIGATION
+        HEARING_SCHEDULED
+        HEARING_COMPLETED
+        DECISION_ISSUED
+        APPEALED
+        APPEAL_DECIDED
+        CLOSED
+    }
+
+    DisciplinaryCase --> ViolationCategory
+    DisciplinaryCase --> Severity
+    DisciplinaryCase --> Sanction
+    DisciplinaryCase --> CaseStatus
+    DisciplinaryCase "1" --> "0..1" DisciplinaryAppeal : may have
+    DisciplinaryAppeal --> AppealOutcome
+```
+
+### Academic Standing
+
+```mermaid
+classDiagram
+    class AcademicStanding {
+        +UUID id
+        +UUID student_id
+        +UUID semester_id
+        +Decimal semester_gpa
+        +Decimal cumulative_gpa
+        +StandingLevel standing
+        +StandingLevel previous_standing
+        +bool deans_list
+        +int credit_hours_attempted
+        +int credit_hours_earned
+        +dict restrictions
+        +datetime determined_at
+        +determine_standing() StandingLevel
+        +check_deans_list() bool
+        +apply_restrictions() None
+    }
+
+    class StandingLevel {
+        <<enumeration>>
+        GOOD_STANDING
+        ACADEMIC_WARNING
+        PROBATION
+        SUSPENSION
+        DISMISSAL
+    }
+
+    AcademicStanding --> StandingLevel
+```
+
+### Grade Appeal
+
+```mermaid
+classDiagram
+    class GradeAppeal {
+        +UUID id
+        +str appeal_number
+        +UUID student_id
+        +UUID enrollment_id
+        +UUID exam_id
+        +str original_grade
+        +RequestedAction requested_action
+        +str justification
+        +list evidence_file_ids
+        +AppealStatus status
+        +EscalationLevel current_level
+        +AppealOutcome outcome
+        +str new_grade
+        +str resolution_notes
+        +UUID resolved_by_id
+        +datetime filed_at
+        +datetime deadline
+        +submit() GradeAppeal
+        +escalate() None
+        +resolve(outcome: AppealOutcome, new_grade: str) None
+    }
+
+    class EscalationLevel {
+        <<enumeration>>
+        FACULTY
+        DEPARTMENT_HEAD
+        COMMITTEE
+    }
+
+    class RequestedAction {
+        <<enumeration>>
+        REVALUATION
+        RE_EXAMINATION
+        GRADE_CHANGE
+    }
+
+    GradeAppeal --> EscalationLevel
+    GradeAppeal --> RequestedAction
+```
+
+### Faculty Recruitment
+
+```mermaid
+classDiagram
+    class JobPosting {
+        +UUID id
+        +str position_number
+        +str title
+        +UUID department_id
+        +str designation
+        +EmploymentType employment_type
+        +str description
+        +dict qualifications
+        +int experience_years_min
+        +Decimal salary_range_min
+        +Decimal salary_range_max
+        +int vacancies
+        +datetime application_deadline
+        +PostingStatus status
+        +bool is_internal_only
+        +dict screening_criteria
+        +publish() None
+        +close() None
+        +auto_screen(application: JobApplication) int
+    }
+
+    class JobApplication {
+        +UUID id
+        +str application_number
+        +UUID posting_id
+        +str applicant_name
+        +str applicant_email
+        +UUID resume_file_id
+        +dict qualifications
+        +ApplicationStatus status
+        +int screening_score
+        +bool screening_passed
+        +list interview_evaluations
+        +Decimal overall_score
+        +dict offer_details
+        +datetime offer_deadline
+        +apply() JobApplication
+        +shortlist() None
+        +schedule_interview(date: datetime, panel: list) None
+        +extend_offer(details: dict) None
+        +hire() None
+        +reject(reason: str) None
+    }
+
+    class InterviewEvaluation {
+        +UUID id
+        +UUID application_id
+        +UUID evaluator_id
+        +int teaching_score
+        +int research_score
+        +int domain_knowledge_score
+        +int communication_score
+        +Decimal overall_score
+        +str comments
+        +str recommendation
+        +submit() InterviewEvaluation
+    }
+
+    class PostingStatus {
+        <<enumeration>>
+        DRAFT
+        PUBLISHED
+        CLOSED
+        FILLED
+        CANCELLED
+    }
+
+    class ApplicationStatus {
+        <<enumeration>>
+        APPLIED
+        SCREENED
+        SHORTLISTED
+        INTERVIEW_SCHEDULED
+        INTERVIEWED
+        OFFERED
+        HIRED
+        REJECTED
+        WITHDRAWN
+        EXPIRED
+    }
+
+    JobPosting --> PostingStatus
+    JobPosting "1" --> "many" JobApplication : receives
+    JobApplication --> ApplicationStatus
+    JobApplication "1" --> "many" InterviewEvaluation : evaluated by
+```
+
+### Room & Facility Management
+
+```mermaid
+classDiagram
+    class Room {
+        +UUID id
+        +str room_code
+        +str building
+        +int floor
+        +str room_number
+        +RoomType room_type
+        +int capacity
+        +list amenities
+        +bool is_wheelchair_accessible
+        +RoomStatus status
+        +check_availability(date: date, start: time, end: time) bool
+        +get_utilization(start_date: date, end_date: date) Decimal
+    }
+
+    class RoomBooking {
+        +UUID id
+        +UUID room_id
+        +UUID booked_by_id
+        +BookingType booking_type
+        +str purpose
+        +date booking_date
+        +time start_time
+        +time end_time
+        +int expected_attendees
+        +bool is_recurring
+        +dict recurrence_pattern
+        +BookingStatus status
+        +book() RoomBooking
+        +cancel() None
+        +confirm() None
+    }
+
+    class RoomType {
+        <<enumeration>>
+        CLASSROOM
+        LAB
+        AUDITORIUM
+        CONFERENCE
+        OFFICE
+        LIBRARY
+        EXAM_HALL
+    }
+
+    Room --> RoomType
+    Room "1" --> "many" RoomBooking : has
+```
+
+### Transfer Credits
+
+```mermaid
+classDiagram
+    class TransferCredit {
+        +UUID id
+        +UUID student_id
+        +str source_institution
+        +str source_course_code
+        +str source_course_name
+        +int source_credits
+        +str source_grade
+        +UUID equivalent_course_id
+        +int credits_awarded
+        +TransferStatus status
+        +UUID evaluated_by_id
+        +str evaluation_notes
+        +bool counts_toward_gpa
+        +bool counts_toward_graduation
+        +submit() TransferCredit
+        +evaluate(status: TransferStatus, equivalent: UUID) None
+        +appeal() None
+    }
+
+    class ArticulationAgreement {
+        +UUID id
+        +str institution_name
+        +date effective_date
+        +date expiry_date
+        +list course_mappings
+        +bool is_active
+        +find_mapping(external_code: str) CourseMapping
+    }
+
+    class TransferStatus {
+        <<enumeration>>
+        SUBMITTED
+        UNDER_REVIEW
+        APPROVED
+        REJECTED
+        APPEALED
+    }
+
+    TransferCredit --> TransferStatus
+    ArticulationAgreement "1" --> "many" TransferCredit : facilitates
+```
+
+### Scholarship & Financial Aid
+
+```mermaid
+classDiagram
+    class ScholarshipProgram {
+        +UUID id
+        +str name
+        +ScholarshipType scholarship_type
+        +str description
+        +dict eligibility_criteria
+        +Decimal award_amount
+        +Decimal award_percentage
+        +int max_recipients
+        +Decimal fund_total
+        +Decimal fund_utilized
+        +dict renewal_criteria
+        +bool is_auto_award
+        +bool is_active
+        +check_eligibility(student_id: UUID) bool
+        +check_fund_balance() Decimal
+        +award(student_id: UUID, amount: Decimal) ScholarshipAward
+    }
+
+    class ScholarshipAward {
+        +UUID id
+        +UUID scholarship_id
+        +UUID student_id
+        +UUID semester_id
+        +AwardStatus status
+        +Decimal award_amount
+        +DisbursementMethod disbursement_method
+        +UUID linked_invoice_id
+        +RenewalStatus renewal_status
+        +apply() ScholarshipAward
+        +approve(amount: Decimal) None
+        +disburse(invoice_id: UUID) None
+        +check_renewal() RenewalStatus
+        +revoke(reason: str) None
+    }
+
+    class ScholarshipType {
+        <<enumeration>>
+        MERIT
+        NEED_BASED
+        ATHLETIC
+        DEPARTMENTAL
+        DONOR
+        GOVERNMENT
+    }
+
+    class AwardStatus {
+        <<enumeration>>
+        APPLIED
+        UNDER_REVIEW
+        AWARDED
+        REJECTED
+        DISBURSED
+        REVOKED
+        WAITLISTED
+    }
+
+    ScholarshipProgram --> ScholarshipType
+    ScholarshipProgram "1" --> "many" ScholarshipAward : awards
+    ScholarshipAward --> AwardStatus
+```
+
+### Department & Curriculum
+
+```mermaid
+classDiagram
+    class Department {
+        +UUID id
+        +str code
+        +str name
+        +str parent_faculty
+        +UUID head_id
+        +date head_term_start
+        +date head_term_end
+        +int sanctioned_positions
+        +int filled_positions
+        +str accreditation_status
+        +date accreditation_expiry
+        +assign_head(faculty_id: UUID, term_start: date, term_end: date) None
+        +get_statistics() dict
+    }
+
+    class CurriculumChangeProposal {
+        +UUID id
+        +str proposal_number
+        +UUID program_id
+        +UUID proposed_by_id
+        +ChangeType change_type
+        +str description
+        +str justification
+        +dict impact_analysis
+        +ProposalStatus status
+        +UUID effective_semester_id
+        +submit() CurriculumChangeProposal
+        +advance(approval_notes: str) None
+        +reject(reason: str) None
+    }
+
+    class ChangeType {
+        <<enumeration>>
+        ADD_COURSE
+        REMOVE_COURSE
+        MODIFY_COURSE
+        MODIFY_PREREQUISITES
+        MODIFY_CREDITS
+        RESTRUCTURE
+    }
+
+    class ProposalStatus {
+        <<enumeration>>
+        DRAFT
+        DEPT_REVIEW
+        ACADEMIC_BOARD
+        SENATE
+        APPROVED
+        REJECTED
+    }
+
+    Department "1" --> "many" CurriculumChangeProposal : proposes
+    CurriculumChangeProposal --> ChangeType
+    CurriculumChangeProposal --> ProposalStatus
+```
+
+---
+
+### Admission Cycle & Examination Management
+
+```mermaid
+classDiagram
+    class AdmissionCycle {
+        +UUID id
+        +UUID program_id
+        +str name
+        +date open_date
+        +date close_date
+        +int seat_limit
+        +bool entrance_exam_required
+        +CycleStatus status
+        +datetime published_at
+        +publish() None
+        +close() None
+        +complete() None
+    }
+
+    class CycleStatus {
+        <<enumeration>>
+        DRAFT
+        PUBLISHED
+        CLOSED
+        COMPLETED
+    }
+
+    class EntranceExam {
+        +UUID id
+        +UUID cycle_id
+        +str title
+        +int duration_minutes
+        +Decimal total_marks
+        +Decimal passing_marks
+        +bool auto_score
+        +ExamStatus status
+        +schedule(exam_date: date) None
+        +startExam() None
+        +finalizeScores() None
+    }
+
+    class ExamStatus {
+        <<enumeration>>
+        CONFIGURED
+        SCHEDULED
+        IN_PROGRESS
+        COMPLETED
+        SCORES_FINALIZED
+    }
+
+    class ExamResult {
+        +UUID id
+        +UUID exam_id
+        +UUID applicant_id
+        +Decimal score
+        +int rank
+        +datetime submitted_at
+    }
+
+    class MeritList {
+        +UUID id
+        +UUID cycle_id
+        +int total_ranked
+        +Decimal cutoff_score
+        +MeritListStatus status
+        +generate() MeritList
+        +publish() None
+        +autoAwardScholarships(top_n: int) list
+    }
+
+    class MeritListStatus {
+        <<enumeration>>
+        DRAFT
+        PUBLISHED
+    }
+
+    class MeritListEntry {
+        +UUID id
+        +UUID merit_list_id
+        +UUID applicant_id
+        +int rank
+        +Decimal composite_score
+        +bool scholarship_eligible
+    }
+
+    AdmissionCycle --> CycleStatus
+    AdmissionCycle "1" --> "0..1" EntranceExam : has
+    AdmissionCycle "1" --> "0..1" MeritList : produces
+    EntranceExam --> ExamStatus
+    EntranceExam "1" --> "many" ExamResult : has
+    MeritList --> MeritListStatus
+    MeritList "1" --> "many" MeritListEntry : contains
+```
+
+---
+
+### Semester Progression Management
+
+```mermaid
+classDiagram
+    class SemesterProgressionService {
+        +assignNextSemester(student_id: UUID, semester_id: UUID) SemesterEnrollment
+        +repeatSemester(student_id: UUID, repeat_semester_number: int) SemesterEnrollment
+        +checkEligibility(student_id: UUID) EligibilityResult
+        +bulkAssign(student_ids: list, semester_id: UUID) list
+    }
+
+    class EligibilityResult {
+        +bool eligible
+        +str reason
+        +int current_semester
+        +int next_semester
+        +str recommended_action
+    }
+
+    class ClassroomAssignment {
+        +UUID id
+        +UUID student_id
+        +UUID semester_id
+        +UUID classroom_id
+        +UUID assigned_by
+        +datetime assigned_at
+    }
+
+    class FacultySubjectAssignment {
+        +UUID id
+        +UUID faculty_id
+        +UUID subject_id
+        +UUID classroom_id
+        +UUID semester_id
+        +datetime assigned_at
+        +validate() bool
+        +checkLoadLimit() bool
+    }
+
+    SemesterProgressionService --> EligibilityResult : returns
+    SemesterProgressionService "1" --> "many" ClassroomAssignment : creates
+    FacultySubjectAssignment --> ClassroomAssignment : linked via classroom
+```

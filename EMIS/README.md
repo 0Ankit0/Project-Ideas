@@ -1,6 +1,6 @@
 # Education Management Information System (EMIS) — Complete Design Documentation
 
-> A comprehensive, Django-powered platform for managing the full student lifecycle — from admissions and enrollment through academics, assessments, finance, and graduation — across 25 integrated modules.
+> A comprehensive, Django-powered platform for managing the full student lifecycle — from admissions and enrollment through academics, assessments, finance, and graduation — across 35 integrated modules.
 
 ## Documentation Structure
 
@@ -59,7 +59,7 @@ EMIS/
 
 ## Key Features
 
-- **25 integrated Django apps** covering students, admissions, courses, exams, attendance, timetable, LMS, finance, library, HR, hostel, transport, inventory, analytics, notifications, CMS, and more
+- **35 integrated Django apps** covering students, admissions, courses, exams, attendance, timetable, LMS, finance, library, HR, hostel, transport, inventory, analytics, notifications, CMS, graduation, academic standing, discipline, grade appeals, recruitment, department administration, room management, transfer credits, scholarships, and more
 - **API-first design** with Django REST Framework, JWT authentication, and comprehensive endpoint coverage
 - **Event-driven architecture** using Redis Pub/Sub and Celery for asynchronous workflows and multi-channel notifications
 - **Multi-channel notifications** via email (AWS SES), SMS (Twilio), mobile push (FCM), and in-app
@@ -82,6 +82,10 @@ EMIS/
 | Library Staff | Book issue/return, fine collection, catalog management |
 | Hostel Warden | Room allocation, occupancy management |
 | Transport Manager | Route and bus seat management |
+| Department Head | Program administration, curriculum review, academic standing oversight |
+| Scholarship Committee | Scholarship evaluation, award approval, fund management |
+| Facilities Manager | Room configuration, facility booking, maintenance coordination |
+| Alumni | Transcript requests, degree verification, alumni communications |
 
 ## Getting Started
 
@@ -103,6 +107,18 @@ EMIS/
 - ✅ Edge cases complete
 - ✅ Implementation complete
 
+### New Module Documentation
+- ✅ Academic Session & Semester Management
+- ✅ Graduation & Degree Conferral
+- ✅ Student Discipline & Conduct
+- ✅ Academic Standing & Progress
+- ✅ Grade Dispute & Appeal
+- ✅ Faculty Recruitment & Onboarding
+- ✅ Department & Program Administration
+- ✅ Room & Facility Management
+- ✅ Transfer Credits & Course Equivalency
+- ✅ Scholarship & Financial Aid
+
 ## Delivery Blueprint
 
 | Phase | Focus | Key Outputs |
@@ -114,6 +130,11 @@ EMIS/
 | Phase 5 | Support Services | Library, HR, hostel, transport, inventory |
 | Phase 6 | Analytics and Portal | Reports, dashboards, CMS, SEO, calendar |
 | Phase 7 | Hardening | Edge case mitigations, security audit, load testing, DR validation |
+| Phase 8 | Graduation & Progress | Degree audits, academic standing, transfer credits, grade appeals |
+| Phase 9 | HR & Recruitment | Faculty recruitment, onboarding, department administration |
+| Phase 10 | Facilities & Scheduling | Room booking, facility management, maintenance tracking |
+| Phase 11 | Scholarship & Aid | Aid applications, eligibility evaluation, disbursement, stacking rules |
+| Phase 12 | Discipline & Conduct | Conduct tracking, disciplinary hearings, sanctions, appeal processing |
 
 ## Operational Policy Addendum
 
@@ -128,3 +149,9 @@ Academic holds (blocking enrollment) are applied only for overdue invoices beyon
 
 ### System Availability During Academic Calendar
 EMIS is classified as Mission-Critical during `REGISTRATION_WINDOW`, `EXAM_PERIOD`, `GRADE_SUBMISSION_WINDOW`, and `MERIT_LIST_DATE` calendar events. No planned maintenance windows are scheduled during these periods. Emergency maintenance requires explicit sign-off from the Registrar and CTO. ECS task counts are pre-scaled before each registration window to handle peak concurrency. A deployment freeze is in effect during all Mission-Critical calendar windows; only emergency security patches may be deployed with three-way approval.
+
+### Graduation & Academic Standing Policies
+Degree conferral requires successful completion of a degree audit confirming all program requirements are met, including minimum GPA, total credit hours, and mandatory course completion. Academic standing is evaluated automatically at the end of each semester based on cumulative GPA thresholds: Good Standing (≥ 2.0), Academic Probation (1.5–1.99), and Academic Dismissal (< 1.5 for two consecutive semesters). Transfer credits are evaluated by the Registrar and require a minimum grade of C (2.0) at the originating institution. All standing changes and graduation decisions are permanently logged in the audit trail.
+
+### Recruitment & Onboarding Policies
+Faculty recruitment postings require Department Head approval before publication. All applications are tracked through a standardized pipeline: Received → Screening → Shortlisted → Interview → Offer → Accepted/Rejected. Interview panels must include at least one member from outside the hiring department. Onboarding checklists are auto-generated based on position type and must be completed within 30 days of hire date. System access is provisioned only after all mandatory onboarding tasks (background verification, policy acknowledgment, IT orientation) are marked complete.

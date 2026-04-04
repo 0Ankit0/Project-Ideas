@@ -334,3 +334,255 @@ flowchart LR
     EmailChannel & SMSChannel -->|On failure| RetryTask --> Redis
     RetryTask -->|Max retries| DLQ --> OpsAlert
 ```
+
+---
+
+## 6. Graduation & Academic Progress Components
+
+```mermaid
+flowchart LR
+    subgraph API["Graduation & Progress API Layer"]
+        GradAuditViewSet["DegreeAuditViewSet\nGET audit-report\nPOST run-audit"]
+        GradViewSet["GraduationViewSet\nPOST apply\nGET status\nPOST confer"]
+        StandingViewSet["AcademicStandingViewSet\nGET status\nPOST evaluate"]
+        TransferViewSet["TransferCreditViewSet\nPOST submit\nGET equivalencies"]
+    end
+
+    subgraph Services["Business Logic Services"]
+        GraduationSvc["GraduationService\napply_for_graduation()\nconfer_degree()\ngenerate_certificate()"]
+        DegreeAuditEngine["DegreeAuditEngine\nrun_audit()\ncheck_requirements()\nidentify_deficiencies()"]
+        AcademicStandingSvc["AcademicStandingService\nevaluate_standing()\napply_probation()\ncheck_dismissal()"]
+        TransferCreditSvc["TransferCreditService\nevaluate_credits()\nmap_equivalencies()\napply_transfer()"]
+    end
+
+    subgraph Models["Django ORM Models"]
+        GradModel["GraduationApplication\nDegreeConferral\nCertificate"]
+        AuditModel["DegreeAudit\nRequirementCheck\nDeficiency"]
+        StandingModel["AcademicStanding\nProbationRecord\nProgressReport"]
+        TransferModel["TransferCredit\nCourseEquivalency\nArticulationAgreement"]
+    end
+
+    subgraph Tasks["Celery Async Tasks"]
+        BatchAuditTask["batch_degree_audit\n(scheduled: semester end)"]
+        StandingEvalTask["evaluate_academic_standing\n(scheduled: after grade publish)"]
+        CertGenTask["generate_graduation_certificate\n(default queue)"]
+    end
+
+    subgraph Infra["Infrastructure"]
+        DB[("PostgreSQL")]
+        FileStore["File Storage\n(Local / S3)"]
+        PDFGen["PDF Generator\n(WeasyPrint)"]
+    end
+
+    GradAuditViewSet --> DegreeAuditEngine
+    GradViewSet --> GraduationSvc
+    StandingViewSet --> AcademicStandingSvc
+    TransferViewSet --> TransferCreditSvc
+    DegreeAuditEngine --> AuditModel --> DB
+    GraduationSvc --> DegreeAuditEngine
+    GraduationSvc --> GradModel --> DB
+    GraduationSvc --> CertGenTask --> PDFGen --> FileStore
+    AcademicStandingSvc --> StandingModel --> DB
+    TransferCreditSvc --> TransferModel --> DB
+    BatchAuditTask --> DegreeAuditEngine
+    StandingEvalTask --> AcademicStandingSvc
+```
+
+---
+
+## 7. HR & Recruitment Components
+
+```mermaid
+flowchart LR
+    subgraph API["HR & Recruitment API Layer"]
+        RecruitmentViewSet["RecruitmentViewSet\nPOST create-posting\nGET applications\nPOST shortlist"]
+        OnboardingViewSet["OnboardingViewSet\nPOST initiate\nGET checklist\nPOST complete-step"]
+        DeptViewSet["DepartmentViewSet\nCRUD departments\nGET faculty-list"]
+    end
+
+    subgraph Services["Business Logic Services"]
+        RecruitmentSvc["RecruitmentService\ncreate_posting()\nreview_application()\nschedule_interview()\nextend_offer()"]
+        ApplicantTracker["ApplicantTracker\ntrack_status()\nrank_candidates()\ngenerate_shortlist()"]
+        OnboardingSvc["OnboardingService\ninitiate_onboarding()\nassign_tasks()\ntrack_completion()\nprovision_access()"]
+        DeptAdminSvc["DepartmentAdminService\nmanage_programs()\nassign_faculty()\nreview_curriculum()"]
+    end
+
+    subgraph Models["Django ORM Models"]
+        JobModel["JobPosting\nApplication\nInterviewSchedule\nOffer"]
+        OnboardModel["OnboardingPlan\nOnboardingTask\nTaskCompletion"]
+        DeptModel["Department\nProgram\nCurriculumReview"]
+    end
+
+    subgraph Tasks["Celery Async Tasks"]
+        NotifyApplicantTask["notify_applicant_status\n(default queue)"]
+        OnboardReminderTask["send_onboarding_reminder\n(scheduled: daily)"]
+        PostingExpiryTask["check_posting_expiry\n(scheduled: nightly)"]
+    end
+
+    subgraph Infra["Infrastructure"]
+        DB[("PostgreSQL")]
+        EmailSvc["Email Service\n(SMTP)"]
+    end
+
+    RecruitmentViewSet --> RecruitmentSvc
+    OnboardingViewSet --> OnboardingSvc
+    DeptViewSet --> DeptAdminSvc
+    RecruitmentSvc --> ApplicantTracker
+    RecruitmentSvc --> JobModel --> DB
+    ApplicantTracker --> JobModel
+    RecruitmentSvc --> NotifyApplicantTask --> EmailSvc
+    OnboardingSvc --> OnboardModel --> DB
+    OnboardReminderTask --> OnboardingSvc
+    DeptAdminSvc --> DeptModel --> DB
+    PostingExpiryTask --> RecruitmentSvc
+```
+
+---
+
+## 8. Facility & Scheduling Components
+
+```mermaid
+flowchart LR
+    subgraph API["Facility API Layer"]
+        RoomViewSet["RoomViewSet\nCRUD rooms\nGET availability"]
+        BookingViewSet["BookingViewSet\nPOST reserve\nDELETE cancel\nGET schedule"]
+        MaintenanceViewSet["MaintenanceViewSet\nPOST request\nPOST resolve"]
+    end
+
+    subgraph Services["Business Logic Services"]
+        RoomBookingSvc["RoomBookingService\nreserve_room()\ncancel_booking()\ncheck_availability()"]
+        FacilityMgr["FacilityManager\nregister_facility()\nupdate_capacity()\ntrack_utilization()"]
+        ConflictDetector["ScheduleConflictDetector\ncheck_conflicts()\nresolve_overlap()\nvalidate_booking()"]
+        MaintenanceSvc["MaintenanceService\nsubmit_request()\nassign_crew()\nmark_resolved()"]
+    end
+
+    subgraph Models["Django ORM Models"]
+        RoomModel["Room\nFacility\nRoomFeature"]
+        BookingModel["Booking\nRecurringSchedule\nBookingConflict"]
+        MaintModel["MaintenanceRequest\nMaintenanceLog"]
+    end
+
+    subgraph Tasks["Celery Async Tasks"]
+        BookingReminderTask["send_booking_reminder\n(scheduled: 1hr before)"]
+        UtilizationReportTask["generate_utilization_report\n(scheduled: weekly)"]
+    end
+
+    subgraph Infra["Infrastructure"]
+        DB[("PostgreSQL")]
+        Redis[("Redis\nAvailability Cache")]
+    end
+
+    RoomViewSet --> RoomBookingSvc
+    BookingViewSet --> RoomBookingSvc
+    MaintenanceViewSet --> MaintenanceSvc
+    RoomBookingSvc --> ConflictDetector
+    RoomBookingSvc --> BookingModel --> DB
+    RoomBookingSvc --> Redis
+    FacilityMgr --> RoomModel --> DB
+    ConflictDetector --> BookingModel
+    MaintenanceSvc --> MaintModel --> DB
+    BookingReminderTask --> RoomBookingSvc
+    UtilizationReportTask --> FacilityMgr
+```
+
+---
+
+## 9. Scholarship & Aid Components
+
+```mermaid
+flowchart LR
+    subgraph API["Scholarship API Layer"]
+        ScholarshipViewSet["ScholarshipViewSet\nCRUD scholarships\nGET eligible-students"]
+        AidAppViewSet["AidApplicationViewSet\nPOST apply\nGET status\nPOST review"]
+        DisbursementViewSet["DisbursementViewSet\nPOST disburse\nGET history"]
+    end
+
+    subgraph Services["Business Logic Services"]
+        ScholarshipSvc["ScholarshipService\ncreate_scholarship()\nevaluate_eligibility()\naward_scholarship()"]
+        AidDisbursementEngine["AidDisbursementEngine\ncalculate_award()\nprocess_disbursement()\ngenerate_letter()"]
+        StackingValidator["StackingValidator\nvalidate_stacking_rules()\ncheck_max_aid_cap()\ndetect_over_award()"]
+    end
+
+    subgraph Models["Django ORM Models"]
+        ScholarshipModel["Scholarship\nEligibilityCriteria\nScholarshipFund"]
+        AidAppModel["AidApplication\nAidAward\nAidDocument"]
+        DisbursementModel["Disbursement\nDisbursementSchedule"]
+    end
+
+    subgraph Tasks["Celery Async Tasks"]
+        EligibilityCheckTask["batch_eligibility_check\n(scheduled: semester start)"]
+        DisbursementTask["process_scheduled_disbursements\n(scheduled: monthly)"]
+        AidNotifyTask["notify_aid_decision\n(default queue)"]
+    end
+
+    subgraph Infra["Infrastructure"]
+        DB[("PostgreSQL")]
+        FinanceSvc["Finance Container\n(Invoice adjustment)"]
+    end
+
+    ScholarshipViewSet --> ScholarshipSvc
+    AidAppViewSet --> ScholarshipSvc
+    DisbursementViewSet --> AidDisbursementEngine
+    ScholarshipSvc --> StackingValidator
+    ScholarshipSvc --> ScholarshipModel --> DB
+    ScholarshipSvc --> AidAppModel --> DB
+    AidDisbursementEngine --> DisbursementModel --> DB
+    AidDisbursementEngine --> FinanceSvc
+    StackingValidator --> ScholarshipModel
+    EligibilityCheckTask --> ScholarshipSvc
+    DisbursementTask --> AidDisbursementEngine
+    AidNotifyTask --> ScholarshipSvc
+```
+
+---
+
+## 10. Discipline & Appeals Components
+
+```mermaid
+flowchart LR
+    subgraph API["Discipline & Appeals API Layer"]
+        DisciplineViewSet["DisciplineViewSet\nPOST report-incident\nGET cases\nPOST resolve"]
+        HearingViewSet["HearingViewSet\nPOST schedule\nPOST record-outcome"]
+        AppealViewSet["AppealViewSet\nPOST submit-appeal\nGET status\nPOST decide"]
+        GradeAppealViewSet["GradeAppealViewSet\nPOST submit\nGET status\nPOST resolve"]
+    end
+
+    subgraph Services["Business Logic Services"]
+        DisciplineSvc["DisciplineService\nreport_incident()\ninvestigate()\napply_sanction()"]
+        HearingMgr["HearingManager\nschedule_hearing()\nrecord_testimony()\nrecord_outcome()"]
+        AppealProcessor["AppealProcessor\nsubmit_appeal()\nassign_reviewer()\nprocess_decision()"]
+        GradeAppealSvc["GradeAppealService\nsubmit_grade_appeal()\nreview_evidence()\napply_grade_change()"]
+    end
+
+    subgraph Models["Django ORM Models"]
+        IncidentModel["DisciplineIncident\nInvestigation\nSanction"]
+        HearingModel["Hearing\nHearingParticipant\nHearingOutcome"]
+        AppealModel["Appeal\nAppealReview\nAppealDecision"]
+        GradeAppealModel["GradeAppeal\nGradeEvidence\nGradeChange"]
+    end
+
+    subgraph Tasks["Celery Async Tasks"]
+        HearingNotifyTask["notify_hearing_schedule\n(default queue)"]
+        AppealDeadlineTask["check_appeal_deadlines\n(scheduled: daily)"]
+        SanctionEnforceTask["enforce_active_sanctions\n(scheduled: daily)"]
+    end
+
+    subgraph Infra["Infrastructure"]
+        DB[("PostgreSQL")]
+        NotifSvc["Notification Container"]
+    end
+
+    DisciplineViewSet --> DisciplineSvc
+    HearingViewSet --> HearingMgr
+    AppealViewSet --> AppealProcessor
+    GradeAppealViewSet --> GradeAppealSvc
+    DisciplineSvc --> HearingMgr
+    DisciplineSvc --> IncidentModel --> DB
+    HearingMgr --> HearingModel --> DB
+    HearingMgr --> HearingNotifyTask --> NotifSvc
+    AppealProcessor --> AppealModel --> DB
+    AppealProcessor --> DisciplineSvc
+    GradeAppealSvc --> GradeAppealModel --> DB
+    AppealDeadlineTask --> AppealProcessor
+    SanctionEnforceTask --> DisciplineSvc
+```

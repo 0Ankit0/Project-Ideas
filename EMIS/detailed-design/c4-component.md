@@ -183,3 +183,187 @@ C4Component
     Rel(delivery_log, db_postgres, "SQL writes via Django ORM")
     Rel(in_app_store, db_postgres, "SQL reads/writes via Django ORM")
 ```
+
+---
+
+## 5. Graduation & Academic Progress Container
+
+```mermaid
+C4Component
+    title C4 Component — Graduation & Academic Progress Container
+
+    Container_Boundary(graduation, "Graduation & Academic Progress (Django API)") {
+        Component(graduation_api, "Graduation API", "DRF ViewSet", "Handles graduation applications, degree conferral, and certificate generation")
+        Component(degree_audit_engine, "Degree Audit Engine", "Django Service Layer", "Evaluates student records against program requirements; identifies deficiencies and generates audit reports")
+        Component(academic_standing_svc, "Academic Standing Service", "Django Service Layer", "Evaluates GPA and credit thresholds; applies probation, suspension, or dismissal classifications")
+        Component(transfer_credit_svc, "Transfer Credit Service", "Django Service Layer", "Processes transfer credit requests; maps course equivalencies; applies credits to student records")
+        Component(cert_generator, "Certificate Generator", "Celery Task + WeasyPrint", "Generates graduation certificates and degree documents in PDF format")
+        Component(grad_repo, "Graduation Repository", "Django ORM", "All DB operations for graduation applications, audits, standing records, and transfer credits")
+        Component(grad_cache, "Graduation Cache", "Redis Client", "Caches program requirements, equivalency mappings, and audit results")
+    }
+
+    System_Ext(db_postgres, "PostgreSQL 15", "Primary relational data store")
+    System_Ext(redis_cache, "Redis 7", "Cache and message broker")
+    System_Ext(storage_s3, "AWS S3", "Stores graduation certificates and audit reports")
+    System_Ext(academic_container, "Academic Core Container", "Source of enrollment and grade data")
+    System_Ext(notification_container, "Notification Container", "Sends graduation status and standing alerts")
+
+    Rel(graduation_api, degree_audit_engine, "Triggers audit on graduation application")
+    Rel(graduation_api, grad_repo, "Reads/writes graduation applications and conferrals")
+    Rel(degree_audit_engine, grad_repo, "Reads program requirements, writes audit results")
+    Rel(degree_audit_engine, academic_container, "Reads enrollment and grade records")
+    Rel(academic_standing_svc, grad_repo, "Reads/writes standing classifications and probation records")
+    Rel(academic_standing_svc, academic_container, "Reads GPA and credit data")
+    Rel(transfer_credit_svc, grad_repo, "Reads/writes transfer credits and equivalency mappings")
+    Rel(cert_generator, storage_s3, "Uploads generated certificate PDFs")
+    Rel(cert_generator, notification_container, "Triggers graduation.certificate_ready event")
+    Rel(grad_repo, db_postgres, "SQL queries via Django ORM")
+    Rel(grad_cache, redis_cache, "GET / SET / DEL")
+```
+
+---
+
+## 6. HR & Recruitment Container
+
+```mermaid
+C4Component
+    title C4 Component — HR & Recruitment Container
+
+    Container_Boundary(hr_recruitment, "HR & Recruitment (Django API)") {
+        Component(recruitment_api, "Recruitment API", "DRF ViewSet", "Handles job posting creation, application intake, interview scheduling, and offer management")
+        Component(applicant_tracker, "Applicant Tracker", "Django Service Layer", "Tracks applicant pipeline stages; ranks candidates; generates shortlists based on configurable criteria")
+        Component(onboarding_svc, "Onboarding Service", "Django Service Layer", "Manages onboarding checklists, task assignments, document collection, and system access provisioning")
+        Component(dept_admin_svc, "Department Admin Service", "Django Service Layer", "Manages department metadata, program assignments, faculty allocation, and curriculum review workflows")
+        Component(hr_repo, "HR Repository", "Django ORM", "All DB operations for postings, applications, onboarding plans, and department records")
+        Component(hr_cache, "HR Cache", "Redis Client", "Caches department hierarchies and active posting lists")
+    }
+
+    System_Ext(db_postgres, "PostgreSQL 15", "Primary relational data store")
+    System_Ext(redis_cache, "Redis 7", "Cache and message broker")
+    System_Ext(notification_container, "Notification Container", "Sends application status updates and onboarding reminders")
+    System_Ext(users_container, "User Management Container", "Provisions accounts for new hires")
+
+    Rel(recruitment_api, applicant_tracker, "Routes applications through pipeline")
+    Rel(recruitment_api, hr_repo, "Reads/writes job postings and applications")
+    Rel(applicant_tracker, hr_repo, "Reads/writes applicant rankings and shortlists")
+    Rel(applicant_tracker, notification_container, "Triggers application.status_changed event")
+    Rel(onboarding_svc, hr_repo, "Reads/writes onboarding plans and task completions")
+    Rel(onboarding_svc, users_container, "Provisions system accounts on onboarding completion")
+    Rel(onboarding_svc, notification_container, "Triggers onboarding.task_due event")
+    Rel(dept_admin_svc, hr_repo, "Reads/writes department and program records")
+    Rel(hr_repo, db_postgres, "SQL queries via Django ORM")
+    Rel(hr_cache, redis_cache, "GET / SET / DEL")
+```
+
+---
+
+## 7. Facility Management Container
+
+```mermaid
+C4Component
+    title C4 Component — Facility Management Container
+
+    Container_Boundary(facility, "Facility Management (Django API)") {
+        Component(room_api, "Room & Booking API", "DRF ViewSet", "Handles room registration, availability queries, booking creation, and cancellation")
+        Component(room_booking_svc, "Room Booking Service", "Django Service Layer", "Processes room reservations; enforces capacity limits; manages recurring schedules")
+        Component(facility_mgr, "Facility Manager", "Django Service Layer", "Registers facilities, tracks utilization metrics, and manages room features and equipment")
+        Component(conflict_detector, "Schedule Conflict Detector", "Django Service Layer", "Validates booking requests against existing reservations; detects and prevents double-booking")
+        Component(maintenance_svc, "Maintenance Service", "Django Service Layer", "Manages maintenance requests, crew assignments, and resolution tracking")
+        Component(facility_repo, "Facility Repository", "Django ORM", "All DB operations for rooms, bookings, facilities, and maintenance records")
+        Component(facility_cache, "Facility Cache", "Redis Client", "Caches room availability grids and facility metadata")
+    }
+
+    System_Ext(db_postgres, "PostgreSQL 15", "Primary relational data store")
+    System_Ext(redis_cache, "Redis 7", "Cache and message broker")
+    System_Ext(timetable_container, "Timetable Engine", "Source of class schedule data for conflict detection")
+    System_Ext(notification_container, "Notification Container", "Sends booking confirmations and maintenance updates")
+
+    Rel(room_api, room_booking_svc, "Delegates booking operations")
+    Rel(room_api, facility_mgr, "Delegates facility CRUD operations")
+    Rel(room_booking_svc, conflict_detector, "Validates against existing bookings")
+    Rel(room_booking_svc, facility_repo, "Reads/writes bookings and schedules")
+    Rel(room_booking_svc, notification_container, "Triggers booking.confirmed event")
+    Rel(facility_mgr, facility_repo, "Reads/writes room and facility records")
+    Rel(conflict_detector, facility_repo, "Reads existing bookings for overlap check")
+    Rel(conflict_detector, timetable_container, "Reads class schedules for conflict detection")
+    Rel(maintenance_svc, facility_repo, "Reads/writes maintenance requests and logs")
+    Rel(maintenance_svc, notification_container, "Triggers maintenance.resolved event")
+    Rel(facility_repo, db_postgres, "SQL queries via Django ORM")
+    Rel(facility_cache, redis_cache, "GET / SET / DEL")
+```
+
+---
+
+## 8. Scholarship & Financial Aid Container
+
+```mermaid
+C4Component
+    title C4 Component — Scholarship & Financial Aid Container
+
+    Container_Boundary(scholarship, "Scholarship & Financial Aid (Django API)") {
+        Component(scholarship_api, "Scholarship API", "DRF ViewSet", "Handles scholarship CRUD, application intake, eligibility queries, and award management")
+        Component(scholarship_svc, "Scholarship Service", "Django Service Layer", "Creates scholarships, evaluates student eligibility against criteria, and manages award lifecycle")
+        Component(aid_disbursement_engine, "Aid Disbursement Engine", "Django Service Layer", "Calculates award amounts, processes scheduled disbursements, and generates award letters")
+        Component(stacking_validator, "Stacking Validator", "Django Service Layer", "Enforces stacking rules across multiple awards; detects over-award situations; caps total aid at tuition")
+        Component(scholarship_repo, "Scholarship Repository", "Django ORM", "All DB operations for scholarships, applications, awards, and disbursement records")
+        Component(scholarship_cache, "Scholarship Cache", "Redis Client", "Caches eligibility criteria and fund balances")
+    }
+
+    System_Ext(db_postgres, "PostgreSQL 15", "Primary relational data store")
+    System_Ext(redis_cache, "Redis 7", "Cache and message broker")
+    System_Ext(finance_container, "Finance Container", "Applies scholarship discounts to invoices")
+    System_Ext(academic_container, "Academic Core Container", "Source of GPA and enrollment data for eligibility")
+    System_Ext(notification_container, "Notification Container", "Sends award notifications and disbursement confirmations")
+
+    Rel(scholarship_api, scholarship_svc, "Delegates scholarship and application operations")
+    Rel(scholarship_api, aid_disbursement_engine, "Triggers disbursement processing")
+    Rel(scholarship_svc, stacking_validator, "Validates award stacking before approval")
+    Rel(scholarship_svc, scholarship_repo, "Reads/writes scholarships, applications, and awards")
+    Rel(scholarship_svc, academic_container, "Reads GPA and enrollment status for eligibility")
+    Rel(aid_disbursement_engine, scholarship_repo, "Reads/writes disbursement records and schedules")
+    Rel(aid_disbursement_engine, finance_container, "Creates invoice discount on disbursement")
+    Rel(aid_disbursement_engine, notification_container, "Triggers aid.disbursed event")
+    Rel(stacking_validator, scholarship_repo, "Reads all active awards for stacking check")
+    Rel(scholarship_repo, db_postgres, "SQL queries via Django ORM")
+    Rel(scholarship_cache, redis_cache, "GET / SET / DEL")
+```
+
+---
+
+## 9. Discipline & Conduct Container
+
+```mermaid
+C4Component
+    title C4 Component — Discipline & Conduct Container
+
+    Container_Boundary(discipline, "Discipline & Conduct (Django API)") {
+        Component(discipline_api, "Discipline API", "DRF ViewSet", "Handles incident reporting, case management, and sanction tracking")
+        Component(discipline_svc, "Discipline Service", "Django Service Layer", "Processes incident reports, manages investigations, and applies sanctions based on conduct policy")
+        Component(hearing_mgr, "Hearing Manager", "Django Service Layer", "Schedules disciplinary hearings, records testimony and evidence, and captures hearing outcomes")
+        Component(appeal_processor, "Appeal Processor", "Django Service Layer", "Manages appeal submissions, assigns reviewers, and processes appeal decisions with escalation rules")
+        Component(grade_appeal_svc, "Grade Appeal Service", "Django Service Layer", "Handles grade dispute submissions, coordinates faculty review, and applies approved grade changes")
+        Component(discipline_repo, "Discipline Repository", "Django ORM", "All DB operations for incidents, hearings, sanctions, appeals, and grade disputes")
+        Component(discipline_cache, "Discipline Cache", "Redis Client", "Caches active sanctions and appeal deadlines")
+    }
+
+    System_Ext(db_postgres, "PostgreSQL 15", "Primary relational data store")
+    System_Ext(redis_cache, "Redis 7", "Cache and message broker")
+    System_Ext(academic_container, "Academic Core Container", "Reads grades for dispute context; applies grade changes on appeal resolution")
+    System_Ext(notification_container, "Notification Container", "Sends hearing notices, sanction letters, and appeal decisions")
+    System_Ext(users_container, "User Management Container", "Applies account restrictions for active sanctions")
+
+    Rel(discipline_api, discipline_svc, "Delegates incident and sanction operations")
+    Rel(discipline_api, appeal_processor, "Delegates appeal submissions")
+    Rel(discipline_api, grade_appeal_svc, "Delegates grade dispute submissions")
+    Rel(discipline_svc, hearing_mgr, "Schedules hearing when investigation warrants")
+    Rel(discipline_svc, discipline_repo, "Reads/writes incidents, investigations, and sanctions")
+    Rel(discipline_svc, users_container, "Applies account restrictions for sanctions")
+    Rel(hearing_mgr, discipline_repo, "Reads/writes hearings, participants, and outcomes")
+    Rel(hearing_mgr, notification_container, "Triggers hearing.scheduled and hearing.outcome events")
+    Rel(appeal_processor, discipline_repo, "Reads/writes appeals, reviews, and decisions")
+    Rel(appeal_processor, notification_container, "Triggers appeal.decision event")
+    Rel(grade_appeal_svc, discipline_repo, "Reads/writes grade appeals and evidence")
+    Rel(grade_appeal_svc, academic_container, "Reads original grade; applies grade change on approval")
+    Rel(discipline_repo, db_postgres, "SQL queries via Django ORM")
+    Rel(discipline_cache, redis_cache, "GET / SET / DEL")
+```

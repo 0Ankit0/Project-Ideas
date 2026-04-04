@@ -405,9 +405,482 @@ flowchart TD
     style End3 fill:#27AE60,color:#fff
 ```
 
+## 8. Graduation Application & Degree Conferral
+
+The end-to-end process from student graduation application through degree conferral.
+
+```mermaid
+flowchart TD
+    Start([Student Initiates Graduation]) --> A1[View Degree Progress]
+    A1 --> A2{All Requirements\nMet?}
+    A2 -->|No| A3[View Missing Requirements]
+    A3 --> End1([Cannot Apply Yet])
+    A2 -->|Yes| A4[Submit Graduation Application]
+    A4 --> A5[System Runs Automated Degree Audit]
+    A5 --> A6{Audit Result}
+    A6 -->|FAILED| A7[Show Missing Requirements]
+    A7 --> A8{Student Addresses\nDeficiencies?}
+    A8 -->|Yes| A4
+    A8 -->|No| End2([Application Rejected])
+    A6 -->|PASSED| A9[Route to Department for Verification]
+    A9 --> A10{Department\nApproves?}
+    A10 -->|No| A11[Return with Feedback]
+    A11 --> End2
+    A10 -->|Yes| A12[Route to Registrar]
+    A12 --> A13{Registrar\nApproves?}
+    A13 -->|No| End2
+    A13 -->|Yes| A14[Determine Honors Classification]
+    A14 --> A15{CGPA Check}
+    A15 -->|≥ 3.90| A16[Summa Cum Laude]
+    A15 -->|≥ 3.70| A17[Magna Cum Laude]
+    A15 -->|≥ 3.50| A18[Cum Laude]
+    A15 -->|< 3.50| A19[No Honors]
+    A16 --> A20[Generate Diploma]
+    A17 --> A20
+    A18 --> A20
+    A19 --> A20
+    A20 --> A21[Assign Diploma Number]
+    A21 --> A22[Finalize Transcript]
+    A22 --> A23[Update Student Status to GRADUATED]
+    A23 --> A24[Create Alumni Record]
+    A24 --> A25[Notify Student]
+    A25 --> End3([Degree Conferred])
+
+    style Start fill:#E74C3C,color:#fff
+    style End1 fill:#F39C12,color:#fff
+    style End2 fill:#E74C3C,color:#fff
+    style End3 fill:#27AE60,color:#fff
+```
+
+## 9. Disciplinary Case Processing
+
+The workflow for handling student disciplinary incidents from report through resolution.
+
+```mermaid
+flowchart TD
+    Start([Incident Reported]) --> A1[Faculty/Staff Submits Report]
+    A1 --> A2[System Creates Case - REPORTED]
+    A2 --> A3[Notify Discipline Committee]
+    A3 --> A4[Notify Student of Report]
+    A4 --> A5[Committee Reviews Evidence]
+    A5 --> A6{Sufficient Evidence?}
+    A6 -->|No| A7[Dismiss Case]
+    A7 --> End1([Case Dismissed])
+    A6 -->|Yes| A8[Begin Investigation]
+    A8 --> A9[Assign Panel Members]
+    A9 --> A10{Conflict of\nInterest Check}
+    A10 -->|Conflict Found| A11[Reassign Panel]
+    A11 --> A9
+    A10 -->|No Conflict| A12[Schedule Hearing]
+    A12 --> A13[Notify Student ≥5 Business Days]
+    A13 --> A14[Conduct Hearing]
+    A14 --> A15[Record Evidence & Testimony]
+    A15 --> A16[Panel Deliberates]
+    A16 --> A17{Decision}
+    A17 -->|Not Responsible| A7
+    A17 -->|Responsible| A18[Determine Sanction]
+    A18 --> A19{Sanction Type}
+    A19 -->|Warning| A20[Issue Written Warning]
+    A19 -->|Probation| A21[Apply Disciplinary Probation]
+    A19 -->|Suspension| A22[Withdraw from Courses]
+    A22 --> A23[Block Registration]
+    A19 -->|Expulsion| A24[Permanent Block]
+    A24 --> A23
+    A20 --> A25[Notify Student of Decision]
+    A21 --> A25
+    A23 --> A25
+    A25 --> A26[Start 10-Day Appeal Window]
+    A26 --> A27{Student Appeals?}
+    A27 -->|No| A28[Close Case]
+    A28 --> End2([Case Closed])
+    A27 -->|Yes| A29[Submit Appeal]
+    A29 --> A30[Assign Appeals Board]
+    A30 --> A31[Review Appeal]
+    A31 --> A32{Appeal Outcome}
+    A32 -->|Upheld| A28
+    A32 -->|Modified| A33[Apply Modified Sanction]
+    A33 --> A28
+    A32 -->|Reversed| A34[Remove Sanctions]
+    A34 --> A35[Restore Enrollment]
+    A35 --> A28
+    A32 -->|New Hearing| A12
+
+    style Start fill:#E74C3C,color:#fff
+    style End1 fill:#F39C12,color:#fff
+    style End2 fill:#27AE60,color:#fff
+```
+
+## 10. Grade Appeal & Revaluation
+
+The multi-level grade appeal process with mandatory escalation.
+
+```mermaid
+flowchart TD
+    Start([Student Disputes Grade]) --> A1[View Published Grade]
+    A1 --> A2{Within 15-Day\nDeadline?}
+    A2 -->|No| End1([Deadline Passed - Cannot Appeal])
+    A2 -->|Yes| A3[Submit Grade Appeal]
+    A3 --> A4[Upload Supporting Evidence]
+    A4 --> A5[Route to Course Faculty]
+    A5 --> A6[Faculty Reviews - 7 Day Window]
+    A6 --> A7{Faculty Decision}
+    A7 -->|Agrees - Modifies Grade| A8[Record New Grade]
+    A8 --> A9[Preserve Original Grade in History]
+    A9 --> A10[Recalculate GPA/CGPA]
+    A10 --> A11[Notify Student]
+    A11 --> End2([Appeal Resolved - Grade Modified])
+    A7 -->|Upholds Original| A12[Escalate to Department Head]
+    A7 -->|No Response in 7 Days| A12
+    A12 --> A13[Dept Head Reviews - 7 Day Window]
+    A13 --> A14{Dept Head Decision}
+    A14 -->|Modifies Grade| A8
+    A14 -->|Upholds| A15[Escalate to Academic Appeals Committee]
+    A14 -->|No Response in 7 Days| A15
+    A15 --> A16[Committee Reviews - 14 Day Window]
+    A16 --> A17{Committee Decision}
+    A17 -->|Grade Modified| A8
+    A17 -->|Re-examination Ordered| A18[Schedule Re-exam]
+    A18 --> A19[Student Takes Re-exam]
+    A19 --> A20[New Grade Recorded]
+    A20 --> A10
+    A17 -->|Upheld - Final| A21[Notify Student - Decision Final]
+    A21 --> End3([Appeal Resolved - Grade Upheld])
+
+    style Start fill:#E74C3C,color:#fff
+    style End1 fill:#F39C12,color:#fff
+    style End2 fill:#27AE60,color:#fff
+    style End3 fill:#27AE60,color:#fff
+```
+
+## 11. Faculty Recruitment Pipeline
+
+The end-to-end faculty recruitment process from position creation to onboarding.
+
+```mermaid
+flowchart TD
+    Start([Department Requests Position]) --> A1[Create Position Request]
+    A1 --> A2[Budget Approval - Dept Head + Dean + Finance]
+    A2 --> A3{Approved?}
+    A3 -->|No| End1([Position Request Denied])
+    A3 -->|Yes| A4[HR Creates Job Posting]
+    A4 --> A5[Publish to Career Portal]
+    A5 --> A6[Receive Applications]
+    A6 --> A7[Auto-Screen Applications]
+    A7 --> A8{Meets Minimum\nQualifications?}
+    A8 -->|No| A9[Notify Candidate - Screened Out]
+    A9 --> End2([Application Rejected])
+    A8 -->|Yes| A10[Add to Shortlist Pool]
+    A10 --> A11[HR Reviews Shortlist]
+    A11 --> A12[Schedule Interviews]
+    A12 --> A13{Panel Composition\nValid?}
+    A13 -->|No| A14[Adjust Panel - Need Dept + External + HR]
+    A14 --> A12
+    A13 -->|Yes| A15[Book Interview Room]
+    A15 --> A16[Notify Candidate & Panel]
+    A16 --> A17[Conduct Interview]
+    A17 --> A18[Panel Submits Evaluations]
+    A18 --> A19[Aggregate Scores]
+    A19 --> A20{Scores Above\nThreshold?}
+    A20 -->|No| A9
+    A20 -->|Yes| A21[HR Extends Offer]
+    A21 --> A22[Send Offer Letter - 15 Day Validity]
+    A22 --> A23{Candidate Response}
+    A23 -->|Accepts| A24[Background Verification]
+    A24 --> A25{Verification\nPassed?}
+    A25 -->|No| A26[Rescind Offer]
+    A26 --> End2
+    A25 -->|Yes| A27[Create Employee Record]
+    A27 --> A28[Provision User Account]
+    A28 --> A29[Send Onboarding Checklist]
+    A29 --> A30[Set Probation Period]
+    A30 --> End3([Faculty Onboarded])
+    A23 -->|Rejects| A31[Consider Next Candidate]
+    A31 --> A11
+    A23 -->|No Response| A32[Offer Expired]
+    A32 --> A31
+
+    style Start fill:#E74C3C,color:#fff
+    style End1 fill:#F39C12,color:#fff
+    style End2 fill:#E74C3C,color:#fff
+    style End3 fill:#27AE60,color:#fff
+```
+
+## 12. Academic Semester Lifecycle Management
+
+The complete lifecycle of an academic semester from creation to archival.
+
+```mermaid
+flowchart TD
+    Start([Admin Creates Semester]) --> A1[Set Semester Dates]
+    A1 --> A2[Configure Registration Window]
+    A2 --> A3[Set Add/Drop Deadline]
+    A3 --> A4[Set Grading Window]
+    A4 --> A5[Department Heads Configure Course Offerings]
+    A5 --> A6[Assign Faculty to Sections]
+    A6 --> A7[Set Room Assignments]
+    A7 --> A8[Publish Course Catalog]
+    A8 --> A9[Open Registration]
+    A9 --> A10[Students Register for Courses]
+    A10 --> A11{Registration\nWindow Closed?}
+    A11 -->|No| A10
+    A11 -->|Yes| A12[Activate Semester]
+    A12 --> A13[Classes Begin]
+    A13 --> A14[Add/Drop Period Active]
+    A14 --> A15{Add/Drop\nDeadline Passed?}
+    A15 -->|No| A14
+    A15 -->|Yes| A16[Lock Enrollments]
+    A16 --> A17[Regular Classes Continue]
+    A17 --> A18[Enter Exam Period]
+    A18 --> A19[Block Enrollment Changes]
+    A19 --> A20[Conduct Exams]
+    A20 --> A21[Open Grading Window]
+    A21 --> A22[Faculty Submit Grades]
+    A22 --> A23{All Grades\nSubmitted?}
+    A23 -->|No| A24[Send Reminders to Faculty]
+    A24 --> A22
+    A23 -->|Yes| A25[Close Grading Window]
+    A25 --> A26[Calculate GPA/CGPA for All Students]
+    A26 --> A27[Determine Academic Standing]
+    A27 --> A28[Generate Dean's List]
+    A28 --> A29[Publish Results]
+    A29 --> A30[Notify Students]
+    A30 --> A31[Close Semester]
+    A31 --> A32[Archive Semester Data]
+    A32 --> End1([Semester Archived])
+
+    style Start fill:#E74C3C,color:#fff
+    style End1 fill:#27AE60,color:#fff
+```
+
+## 13. Transfer Credit Evaluation
+
+The workflow for evaluating and approving transfer credits from external institutions.
+
+```mermaid
+flowchart TD
+    Start([Transfer Student Submits Request]) --> A1[Upload Official Transcripts]
+    A1 --> A2[Upload Course Syllabi]
+    A2 --> A3[Submit Transfer Application]
+    A3 --> A4[Registrar Receives Application]
+    A4 --> A5{Articulation Agreement\nExists?}
+    A5 -->|Yes| A6[Auto-Map Using Agreement]
+    A5 -->|No| A7[Manual Equivalency Review]
+    A7 --> A8[Compare Syllabi with Internal Courses]
+    A8 --> A9{Equivalent Course\nFound?}
+    A9 -->|Yes| A6
+    A9 -->|No| A10[Reject - No Equivalent]
+    A6 --> A11{Grade ≥ B?}
+    A11 -->|No| A12[Reject - Grade Insufficient]
+    A11 -->|Yes| A13{Total Transfers\n≤ 40%?}
+    A13 -->|No| A14[Reject - Transfer Limit Exceeded]
+    A13 -->|Yes| A15{Residency Requirement\nMet?}
+    A15 -->|No| A16[Reject - Residency Violation]
+    A15 -->|Yes| A17[Approve Transfer Credit]
+    A17 --> A18[Update Student Record]
+    A18 --> A19[Update Degree Audit]
+    A19 --> A20[Notify Student]
+    A20 --> End1([Transfer Credits Applied])
+    A10 --> A21[Notify Student - Rejected]
+    A12 --> A21
+    A14 --> A21
+    A16 --> A21
+    A21 --> A22{Student Appeals?}
+    A22 -->|Yes| A7
+    A22 -->|No| End2([Transfer Rejected])
+
+    style Start fill:#E74C3C,color:#fff
+    style End1 fill:#27AE60,color:#fff
+    style End2 fill:#E74C3C,color:#fff
+```
+
+## 14. Scholarship Application & Lifecycle
+
+The workflow for scholarship application, disbursement, and renewal.
+
+```mermaid
+flowchart TD
+    Start([Student Explores Scholarships]) --> A1[Browse Available Scholarships]
+    A1 --> A2[Check Eligibility Criteria]
+    A2 --> A3{Eligible?}
+    A3 -->|No| End1([Not Eligible])
+    A3 -->|Yes| A4{Auto-Award\nScholarship?}
+    A4 -->|Yes| A5[System Auto-Awards Based on GPA]
+    A4 -->|No| A6[Student Submits Application]
+    A6 --> A7[Upload Supporting Documents]
+    A7 --> A8[Financial Aid Reviews Application]
+    A8 --> A9[Score and Rank Applicants]
+    A9 --> A10{Approved?}
+    A10 -->|No| End2([Application Rejected])
+    A10 -->|Yes, Fund Available| A5
+    A10 -->|Yes, No Fund| A11[Waitlist Application]
+    A11 --> A12{Fund Replenished?}
+    A12 -->|Yes| A5
+    A12 -->|No| End2
+    A5 --> A13[Award Scholarship]
+    A13 --> A14[Notify Student]
+    A14 --> A15{Disbursement\nMethod}
+    A15 -->|Fee Adjustment| A16[Apply to Fee Invoice]
+    A15 -->|Direct Payment| A17[Process Stipend Payment]
+    A16 --> A18[Invoice Balance Reduced]
+    A17 --> A18
+    A18 --> A19[Semester Ends]
+    A19 --> A20[Check Renewal Criteria]
+    A20 --> A21{Criteria Met?}
+    A21 -->|Yes| A22[Renew for Next Semester]
+    A22 --> A19
+    A21 -->|First Failure| A23[Issue Warning - Grace Period]
+    A23 --> A19
+    A21 -->|Second Consecutive Failure| A24[Revoke Scholarship]
+    A24 --> A25[Reverse Fee Adjustment]
+    A25 --> A26[Notify Student]
+    A26 --> End3([Scholarship Revoked])
+
+    style Start fill:#E74C3C,color:#fff
+    style End1 fill:#F39C12,color:#fff
+    style End2 fill:#E74C3C,color:#fff
+    style End3 fill:#E74C3C,color:#fff
+```
+
+## 15. Student Admission to Enrollment
+
+The complete workflow from admission cycle opening to student enrolled in semester with classroom and faculty assignments.
+
+```mermaid
+flowchart TD
+    Start([Admin Opens Admission Cycle]) --> A1[Configure Cycle Details]
+    A1 --> A2[Set Program, Dates, Seat Limit]
+    A2 --> A3[Publish Cycle to Portal]
+    A3 --> A4([Cycle Published])
+
+    A4 --> B1[Student Visits Portal]
+    B1 --> B2[Fill Application Form]
+    B2 --> B3[Upload Documents]
+    B3 --> B4[Pay Application Fee]
+    B4 --> B5[Submit Application]
+    B5 --> B6([Application Submitted])
+
+    B6 --> C1[Admissions Reviews Application]
+    C1 --> C2{Documents\nComplete?}
+    C2 -->|No| C3[Request Additional Documents]
+    C3 --> B3
+    C2 -->|Yes| C4[Evaluate Application]
+    C4 --> C5{Decision}
+    C5 -->|Reject| C6[Send Rejection Notification]
+    C6 --> End1([Application Rejected])
+    C5 -->|Shortlist| C7[Shortlist Applicant]
+
+    C7 --> D1{Entrance Exam\nRequired?}
+    D1 -->|No| D8[Use Application Score]
+    D1 -->|Yes| D2[Schedule Entrance Exam]
+    D2 --> D3[Conduct Entrance Exam]
+    D3 --> D4{Auto-Score\nEnabled?}
+    D4 -->|Yes| D5[System Auto-Scores]
+    D4 -->|No| D6[Manual Scoring]
+    D5 --> D7[Finalize Scores]
+    D6 --> D7
+    D7 --> D8
+
+    D8 --> E1[Generate Merit List]
+    E1 --> E2[Assign Ranks Based on Scores]
+    E2 --> E3[Calculate Cutoff Score]
+    E3 --> E4[Publish Merit List]
+    E4 --> E5{Student Rank\n≤ Seat Limit?}
+    E5 -->|No| E6[Waitlist or Reject]
+    E6 --> End2([Not Selected])
+    E5 -->|Yes| E7[Send Admission Offer]
+
+    E7 --> F1{Top N Merit\nStudent?}
+    F1 -->|Yes| F2[Auto-Award Scholarship]
+    F2 --> F3[Scholarship Linked to Student]
+    F1 -->|No| F3
+
+    F3 --> G1[Student Accepts Offer]
+    G1 --> G2[Generate Fee Invoice]
+    G2 --> G3{Scholarship\nAwarded?}
+    G3 -->|Yes| G4[Auto-Deduct Scholarship from Invoice]
+    G4 --> G5[Student Pays Remaining Balance]
+    G3 -->|No| G5[Student Pays Full Invoice]
+    G5 --> G6{All Bills\nCleared?}
+    G6 -->|No| G7[Notify Outstanding Balance]
+    G7 --> G5
+    G6 -->|Yes| G8[Bills Cleared]
+
+    G8 --> H1[Staff Initiates Conversion]
+    H1 --> H2{Documents Verified\n& Offer Accepted?}
+    H2 -->|No| H3[Return Error to Staff]
+    H3 --> End3([Conversion Failed])
+    H2 -->|Yes| H4[Create Student Record]
+    H4 --> H5[Generate Student ID]
+    H5 --> H6[Create Semester Enrollment]
+    H6 --> H7[Assign Classroom]
+    H7 --> H8[Assign Teachers to Subjects]
+    H8 --> H9[Send Welcome Email]
+    H9 --> End4([Student Enrolled])
+
+    style Start fill:#4A90E2,color:#fff
+    style A4 fill:#F39C12,color:#fff
+    style B6 fill:#F39C12,color:#fff
+    style End1 fill:#E74C3C,color:#fff
+    style End2 fill:#E74C3C,color:#fff
+    style End3 fill:#E74C3C,color:#fff
+    style End4 fill:#27AE60,color:#fff
+    style C5 fill:#9B59B6,color:#fff
+    style E5 fill:#9B59B6,color:#fff
+    style F1 fill:#9B59B6,color:#fff
+    style G6 fill:#9B59B6,color:#fff
+    style H2 fill:#9B59B6,color:#fff
+```
+
+## 16. Semester Progression & Repeat
+
+The workflow for assigning students to next semester or repeating a previous semester.
+
+```mermaid
+flowchart TD
+    Start([Semester Ends]) --> A1[Admin Reviews Student Results]
+    A1 --> A2[System Calculates GPA/CGPA]
+    A2 --> A3[Determine Academic Standing]
+    A3 --> A4{Passed All\nCourses?}
+
+    A4 -->|Yes| B1[Check Progression Eligibility]
+    B1 --> B2{Financial\nHolds?}
+    B2 -->|Yes| B3[Notify Student of Hold]
+    B3 --> B4[Student Clears Hold]
+    B4 --> B2
+    B2 -->|No| B5{Academic Standing\nOK?}
+    B5 -->|No| B6[Place on Academic Probation]
+    B6 --> B7{Admin Approves\nProgression?}
+    B7 -->|No| C1
+    B7 -->|Yes| B8[Assign Next Semester]
+    B5 -->|Yes| B8
+    B8 --> B9[Create Semester Enrollment]
+    B9 --> B10[Assign Classroom]
+    B10 --> B11[Notify Student]
+    B11 --> End1([Progressed to Next Semester])
+
+    A4 -->|No| C1{Admin Approves\nRepeat?}
+    C1 -->|No| C2[Student Counseling]
+    C2 --> C3{Student Withdraws?}
+    C3 -->|Yes| End2([Student Withdrawn])
+    C3 -->|No| C1
+    C1 -->|Yes| C4[Assign Repeat Semester]
+    C4 --> C5[Create Enrollment with is_repeat=true]
+    C5 --> C6[Assign Classroom]
+    C6 --> C7[Notify Student]
+    C7 --> End3([Repeating Semester])
+
+    style Start fill:#4A90E2,color:#fff
+    style End1 fill:#27AE60,color:#fff
+    style End2 fill:#E74C3C,color:#fff
+    style End3 fill:#F39C12,color:#fff
+    style A4 fill:#9B59B6,color:#fff
+    style C1 fill:#9B59B6,color:#fff
+    style B5 fill:#9B59B6,color:#fff
+```
+
 ## Summary
 
-This document provides detailed flowcharts and activity diagrams for 7 critical business processes:
+This document provides detailed flowcharts and activity diagrams for 16 critical business processes:
 
 1. **Student Admission & Enrollment**: End-to-end process from application to enrollment
 2. **Course Registration**: Student course selection and enrollment workflow
@@ -416,5 +889,14 @@ This document provides detailed flowcharts and activity diagrams for 7 critical 
 5. **Library Book Circulation**: Book issue and return process with fine management
 6. **Attendance Marking**: Multiple methods of attendance tracking
 7. **Report Generation**: Configurable report creation and export
+8. **Graduation Application & Degree Conferral**: Student graduation through degree conferral and alumni record creation
+9. **Disciplinary Case Processing**: Incident report through hearing, sanctions, and appeals
+10. **Grade Appeal & Revaluation**: Multi-level grade appeal with escalation and re-examination
+11. **Faculty Recruitment Pipeline**: Position creation through hiring and onboarding
+12. **Academic Semester Lifecycle Management**: Semester creation through grading and archival
+13. **Transfer Credit Evaluation**: External credit evaluation with articulation agreements
+14. **Scholarship Application & Lifecycle**: Scholarship application, disbursement, and renewal
+15. **Student Admission to Enrollment**: Complete admission cycle from opening through entrance exam, merit list, scholarship, payment, and conversion to enrolled student
+16. **Semester Progression & Repeat**: Student progression to next semester or repeat assignment with eligibility checks
 
 Each diagram shows decision points, validation steps, error handling, and success/failure paths to guide implementation and testing.

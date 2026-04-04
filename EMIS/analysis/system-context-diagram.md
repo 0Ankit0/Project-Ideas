@@ -11,6 +11,7 @@ graph TB
     subgraph External_Users["External Users"]
         Guest[Guest/Prospective Student]
         Parent[Parent/Guardian]
+        Alumni[Alumni]
     end
     
     subgraph Internal_Users["Internal Users"]
@@ -18,6 +19,10 @@ graph TB
         Faculty[Faculty]
         Admin[Administrator]
         Staff[Staff<br/>HR, Finance, Library, etc.]
+        HRStaff[HR Staff]
+        DeptHead[Department Head]
+        ScholarshipComm[Scholarship Committee]
+        FacilitiesMgr[Facilities Manager]
     end
     
     subgraph EMIS_System["EMIS - Education Management Information System"]
@@ -64,6 +69,17 @@ graph TB
     Staff -->|Process Transactions| Core
     Staff -->|Manage Resources| Core
     
+    HRStaff -->|Manage Recruitment| Core
+    HRStaff -->|Process Onboarding| Core
+    DeptHead -->|Administer Programs| Core
+    DeptHead -->|Review Academic Standing| Core
+    ScholarshipComm -->|Evaluate Applications| Core
+    ScholarshipComm -->|Approve Awards| Core
+    FacilitiesMgr -->|Manage Rooms| Core
+    FacilitiesMgr -->|Schedule Facilities| Core
+    Alumni -->|Request Transcripts| Core
+    Alumni -->|Verify Degrees| Core
+    
     %% Core to users
     Core -->|Send Notifications| Parent
     Core -->|Send Notifications| Student
@@ -71,6 +87,11 @@ graph TB
     Core -->|Provide Dashboard| Student
     Core -->|Provide Dashboard| Faculty
     Core -->|Provide Dashboard| Admin
+    Core -->|Provide Dashboard| HRStaff
+    Core -->|Provide Dashboard| DeptHead
+    Core -->|Provide Dashboard| ScholarshipComm
+    Core -->|Provide Dashboard| FacilitiesMgr
+    Core -->|Send Notifications| Alumni
     
     %% External system interactions
     Core -->|Process Payment| PaymentGW
@@ -102,6 +123,11 @@ graph TB
     style Faculty fill:#7B68EE,color:#fff
     style Admin fill:#E74C3C,color:#fff
     style Staff fill:#27AE60,color:#fff
+    style HRStaff fill:#1ABC9C,color:#fff
+    style DeptHead fill:#8E44AD,color:#fff
+    style ScholarshipComm fill:#D35400,color:#fff
+    style FacilitiesMgr fill:#2980B9,color:#fff
+    style Alumni fill:#34495E,color:#fff
     style Core fill:#2C3E50,color:#fff
     style PaymentGW fill:#E8F5E9
     style EmailService fill:#E3F2FD
@@ -127,6 +153,11 @@ graph TB
     Admin["Administrator<br/>[Person]<br/><br/>System manager"]
     Parent["Parent<br/>[Person]<br/><br/>Student guardian"]
     Staff["Staff<br/>[Person]<br/><br/>Support staff"]
+    HRStaff["HR Staff<br/>[Person]<br/><br/>Recruitment and onboarding"]
+    DeptHead["Department Head<br/>[Person]<br/><br/>Program administrator"]
+    ScholarshipComm["Scholarship Committee<br/>[Person]<br/><br/>Aid evaluator"]
+    FacilitiesMgr["Facilities Manager<br/>[Person]<br/><br/>Room and facility manager"]
+    Alumni["Alumni<br/>[Person]<br/><br/>Graduated student"]
     
     Payment["Payment Gateway<br/>[External System]<br/><br/>Processes online payments"]
     Email["Email System<br/>[External System]<br/><br/>Sends notifications"]
@@ -137,10 +168,20 @@ graph TB
     Admin -->|"Manages users,<br/>configures system,<br/>generates reports"| EMIS
     Parent -->|"Monitors progress,<br/>pays fees"| EMIS
     Staff -->|"Processes transactions,<br/>manages resources"| EMIS
+    HRStaff -->|"Manages recruitment,<br/>processes onboarding"| EMIS
+    DeptHead -->|"Administers programs,<br/>reviews academic standing"| EMIS
+    ScholarshipComm -->|"Evaluates applications,<br/>approves awards"| EMIS
+    FacilitiesMgr -->|"Manages rooms,<br/>schedules facilities"| EMIS
+    Alumni -->|"Requests transcripts,<br/>verifies degrees"| EMIS
     
     EMIS -->|"Sends notifications"| Student
     EMIS -->|"Sends notifications"| Faculty
     EMIS -->|"Sends notifications"| Parent
+    EMIS -->|"Sends notifications"| HRStaff
+    EMIS -->|"Sends notifications"| DeptHead
+    EMIS -->|"Sends notifications"| ScholarshipComm
+    EMIS -->|"Sends notifications"| FacilitiesMgr
+    EMIS -->|"Sends notifications"| Alumni
     
     EMIS -->|"Processes payments via"| Payment
     Payment -->|"Confirms transactions"| EMIS
@@ -154,6 +195,11 @@ graph TB
     style Admin fill:#E74C3C,color:#fff
     style Parent fill:#F39C12,color:#fff
     style Staff fill:#27AE60,color:#fff
+    style HRStaff fill:#1ABC9C,color:#fff
+    style DeptHead fill:#8E44AD,color:#fff
+    style ScholarshipComm fill:#D35400,color:#fff
+    style FacilitiesMgr fill:#2980B9,color:#fff
+    style Alumni fill:#34495E,color:#fff
     style Payment fill:#E8F5E9,stroke:#4CAF50,stroke-width:2px
     style Email fill:#E3F2FD,stroke:#2196F3,stroke-width:2px
     style SMS fill:#E3F2FD,stroke:#2196F3,stroke-width:2px
@@ -180,6 +226,16 @@ The following capabilities are within the EMIS system boundary:
 14. **Communication**: Notifications, announcements
 15. **CMS**: Website content management
 16. **Portal**: Personalized user portals
+17. **Academic Session & Semester Management**: Session configuration, semester scheduling, academic calendar
+18. **Graduation & Degree Conferral**: Degree audits, convocation management, certificate issuance
+19. **Student Discipline & Conduct**: Conduct tracking, disciplinary hearings, sanction management
+20. **Academic Standing & Progress**: Probation rules, progress tracking, standing classification
+21. **Grade Dispute & Appeal**: Appeal submission, review workflow, resolution tracking
+22. **Faculty Recruitment & Onboarding**: Job postings, applicant tracking, onboarding workflows
+23. **Department & Program Administration**: Department governance, program lifecycle, curriculum review
+24. **Room & Facility Management**: Room booking, facility scheduling, maintenance requests
+25. **Transfer Credits & Course Equivalency**: Credit evaluation, equivalency mapping, transfer articulation
+26. **Scholarship & Financial Aid**: Aid applications, eligibility evaluation, disbursement management
 
 ### Outside the System (External Dependencies)
 
@@ -221,6 +277,31 @@ The following capabilities are within the EMIS system boundary:
 - **Hostel**: Allocate rooms, manage mess services
 - **Transport**: Plan routes, track vehicles
 
+### HR Staff Interactions
+- **Recruitment**: Post job openings, review applications, schedule interviews
+- **Onboarding**: Process new hire documentation, assign orientation tasks
+- **Records**: Manage faculty and staff employment records
+
+### Department Head Interactions
+- **Program Administration**: Manage department programs, review curriculum changes
+- **Academic Standing**: Review student progress, approve probation/dismissal actions
+- **Faculty Oversight**: Assign teaching loads, evaluate faculty performance
+
+### Scholarship Committee Interactions
+- **Application Review**: Evaluate scholarship applications, verify eligibility
+- **Award Management**: Approve/deny awards, manage scholarship funds
+- **Disbursement**: Authorize aid disbursement, monitor stacking rules
+
+### Facilities Manager Interactions
+- **Room Management**: Configure rooms, manage capacity, handle maintenance
+- **Scheduling**: Approve facility bookings, resolve scheduling conflicts
+- **Reporting**: Track facility utilization, generate usage reports
+
+### Alumni Interactions
+- **Transcript Requests**: Request official transcripts and degree verification
+- **Degree Verification**: Authorize third-party verification of credentials
+- **Communication**: Receive alumni newsletters and event notifications
+
 ### External System Interactions
 - **Payment Gateway**: Bidirectional - Send payment requests, receive confirmations
 - **Email/SMS**: Unidirectional - Send notifications (with optional delivery receipts)
@@ -237,6 +318,13 @@ The following capabilities are within the EMIS system boundary:
 - Attendance (from faculty)
 - Fee payments (via payment gateway)
 - User profiles (from all users)
+- Job applications (from faculty/staff candidates)
+- Transfer credit requests (from transfer students)
+- Scholarship applications (from students)
+- Discipline reports (from faculty and staff)
+- Grade appeal submissions (from students)
+- Room booking requests (from faculty and staff)
+- Degree conferral nominations (from departments)
 
 ### Outbound Data
 - Notifications (to students, faculty, parents)
@@ -244,6 +332,14 @@ The following capabilities are within the EMIS system boundary:
 - Payment requests (to payment gateway)
 - Financial transfers (to banking system)
 - Transcripts and certificates (to students)
+- Graduation certificates and diplomas (to graduates)
+- Recruitment offers and rejection notices (to applicants)
+- Scholarship award notifications (to students)
+- Discipline hearing notices and sanction letters (to students)
+- Grade appeal decisions (to students and faculty)
+- Facility booking confirmations (to faculty and staff)
+- Degree verification responses (to third parties)
+- Academic standing notifications (to students and parents)
 
 ## Security Boundary
 

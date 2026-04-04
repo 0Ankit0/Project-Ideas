@@ -546,16 +546,424 @@ graph TB
     style USR1 fill:#4A90E2,color:#fff
 ```
 
+## 7. Graduation & Degree Conferral Process
+
+Cross-departmental workflow for processing graduation applications.
+
+```mermaid
+graph TB
+    subgraph Student["Student"]
+        S1[View Degree Progress]
+        S2[Submit Graduation Application]
+        S3[Receive Notification]
+    end
+
+    subgraph System["IT System (Automated)"]
+        SYS1[Run Degree Audit]
+        SYS2[Determine Honors]
+        SYS3[Generate Diploma Number]
+        SYS4[Calculate Final GPA/CGPA]
+    end
+
+    subgraph Department["Department"]
+        D1[Verify Student Records]
+        D2[Confirm Course Completion]
+        D3[Department Head Approval]
+    end
+
+    subgraph Registrar["Registrar Office"]
+        R1[Review Application]
+        R2[Final Approval]
+        R3[Issue Diploma]
+        R4[Finalize Transcript]
+        R5[Update Student Status]
+    end
+
+    subgraph Finance["Finance Department"]
+        F1[Clear Financial Holds]
+        F2[Verify Fee Clearance]
+    end
+
+    S1 --> S2
+    S2 --> SYS1
+    SYS1 --> SYS4
+    SYS4 --> D1
+    D1 --> D2
+    D2 --> D3
+    D3 --> R1
+    R1 --> F1
+    F1 --> F2
+    F2 --> R2
+    R2 --> SYS2
+    SYS2 --> SYS3
+    SYS3 --> R3
+    R3 --> R4
+    R4 --> R5
+    R5 --> S3
+
+    style S1 fill:#4A90E2,color:#fff
+    style SYS1 fill:#34495E,color:#fff
+    style D1 fill:#7B68EE,color:#fff
+    style R1 fill:#27AE60,color:#fff
+    style F1 fill:#F39C12,color:#fff
+```
+
+## 8. Faculty Recruitment & Onboarding Process
+
+Cross-departmental workflow for hiring faculty from requisition to onboarding.
+
+```mermaid
+graph TB
+    subgraph Dept["Requesting Department"]
+        DP1[Submit Position Request]
+        DP2[Review Shortlist]
+        DP3[Participate in Interviews]
+        DP4[Submit Evaluation]
+    end
+
+    subgraph Finance["Finance & Budget"]
+        FN1[Review Budget Allocation]
+        FN2[Approve/Reject Budget]
+    end
+
+    subgraph HR["Human Resources"]
+        HR1[Create Job Posting]
+        HR2[Publish to Portal]
+        HR3[Screen Applications]
+        HR4[Shortlist Candidates]
+        HR5[Schedule Interviews]
+        HR6[Extend Offer Letter]
+        HR7[Background Verification]
+        HR8[Create Employee Record]
+        HR9[Send Onboarding Checklist]
+    end
+
+    subgraph Candidate["Candidate"]
+        C1[Submit Application]
+        C2[Attend Interview]
+        C3[Accept/Reject Offer]
+        C4[Submit Documents]
+    end
+
+    subgraph IT["IT Department"]
+        IT1[Create User Account]
+        IT2[Grant System Access]
+        IT3[Provision Email]
+    end
+
+    DP1 --> FN1
+    FN1 --> FN2
+    FN2 --> HR1
+    HR1 --> HR2
+    HR2 --> C1
+    C1 --> HR3
+    HR3 --> HR4
+    HR4 --> DP2
+    DP2 --> HR5
+    HR5 --> C2
+    C2 --> DP3
+    DP3 --> DP4
+    DP4 --> HR6
+    HR6 --> C3
+    C3 --> HR7
+    HR7 --> HR8
+    HR8 --> IT1
+    IT1 --> IT2
+    IT2 --> IT3
+    IT3 --> HR9
+    HR9 --> C4
+
+    style DP1 fill:#7B68EE,color:#fff
+    style FN1 fill:#F39C12,color:#fff
+    style HR1 fill:#27AE60,color:#fff
+    style C1 fill:#4A90E2,color:#fff
+    style IT1 fill:#34495E,color:#fff
+```
+
+## 9. Disciplinary Case Adjudication Process
+
+Cross-departmental workflow for handling student discipline cases.
+
+```mermaid
+graph TB
+    subgraph Reporter["Reporter (Faculty/Staff)"]
+        RP1[Report Incident]
+        RP2[Provide Evidence]
+    end
+
+    subgraph System["IT System"]
+        SYS1[Create Case Number]
+        SYS2[Notify Stakeholders]
+        SYS3[Check Conflict of Interest]
+        SYS4[Enforce Sanctions]
+    end
+
+    subgraph Committee["Discipline Committee"]
+        DC1[Review Evidence]
+        DC2[Investigate]
+        DC3[Schedule Hearing]
+        DC4[Conduct Hearing]
+        DC5[Deliberate]
+        DC6[Issue Decision]
+    end
+
+    subgraph Student_Actor["Student (Accused)"]
+        ST1[Receive Notice]
+        ST2[Attend Hearing]
+        ST3[Receive Decision]
+        ST4[File Appeal]
+    end
+
+    subgraph Appeals["Appeals Board"]
+        AP1[Review Appeal]
+        AP2[Render Decision]
+    end
+
+    subgraph Enrollment["Academic Operations"]
+        EN1[Withdraw from Courses]
+        EN2[Block Registration]
+        EN3[Restore Access]
+    end
+
+    RP1 --> RP2
+    RP2 --> SYS1
+    SYS1 --> SYS2
+    SYS2 --> DC1
+    SYS2 --> ST1
+    DC1 --> DC2
+    DC2 --> SYS3
+    SYS3 --> DC3
+    DC3 --> ST1
+    ST1 --> ST2
+    ST2 --> DC4
+    DC4 --> DC5
+    DC5 --> DC6
+    DC6 --> ST3
+    DC6 --> SYS4
+    SYS4 --> EN1
+    EN1 --> EN2
+    ST3 --> ST4
+    ST4 --> AP1
+    AP1 --> AP2
+    AP2 --> EN3
+
+    style RP1 fill:#E74C3C,color:#fff
+    style SYS1 fill:#34495E,color:#fff
+    style DC1 fill:#7B68EE,color:#fff
+    style ST1 fill:#4A90E2,color:#fff
+    style AP1 fill:#F39C12,color:#fff
+    style EN1 fill:#27AE60,color:#fff
+```
+
+## 10. Academic Semester Lifecycle Process
+
+Cross-departmental workflow for managing the complete semester lifecycle.
+
+```mermaid
+graph TB
+    subgraph Admin["Administration"]
+        AD1[Create Academic Year]
+        AD2[Create Semester]
+        AD3[Set Calendar Dates]
+        AD4[Open Registration]
+        AD5[Activate Semester]
+        AD6[Start Exam Period]
+        AD7[Open Grading Window]
+        AD8[Close Semester]
+    end
+
+    subgraph DeptHead["Department Heads"]
+        DH1[Configure Course Offerings]
+        DH2[Assign Faculty to Sections]
+        DH3[Approve Room Assignments]
+    end
+
+    subgraph Faculty_Actor["Faculty"]
+        FA1[Accept Teaching Load]
+        FA2[Conduct Classes]
+        FA3[Submit Grades]
+    end
+
+    subgraph Students_Actor["Students"]
+        STU1[Register for Courses]
+        STU2[Attend Classes]
+        STU3[Take Exams]
+        STU4[View Results]
+    end
+
+    subgraph System["IT System"]
+        SYS1[Publish Course Catalog]
+        SYS2[Calculate GPA/CGPA]
+        SYS3[Determine Standing]
+        SYS4[Generate Dean's List]
+        SYS5[Publish Results]
+    end
+
+    AD1 --> AD2
+    AD2 --> AD3
+    AD3 --> DH1
+    DH1 --> DH2
+    DH2 --> DH3
+    DH3 --> SYS1
+    SYS1 --> AD4
+    AD4 --> STU1
+    STU1 --> AD5
+    AD5 --> FA1
+    FA1 --> FA2
+    FA2 --> STU2
+    STU2 --> AD6
+    AD6 --> STU3
+    STU3 --> AD7
+    AD7 --> FA3
+    FA3 --> SYS2
+    SYS2 --> SYS3
+    SYS3 --> SYS4
+    SYS4 --> SYS5
+    SYS5 --> STU4
+    STU4 --> AD8
+
+    style AD1 fill:#E74C3C,color:#fff
+    style DH1 fill:#7B68EE,color:#fff
+    style FA1 fill:#27AE60,color:#fff
+    style STU1 fill:#4A90E2,color:#fff
+    style SYS1 fill:#34495E,color:#fff
+```
+
+## 11. End-to-End Admission to Enrollment Process
+
+Cross-departmental workflow covering the complete admission cycle from opening through student enrollment, including entrance examination, merit list, scholarship, payment, and conversion.
+
+```mermaid
+graph TB
+    subgraph Admin_Lane["Administration"]
+        AD1[Create Admission Cycle]
+        AD2[Configure Cycle Details]
+        AD3[Publish Cycle to Portal]
+        AD4[Configure Entrance Exam]
+        AD5[Schedule Exam Date]
+        AD6[Conduct Entrance Exam]
+        AD7[Finalize Scores]
+        AD8[Generate Merit List]
+        AD9[Publish Merit List]
+    end
+
+    subgraph Applicant_Lane["Applicant / Student"]
+        AP1[Visit Portal]
+        AP2[Fill Application Form]
+        AP3[Upload Documents]
+        AP4[Pay Application Fee]
+        AP5[Submit Application]
+        AP6[Take Entrance Exam]
+        AP7[View Merit List]
+        AP8[Accept Admission Offer]
+        AP9[Pay Fees]
+    end
+
+    subgraph Admissions_Lane["Admissions Staff"]
+        AS1[Review Applications]
+        AS2[Verify Documents]
+        AS3[Shortlist Applicants]
+        AS4[Dispatch Offers]
+        AS5[Initiate Conversion]
+        AS6[Verify Conversion Checklist]
+    end
+
+    subgraph Finance_Lane["Finance Department"]
+        FI1[Verify Application Fee]
+        FI2[Generate Fee Invoice]
+        FI3[Apply Scholarship Deduction]
+        FI4[Verify Bill Clearance]
+        FI5[Confirm All Bills Cleared]
+    end
+
+    subgraph System_Lane["System (Automated)"]
+        SY1[Publish to External Portal]
+        SY2[Generate Application Number]
+        SY3[Auto-Score Exam]
+        SY4[Rank Applicants by Score]
+        SY5[Determine Cutoff]
+        SY6[Auto-Award Scholarships]
+        SY7[Create Student Record]
+        SY8[Generate Student ID]
+        SY9[Create Semester Enrollment]
+        SY10[Assign Classroom]
+        SY11[Assign Faculty to Subjects]
+        SY12[Send Welcome Notification]
+    end
+
+    AD1 --> AD2
+    AD2 --> AD3
+    AD3 --> SY1
+    SY1 --> AP1
+
+    AP1 --> AP2
+    AP2 --> AP3
+    AP3 --> AP4
+    AP4 --> FI1
+    FI1 -->|Verified| AP5
+    AP5 --> SY2
+    SY2 --> AS1
+
+    AS1 --> AS2
+    AS2 -->|Valid| AS3
+    AS2 -->|Invalid| AP3
+
+    AS3 --> AD4
+    AD4 --> AD5
+    AD5 --> AP6
+    AP6 --> AD6
+    AD6 --> SY3
+    SY3 --> AD7
+    AD7 --> SY4
+    SY4 --> SY5
+    SY5 --> AD8
+    AD8 --> AD9
+    AD9 --> AP7
+
+    AP7 --> SY6
+    SY6 --> AS4
+    AS4 --> AP8
+
+    AP8 --> FI2
+    FI2 --> FI3
+    FI3 --> AP9
+    AP9 --> FI4
+    FI4 -->|Outstanding| AP9
+    FI4 -->|Cleared| FI5
+
+    FI5 --> AS5
+    AS5 --> AS6
+    AS6 -->|All Checks Pass| SY7
+    AS6 -->|Checks Fail| AS5
+
+    SY7 --> SY8
+    SY8 --> SY9
+    SY9 --> SY10
+    SY10 --> SY11
+    SY11 --> SY12
+
+    style AD1 fill:#E74C3C,color:#fff
+    style AP1 fill:#4A90E2,color:#fff
+    style AS1 fill:#7B68EE,color:#fff
+    style FI1 fill:#27AE60,color:#fff
+    style SY1 fill:#34495E,color:#fff
+```
+
 ## Summary
 
-This document provides BPMN-style swimlane diagrams for 6 cross-departmental workflows:
+This document provides BPMN-style swimlane diagrams for 11 cross-departmental workflows:
 
 1. **Student Admission Process**: Multi-stakeholder workflow from application to enrollment
 2. **Fee Payment & Collection**: Payment processing across student, system, gateways, and finance
-3.**Course Registration**: Complex workflow involving students, advisors, academics, and finance
+3. **Course Registration**: Complex workflow involving students, advisors, academics, and finance
 4. **Grade Processing & Transcript Generation**: Grade submission, approval, and record-keeping
 5. **Employee Payroll Processing**: Monthly payroll across HR, finance, and accounting
 6. **Library Book Procurement & Cataloging**: Book acquisition workflow
+7. **Graduation & Degree Conferral Process**: Cross-departmental graduation application and diploma issuance
+8. **Faculty Recruitment & Onboarding Process**: End-to-end faculty hiring from requisition to onboarding
+9. **Disciplinary Case Adjudication Process**: Student discipline case handling with appeals workflow
+10. **Academic Semester Lifecycle Process**: Complete semester management from creation to closure
+11. **End-to-End Admission to Enrollment Process**: Complete admission cycle with entrance exam, merit list, scholarship auto-award, payment clearance, and applicant-to-student conversion across Admin, Applicant, Admissions, Finance, and System
 
 Each diagram clearly shows:
 - Responsibilities of each actor/department (swimlanes)

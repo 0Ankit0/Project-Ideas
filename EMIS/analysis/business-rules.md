@@ -88,6 +88,14 @@ flowchart TD
 
 **BR-ENROLL-007:** Course add/drop is permitted only during the defined add/drop period (a sub-window of the registration period, typically the first two weeks of a semester). Dropped courses within this window leave no grade record. Courses dropped after the add/drop window but before the late-drop deadline are recorded as `W` (Withdrawn) on the transcript. Drops after the late-drop deadline require department head approval and are recorded as `WF` (Withdrawn Failing).
 
+**BR-ENROLL-008:** Applicant-to-student conversion requires all of the following: (a) application status = `ACCEPTED`, (b) all account section bills cleared (zero outstanding balance), (c) all required documents verified (status = `VERIFIED`), (d) offer letter accepted by the applicant. Conversion attempted with any condition unmet returns `CONVERSION_PREREQUISITES_NOT_MET` with the list of failing conditions.
+
+**BR-ENROLL-009:** Semester progression is admin-driven: the system does not auto-progress students to the next semester. After a semester ends, the admin must explicitly assign each student to the next semester or a repeat semester. Students without an explicit assignment remain in `AWAITING_ASSIGNMENT` status and cannot register for courses.
+
+**BR-ENROLL-010:** Semester repeat is permitted only if the student meets at least one of: (a) failed one or more courses in the semester (grade = `FAIL`), (b) attendance fell below the minimum threshold for the program, or (c) admin override with a documented reason. Repeat requests that meet none of these criteria are rejected with `REPEAT_NOT_ELIGIBLE`.
+
+**BR-ENROLL-011:** Classroom assignment is mandatory during semester enrollment. A student cannot be enrolled in a semester without a classroom/section assignment. Enrollment attempted without a classroom returns `CLASSROOM_ASSIGNMENT_REQUIRED`.
+
 ---
 
 ### 3.3 Academic Operations
@@ -131,6 +139,14 @@ flowchart TD
 **BR-ADM-003:** An accepted applicant has `enrollment_deadline` days from the acceptance date to complete enrollment (pay the admission fee and submit required documents). Failure to enroll by the deadline moves the applicant to `EXPIRED` status and the seat is released for the next merit list candidate.
 
 **BR-ADM-004:** Required documents must be verified (status = `VERIFIED`) before final enrollment is completed. Document verification is performed by the admissions officer. Enrollment with `PENDING` or `REJECTED` documents returns `DOCUMENT_VERIFICATION_PENDING`.
+
+**BR-ADM-005:** Admission cycle must have `open_date < close_date`; only one admission cycle may be in `ACTIVE` status per program at a time. Attempting to activate a second cycle for the same program returns `ADMISSION_CYCLE_CONFLICT`. Cycle dates are managed via the `AdmissionCycle` model.
+
+**BR-ADM-006:** Admission open notice is only visible to users who are NOT currently enrolled students of the institution. The public portal filters admission notices based on user enrollment status; authenticated students with an active enrollment see no admission notices. Unauthenticated visitors and prospective applicants see all active admission notices.
+
+**BR-ADM-007:** Merit list generation requires all entrance exam scores to be finalized (status = `FINALIZED`) before the merit list can be generated. No partial merit lists are allowed. Attempting to generate a merit list with any pending scores returns `EXAM_SCORES_NOT_FINALIZED`.
+
+**BR-ADM-008:** Scholarship auto-award from the merit list requires all of the following: (a) merit list is finalized and published, (b) scholarship program is configured with number of seats and award amount, (c) the student does not already hold an active scholarship for the same program. Auto-award is executed only after the admin confirms the auto-award configuration. Violation returns `SCHOLARSHIP_AUTO_AWARD_BLOCKED` with the specific failing condition.
 
 ---
 
@@ -702,6 +718,83 @@ flowchart TD
 | **Test Tag** | `@br_scholarship_003` |
 | **Error Code** | `INSUFFICIENT_SCHOLARSHIP_FUND` (422) |
 
+#### BR-SCHOLARSHIP-004 — Scholarship Auto-Deduction at Invoice Generation
+
+| Attribute | Detail |
+|---|---|
+| **Rule ID** | BR-SCHOLARSHIP-004 |
+| **Domain** | Scholarship & Financial Aid |
+| **Statement** | Scholarship auto-deduction applies at invoice generation time. When a student with an active scholarship has a fee invoice generated, the scholarship amount is automatically subtracted from the total fee before payment processing. The deduction is recorded as a separate line item on the invoice. |
+| **Trigger** | Fee invoice generation for a student with active scholarship |
+| **Preconditions** | Student has an active scholarship award; fee invoice is being generated for the current semester |
+| **Postconditions** | Scholarship amount is deducted from invoice total; deduction recorded as invoice line item; remaining payable amount is calculated |
+| **Exception / Override** | Finance Head may manually adjust the deduction amount for partial scholarship periods |
+| **Enforcement Point** | Service layer — `finance/services.py` |
+| **Test Tag** | `@br_scholarship_004` |
+| **Error Code** | N/A (auto-applied) |
+
+#### BR-SCHOLARSHIP-005 — Scholarship Duration Types
+
+| Attribute | Detail |
+|---|---|
+| **Rule ID** | BR-SCHOLARSHIP-005 |
+| **Domain** | Scholarship & Financial Aid |
+| **Statement** | Scholarship duration is configured as one of two types: `FIXED_PER_SEMESTER` (a fixed monetary amount deducted each semester) or `FULL_COVERAGE` (100% fee waiver for N semesters). The `duration_semesters` field defines how many semesters the scholarship covers. After the configured number of semesters, the scholarship expires automatically. |
+| **Trigger** | Scholarship award creation and semester-end processing |
+| **Preconditions** | Scholarship program has a defined duration type and semester count |
+| **Postconditions** | Scholarship is applied for the configured duration; expired scholarships are marked as `EXPIRED` and no longer deducted |
+| **Exception / Override** | Scholarship committee may extend duration by one semester for documented extenuating circumstances |
+| **Enforcement Point** | Service layer — `finance/services.py` + Background task — `finance/tasks.py` |
+| **Test Tag** | `@br_scholarship_005` |
+| **Error Code** | N/A (configuration and auto-expiry) |
+
+#### BR-SCHOLARSHIP-006 — Merit-Based Scholarship Auto-Award Execution
+
+| Attribute | Detail |
+|---|---|
+| **Rule ID** | BR-SCHOLARSHIP-006 |
+| **Domain** | Scholarship & Financial Aid |
+| **Statement** | Merit-based scholarship auto-award executes only after the merit list is published and the admin confirms the auto-award configuration. The system awards scholarships to the top N students on the merit list as configured. Auto-award does not execute on draft or unpublished merit lists. |
+| **Trigger** | Admin confirms auto-award after merit list publication |
+| **Preconditions** | Merit list is in `PUBLISHED` status; scholarship program is configured with number of seats; auto-award configuration is confirmed by admin |
+| **Postconditions** | Scholarships are awarded to top N students; fund balance is decremented; award notifications are sent to recipients |
+| **Exception / Override** | Admissions Director may exclude specific students from auto-award with documented justification |
+| **Enforcement Point** | Service layer — `finance/services.py` + `admissions/services.py` |
+| **Test Tag** | `@br_scholarship_006` |
+| **Error Code** | `MERIT_LIST_NOT_PUBLISHED` (422) |
+
+### 3.17 Faculty Assignment
+
+#### BR-FACULTY-001 — Faculty-to-Subject Assignment Validation
+
+| Attribute | Detail |
+|---|---|
+| **Rule ID** | BR-FACULTY-001 |
+| **Domain** | Faculty Assignment |
+| **Statement** | Faculty-to-subject assignment requires all of the following: (a) faculty member is in `ACTIVE` status, (b) faculty teaching load does not exceed the maximum credit hours per semester (institutional default: 18 credit hours), (c) no timetable conflict exists with other subjects already assigned to the faculty for the same semester. Assignments violating any condition are rejected. |
+| **Trigger** | Faculty assignment to a subject for a classroom |
+| **Preconditions** | Faculty exists and is active; subject and classroom are defined for the semester |
+| **Postconditions** | Faculty is assigned to the subject for the classroom; teaching load is updated; timetable is validated |
+| **Exception / Override** | Department Head may approve teaching load exceeding the maximum by up to 3 credit hours with documented justification |
+| **Enforcement Point** | Service layer — `academic/services.py` |
+| **Test Tag** | `@br_faculty_001` |
+| **Error Code** | `FACULTY_ASSIGNMENT_INVALID` (422) |
+
+#### BR-FACULTY-002 — Mid-Semester Reassignment Restrictions
+
+| Attribute | Detail |
+|---|---|
+| **Rule ID** | BR-FACULTY-002 |
+| **Domain** | Faculty Assignment |
+| **Statement** | Faculty assignment to a classroom's subject persists for the entire semester. Mid-semester reassignment (changing the assigned faculty after classes have begun) requires Department Head approval and triggers automatic notification to all enrolled students in the affected classroom. The original assignment and reassignment are both recorded in the audit log. |
+| **Trigger** | Faculty reassignment request after semester start date |
+| **Preconditions** | Faculty is currently assigned to the subject; semester is in `ACTIVE` status |
+| **Postconditions** | New faculty is assigned; students are notified; audit log records the change with approver, reason, and timestamp |
+| **Exception / Override** | Dean may approve emergency reassignment without Department Head approval in cases of faculty medical leave or termination |
+| **Enforcement Point** | Service layer — `academic/services.py` |
+| **Test Tag** | `@br_faculty_002` |
+| **Error Code** | `MID_SEMESTER_REASSIGNMENT_REQUIRES_APPROVAL` (422) |
+
 ---
 
 ## 4. Exception and Override Handling
@@ -785,6 +878,19 @@ Overrides allow authorized actors to bypass specific rules in documented excepti
 | BR-SCHOLARSHIP-001 | Scholarship | `finance/services.py` | `@br_scholarship_001` | `SCHOLARSHIP_EXCEEDS_FEE` |
 | BR-SCHOLARSHIP-002 | Scholarship | `finance/tasks.py` | `@br_scholarship_002` | N/A (automated) |
 | BR-SCHOLARSHIP-003 | Scholarship | `finance/services.py` | `@br_scholarship_003` | `INSUFFICIENT_SCHOLARSHIP_FUND` |
+| BR-SCHOLARSHIP-004 | Scholarship | `finance/services.py` | `@br_scholarship_004` | N/A (auto-applied) |
+| BR-SCHOLARSHIP-005 | Scholarship | `finance/services.py` | `@br_scholarship_005` | N/A (configuration) |
+| BR-SCHOLARSHIP-006 | Scholarship | `finance/services.py` | `@br_scholarship_006` | `MERIT_LIST_NOT_PUBLISHED` |
+| BR-ENROLL-008 | Enrollment | `admissions/services.py` | `@br_enroll_008` | `CONVERSION_PREREQUISITES_NOT_MET` |
+| BR-ENROLL-009 | Enrollment | `academic/services.py` | `@br_enroll_009` | N/A (administrative) |
+| BR-ENROLL-010 | Enrollment | `academic/services.py` | `@br_enroll_010` | `REPEAT_NOT_ELIGIBLE` |
+| BR-ENROLL-011 | Enrollment | `academic/services.py` | `@br_enroll_011` | `CLASSROOM_ASSIGNMENT_REQUIRED` |
+| BR-ADM-005 | Admissions | `admissions/services.py` | `@br_adm_005` | `ADMISSION_CYCLE_CONFLICT` |
+| BR-ADM-006 | Admissions | `admissions/services.py` | `@br_adm_006` | N/A (visibility filter) |
+| BR-ADM-007 | Admissions | `admissions/services.py` | `@br_adm_007` | `EXAM_SCORES_NOT_FINALIZED` |
+| BR-ADM-008 | Admissions | `admissions/services.py` | `@br_adm_008` | `SCHOLARSHIP_AUTO_AWARD_BLOCKED` |
+| BR-FACULTY-001 | Faculty Assignment | `academic/services.py` | `@br_faculty_001` | `FACULTY_ASSIGNMENT_INVALID` |
+| BR-FACULTY-002 | Faculty Assignment | `academic/services.py` | `@br_faculty_002` | `MID_SEMESTER_REASSIGNMENT_REQUIRES_APPROVAL` |
 
 ---
 

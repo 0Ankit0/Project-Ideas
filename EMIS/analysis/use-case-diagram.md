@@ -304,3 +304,11 @@ graph LR
 | UC48 | Generate Reports | Administrator | Create custom reports |
 | UC49 | View Dashboard | Student, Faculty, Admin | Access personalized overview |
 | UC50 | Export Data | Administrator | Extract system data |
+| UC51 | Apply for Graduation | Student, Registrar | Apply for degree conferral |
+| UC52 | Process Disciplinary Case | Faculty, Admin, Committee | Handle conduct violations |
+| UC53 | Submit Grade Appeal | Student, Faculty | Contest grades |
+| UC54 | Recruit Faculty | HR Admin, Panel | Hire new faculty |
+| UC55 | Manage Academic Session | Administrator | Configure year/semesters |
+| UC56 | Evaluate Transfer Credits | Registrar, Student | Transfer credit evaluation |
+| UC57 | Process Scholarship | Student, Financial Aid | Apply for and manage aid |
+| UC58 | Book Room | Faculty, Staff | Reserve facilities |

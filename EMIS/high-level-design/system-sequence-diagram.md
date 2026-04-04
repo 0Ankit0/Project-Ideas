@@ -1,6 +1,6 @@
 # System Sequence Diagrams — Education Management Information System
 
-This document captures the six primary cross-module system sequences that span multiple EMIS domains. Each sequence shows all participating actors, services, and external systems — covering the happy path and key error branches — along with the audit events emitted at critical steps.
+This document captures the twelve primary cross-module system sequences that span multiple EMIS domains. Each sequence shows all participating actors, services, and external systems — covering the happy path and key error branches — along with the audit events emitted at critical steps.
 
 ---
 
@@ -461,4 +461,305 @@ sequenceDiagram
         HoldSvc->>NotifSvc: Notify student: hold lifted
         NotifSvc-->>Student: Email: "Academic hold lifted — CS301 exam registration is now available"
     end
+```
+
+---
+
+## 7. Academic Session & Semester Management
+
+Covers the full academic session lifecycle — from academic year creation, semester planning, calendar configuration, and registration opening through semester activation, exam period, grading period, and semester completion.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Academic Admin
+    participant SES as Session Service
+    participant SEM as Semester Service
+    participant CAL as Calendar Service
+    participant NotifSvc as Notification Service
+    participant DB as Database
+
+    Admin->>SES: createAcademicYear(name, dates)
+    SES->>DB: INSERT academic_year (PLANNING)
+    SES-->>Admin: yearCreated
+
+    Admin->>SEM: createSemester(year_id, type, dates)
+    SEM->>DB: INSERT semester (PLANNING)
+    Admin->>CAL: configureCalendar(semester_id, events, holidays)
+    CAL->>DB: INSERT calendar_events
+
+    Admin->>SEM: openRegistration(semester_id)
+    SEM->>DB: UPDATE semester SET status=REGISTRATION_OPEN
+    SEM->>NotifSvc: notifyAll("Registration is now open for {semester}")
+    NotifSvc-->>SEM: notificationsSent
+
+    Note over SEM: Registration period...
+
+    Admin->>SEM: activateSemester(semester_id)
+    SEM->>DB: UPDATE semester SET status=ACTIVE
+    SEM->>NotifSvc: notifyAll("Semester has begun")
+
+    Note over SEM: Teaching period...
+
+    Admin->>SEM: startExamPeriod(semester_id)
+    SEM->>DB: UPDATE semester SET status=EXAM_PERIOD
+
+    Admin->>SEM: startGradingPeriod(semester_id)
+    SEM->>DB: UPDATE semester SET status=GRADING
+
+    Admin->>SEM: completeSemester(semester_id)
+    SEM->>DB: UPDATE semester SET status=COMPLETED
+```
+
+---
+
+## 8. Graduation Application & Degree Conferral
+
+Covers the graduation pipeline — student application submission, automated degree audit (credit, GPA, holds, and pending-grade checks), registrar approval, diploma generation, and degree conferral with student status update.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student
+    participant GAP as Graduation Service
+    participant AUD as Degree Audit Engine
+    participant REG as Registrar Service
+    participant DIP as Diploma Service
+    participant NotifSvc as Notification Service
+    participant DB as Database
+
+    Student->>GAP: submitGraduationApplication(student_id, semester_id)
+    GAP->>DB: INSERT graduation_application (SUBMITTED)
+    GAP->>AUD: runDegreeAudit(student_id)
+    AUD->>DB: SELECT credits, courses, gpa, holds
+    AUD->>AUD: checkEligibility(credits>=required, cgpa>=2.0, noHolds, noPendingGrades)
+    AUD->>DB: INSERT degree_audit(results)
+
+    alt Eligible
+        AUD-->>GAP: eligible=true
+        GAP->>DB: UPDATE application SET status=ELIGIBLE
+        GAP->>REG: requestApproval(application_id)
+        REG->>DB: UPDATE application SET status=APPROVED
+        REG->>DIP: generateDiploma(student_id, honors)
+        DIP->>DB: INSERT diploma_record(GENERATED)
+        DIP->>DB: UPDATE student SET enrollment_status=GRADUATED
+        DIP->>NotifSvc: notify(student, "Congratulations! Degree conferred")
+        NotifSvc-->>Student: Email: "Congratulations! Your degree has been conferred"
+    else Not Eligible
+        AUD-->>GAP: eligible=false, deficiencies=[...]
+        GAP->>DB: UPDATE application SET status=INELIGIBLE
+        GAP->>NotifSvc: notify(student, "Graduation application denied", deficiencies)
+        NotifSvc-->>Student: Email: "Graduation application denied — see deficiency details"
+    end
+```
+
+---
+
+## 9. Student Discipline Case Lifecycle
+
+Covers the disciplinary process from incident reporting through investigation, hearing scheduling and conduct, sanction application, and the optional appeal pathway — including notifications at each stage.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Reporter
+    actor Student
+    participant DIS as Discipline Service
+    participant HRG as Hearing Manager
+    participant SAN as Sanction Engine
+    participant NotifSvc as Notification Service
+    participant DB as Database
+
+    Reporter->>DIS: reportIncident(student_id, offense_type, description)
+    DIS->>DB: INSERT disciplinary_case (REPORTED)
+    DIS->>NotifSvc: notify(student, "Disciplinary case filed")
+    NotifSvc-->>Student: Email: "A disciplinary case has been filed"
+
+    DIS->>DIS: investigate(case_id)
+    DIS->>DB: UPDATE case SET status=UNDER_INVESTIGATION
+
+    alt Sufficient evidence
+        DIS->>HRG: scheduleHearing(case_id, date, panel)
+        HRG->>DB: INSERT hearing(scheduled)
+        HRG->>DB: UPDATE case SET status=HEARING_SCHEDULED
+        HRG->>NotifSvc: notify(student, "Hearing scheduled", date, 5_business_days_notice)
+        NotifSvc-->>Student: Email: "Hearing scheduled — {date} (5 business days notice)"
+
+        Note over HRG: Hearing conducted...
+
+        HRG->>DB: UPDATE hearing SET outcome, minutes
+        HRG->>DB: UPDATE case SET status=HEARING_COMPLETED
+
+        HRG->>SAN: applySanction(case_id, type, duration)
+        SAN->>DB: INSERT sanction
+        SAN->>DB: UPDATE case SET status=SANCTIONED
+        SAN->>NotifSvc: notify(student, "Sanction applied", appeal_window=10_business_days)
+        NotifSvc-->>Student: Email: "Sanction applied — you may appeal within 10 business days"
+
+        alt Student appeals within 10 days
+            Student->>DIS: submitAppeal(case_id, grounds)
+            DIS->>DB: INSERT discipline_appeal(SUBMITTED)
+            DIS->>DB: UPDATE case SET status=APPEALED
+            Note over DIS: Appeal review process...
+            DIS->>DB: UPDATE appeal SET decision
+        end
+    else Insufficient evidence
+        DIS->>DB: UPDATE case SET status=CLOSED
+        DIS->>NotifSvc: notify(student, "Case dismissed")
+        NotifSvc-->>Student: Email: "Disciplinary case dismissed"
+    end
+```
+
+---
+
+## 10. Grade Appeal Process
+
+Covers the formal grade appeal workflow — student-initiated appeal with evidence, faculty-level review, optional escalation to department head, and final escalation to an appeal committee, with grade modification at any resolution stage.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student
+    participant GAP as Grade Appeal Service
+    actor Faculty
+    actor HOD as Dept Head
+    actor COM as Appeal Committee
+    participant GradeSvc as Grade Service
+    participant NotifSvc as Notification Service
+    participant DB as Database
+
+    Student->>GAP: submitAppeal(enrollment_id, reason, evidence)
+    GAP->>GAP: validateWindow(<=15 calendar days from grade publish)
+    GAP->>DB: INSERT grade_appeal (SUBMITTED)
+    GAP->>NotifSvc: notify(faculty, "Grade appeal received")
+    NotifSvc-->>Faculty: Email: "Grade appeal received for enrollment {enrollment_id}"
+
+    GAP->>DB: UPDATE appeal SET status=FACULTY_REVIEW
+    Faculty->>GAP: reviewAppeal(appeal_id, decision, comments)
+
+    alt Faculty upholds or modifies
+        GAP->>DB: INSERT appeal_review(FACULTY, decision)
+        alt Grade modified
+            GAP->>GradeSvc: updateGrade(enrollment_id, new_grade)
+            GradeSvc->>DB: UPDATE enrollment SET grade=new_grade
+        end
+        GAP->>DB: UPDATE appeal SET status=RESOLVED
+        GAP->>NotifSvc: notify(student, "Appeal resolved by faculty")
+        NotifSvc-->>Student: Email: "Your grade appeal has been resolved by faculty"
+    else Faculty escalates to Dept Head
+        GAP->>DB: UPDATE appeal SET status=DEPT_HEAD_REVIEW
+        HOD->>GAP: reviewAppeal(appeal_id, decision)
+
+        alt Dept Head resolves
+            GAP->>DB: INSERT appeal_review(DEPT_HEAD, decision)
+            GAP->>DB: UPDATE appeal SET status=RESOLVED
+        else Dept Head escalates to Committee
+            GAP->>DB: UPDATE appeal SET status=COMMITTEE_REVIEW
+            COM->>GAP: reviewAppeal(appeal_id, final_decision)
+            GAP->>DB: INSERT appeal_review(COMMITTEE, decision)
+            GAP->>DB: UPDATE appeal SET status=RESOLVED
+            GAP->>NotifSvc: notify(student, "Final appeal decision")
+            NotifSvc-->>Student: Email: "Final appeal decision has been issued"
+        end
+    end
+```
+
+---
+
+## 11. Faculty Recruitment Workflow
+
+Covers the end-to-end faculty recruitment process — from department-initiated position request, HR approval and job posting, application screening and shortlisting, interview scheduling, offer extension, and candidate acceptance or decline.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor HOD as Dept Head
+    actor HR as HR Staff
+    actor Applicant
+    participant REC as Recruitment Service
+    participant SCR as Screening Service
+    participant INT as Interview Scheduler
+    participant OFR as Offer Manager
+    participant NotifSvc as Notification Service
+    participant DB as Database
+
+    HOD->>REC: requestPosition(department_id, title, requirements)
+    REC->>DB: INSERT job_posting (DRAFT)
+    HR->>REC: approveAndPublish(posting_id)
+    REC->>DB: UPDATE posting SET status=PUBLISHED
+    REC->>NotifSvc: publishToJobBoard(posting)
+
+    Applicant->>REC: submitApplication(posting_id, resume, cover_letter)
+    REC->>DB: INSERT job_application (RECEIVED)
+    REC->>NotifSvc: acknowledge(applicant, "Application received")
+    NotifSvc-->>Applicant: Email: "Your application has been received"
+
+    HR->>SCR: screenApplications(posting_id)
+    SCR->>DB: UPDATE applications SET status=SCREENING
+    SCR->>SCR: evaluateQualifications()
+    SCR->>DB: UPDATE qualified SET status=SHORTLISTED
+    SCR->>DB: UPDATE unqualified SET status=REJECTED
+
+    HR->>INT: scheduleInterviews(shortlisted_ids, panel, dates)
+    INT->>DB: INSERT interview_schedules
+    INT->>NotifSvc: notify(applicants, "Interview scheduled")
+    NotifSvc-->>Applicant: Email: "Interview scheduled — {date}"
+
+    Note over INT: Interviews conducted...
+    INT->>DB: UPDATE interviews SET feedback, score
+
+    HR->>OFR: extendOffer(application_id, salary, terms)
+    OFR->>DB: INSERT offer_letter (SENT)
+    OFR->>NotifSvc: notify(applicant, "Offer letter")
+    NotifSvc-->>Applicant: Email: "You have received an offer letter"
+
+    alt Applicant accepts
+        Applicant->>OFR: acceptOffer(offer_id)
+        OFR->>DB: UPDATE offer SET status=ACCEPTED
+        OFR->>DB: UPDATE posting SET status=FILLED
+        OFR->>NotifSvc: notify(HR, "Offer accepted, begin onboarding")
+        NotifSvc-->>HR: Email: "Offer accepted — initiate onboarding"
+    else Applicant declines
+        Applicant->>OFR: declineOffer(offer_id)
+        OFR->>DB: UPDATE offer SET status=DECLINED
+    end
+```
+
+---
+
+## 12. Transfer Credit Evaluation
+
+Covers the transfer credit evaluation process — student transcript submission, articulation agreement lookup, per-course evaluation (automatic or manual), credit-limit and residency-requirement validation, and final approval notification.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student
+    participant TCR as Transfer Credit Service
+    participant ART as Articulation Service
+    participant REG as Registrar Service
+    participant NotifSvc as Notification Service
+    participant DB as Database
+
+    Student->>TCR: submitTransferRequest(transcripts, courses)
+    TCR->>DB: INSERT transfer_credit_request (SUBMITTED)
+
+    TCR->>ART: checkArticulationAgreements(source_institution)
+    ART->>DB: SELECT matching articulation_mappings
+
+    loop For each external course
+        TCR->>TCR: evaluateCourse(grade>=B?, accredited?, not_duplicate?)
+        alt Has articulation mapping
+            TCR->>DB: INSERT transfer_credit_item (APPROVED, mapped_course)
+        else Manual evaluation needed
+            TCR->>REG: requestEvaluation(course_details)
+            REG->>DB: UPDATE item SET evaluation_status
+        end
+    end
+
+    TCR->>TCR: validateCreditLimits(total<=40% of program)
+    TCR->>TCR: validateResidencyRequirement(>=60% internal)
+    TCR->>DB: UPDATE request SET status=APPROVED/PARTIALLY_APPROVED
+    TCR->>NotifSvc: notify(student, "Transfer credits evaluated")
+    NotifSvc-->>Student: Email: "Your transfer credit evaluation is complete"
 ```

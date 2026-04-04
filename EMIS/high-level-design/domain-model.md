@@ -668,6 +668,657 @@ erDiagram
     }
 ```
 
+## Academic Session Domain
+
+```mermaid
+classDiagram
+    class AcademicYear {
+        UUID id
+        String name
+        Date start_date
+        Date end_date
+        AcademicYearStatus status
+    }
+
+    class AcademicYearStatus {
+        <<enumeration>>
+        PLANNING
+        ACTIVE
+        COMPLETED
+        ARCHIVED
+    }
+
+    class Semester {
+        UUID id
+        UUID academic_year_id
+        String name
+        SemesterType type
+        Date start_date
+        Date end_date
+        SemesterStatus status
+    }
+
+    class SemesterType {
+        <<enumeration>>
+        FALL
+        SPRING
+        SUMMER
+    }
+
+    class SemesterStatus {
+        <<enumeration>>
+        PLANNING
+        REGISTRATION_OPEN
+        ACTIVE
+        EXAM_PERIOD
+        GRADING
+        COMPLETED
+        ARCHIVED
+    }
+
+    class RegistrationWindow {
+        UUID id
+        UUID semester_id
+        Date open_date
+        Date close_date
+        WindowType type
+    }
+
+    class WindowType {
+        <<enumeration>>
+        REGULAR
+        LATE
+        ADD_DROP
+    }
+
+    class AcademicCalendarEvent {
+        UUID id
+        UUID semester_id
+        String name
+        String event_type
+        Date start_date
+        Date end_date
+        Boolean is_holiday
+    }
+
+    AcademicYear "1" --> "*" Semester
+    Semester "1" --> "*" RegistrationWindow
+    Semester "1" --> "*" AcademicCalendarEvent
+```
+
+## Graduation & Degree Domain
+
+```mermaid
+classDiagram
+    class GraduationApplication {
+        UUID id
+        UUID student_id
+        UUID semester_id
+        GraduationStatus status
+        DateTime applied_at
+        Date decision_date
+        String honors_designation
+    }
+
+    class GraduationStatus {
+        <<enumeration>>
+        SUBMITTED
+        UNDER_REVIEW
+        ELIGIBLE
+        INELIGIBLE
+        APPROVED
+        CONFERRED
+    }
+
+    class DegreeAudit {
+        UUID id
+        UUID graduation_application_id
+        Integer total_credits_required
+        Integer total_credits_earned
+        Decimal cgpa
+        Boolean all_courses_complete
+        Boolean no_holds
+        Boolean no_pending_grades
+        Boolean is_eligible
+        Date audit_date
+    }
+
+    class DiplomaRecord {
+        UUID id
+        UUID student_id
+        String diploma_number
+        String program_name
+        Date conferral_date
+        String honors
+        DiplomaStatus status
+    }
+
+    class DiplomaStatus {
+        <<enumeration>>
+        GENERATED
+        DISPATCHED
+        DELIVERED
+    }
+
+    GraduationApplication "1" --> "1" DegreeAudit
+    GraduationApplication "1" --> "0..1" DiplomaRecord
+```
+
+## Student Discipline Domain
+
+```mermaid
+classDiagram
+    class DisciplinaryCase {
+        UUID id
+        UUID student_id
+        UUID reported_by
+        String offense_type
+        CaseSeverity severity
+        String description
+        CaseStatus status
+        Date reported_date
+    }
+
+    class CaseSeverity {
+        <<enumeration>>
+        MINOR
+        MODERATE
+        MAJOR
+        CRITICAL
+    }
+
+    class CaseStatus {
+        <<enumeration>>
+        REPORTED
+        UNDER_INVESTIGATION
+        HEARING_SCHEDULED
+        HEARING_COMPLETED
+        SANCTIONED
+        APPEALED
+        CLOSED
+        SEALED
+    }
+
+    class DisciplinaryHearing {
+        UUID id
+        UUID case_id
+        DateTime scheduled_date
+        String location
+        String panel_members
+        String hearing_outcome
+        String minutes
+    }
+
+    class Sanction {
+        UUID id
+        UUID case_id
+        SanctionType type
+        Date start_date
+        Date end_date
+        String conditions
+    }
+
+    class SanctionType {
+        <<enumeration>>
+        WARNING
+        PROBATION
+        SUSPENSION
+        EXPULSION
+        COMMUNITY_SERVICE
+        FINE
+    }
+
+    class DisciplineAppeal {
+        UUID id
+        UUID case_id
+        UUID student_id
+        String grounds
+        DisciplineAppealStatus status
+        Date submitted_date
+        Date decision_date
+    }
+
+    class DisciplineAppealStatus {
+        <<enumeration>>
+        SUBMITTED
+        UNDER_REVIEW
+        UPHELD
+        MODIFIED
+        OVERTURNED
+    }
+
+    DisciplinaryCase "1" --> "*" DisciplinaryHearing
+    DisciplinaryCase "1" --> "*" Sanction
+    DisciplinaryCase "1" --> "0..1" DisciplineAppeal
+```
+
+## Academic Standing Domain
+
+```mermaid
+classDiagram
+    class AcademicStandingRecord {
+        UUID id
+        UUID student_id
+        UUID semester_id
+        Decimal semester_gpa
+        Decimal cgpa
+        StandingType standing
+        Date determined_date
+        String notes
+    }
+
+    class StandingType {
+        <<enumeration>>
+        GOOD_STANDING
+        PROBATION
+        ACADEMIC_WARNING
+        SUSPENSION
+        DISMISSAL
+        DEANS_LIST
+        PRESIDENTS_LIST
+    }
+
+    class ProbationContract {
+        UUID id
+        UUID standing_record_id
+        UUID student_id
+        String conditions
+        Decimal min_gpa_target
+        Integer max_semesters
+        UUID advisor_id
+        Date signed_date
+    }
+
+    AcademicStandingRecord "1" --> "0..1" ProbationContract
+```
+
+## Grade Appeal Domain
+
+```mermaid
+classDiagram
+    class GradeAppeal {
+        UUID id
+        UUID student_id
+        UUID enrollment_id
+        UUID course_id
+        String original_grade
+        String requested_action
+        String reason
+        String evidence_urls
+        AppealStatus status
+        Date submitted_date
+    }
+
+    class AppealStatus {
+        <<enumeration>>
+        SUBMITTED
+        FACULTY_REVIEW
+        DEPT_HEAD_REVIEW
+        COMMITTEE_REVIEW
+        RESOLVED
+        REJECTED
+        WITHDRAWN
+    }
+
+    class AppealReview {
+        UUID id
+        UUID appeal_id
+        UUID reviewer_id
+        ReviewerRole reviewer_role
+        ReviewDecision decision
+        String new_grade
+        Date review_date
+        String comments
+    }
+
+    class ReviewerRole {
+        <<enumeration>>
+        FACULTY
+        DEPT_HEAD
+        COMMITTEE
+    }
+
+    class ReviewDecision {
+        <<enumeration>>
+        UPHELD
+        MODIFIED
+        ESCALATED
+    }
+
+    GradeAppeal "1" --> "*" AppealReview
+```
+
+## Faculty Recruitment Domain
+
+```mermaid
+classDiagram
+    class JobPosting {
+        UUID id
+        UUID department_id
+        String title
+        PositionType position_type
+        String description
+        String qualifications
+        String salary_range
+        PostingStatus status
+        Date posted_date
+        Date deadline
+    }
+
+    class PositionType {
+        <<enumeration>>
+        FULL_TIME
+        PART_TIME
+        ADJUNCT
+        VISITING
+    }
+
+    class PostingStatus {
+        <<enumeration>>
+        DRAFT
+        PUBLISHED
+        CLOSED
+        FILLED
+        CANCELLED
+    }
+
+    class JobApplication {
+        UUID id
+        UUID posting_id
+        String applicant_name
+        String email
+        String resume_url
+        String cover_letter
+        ApplicationStatus status
+    }
+
+    class ApplicationStatus {
+        <<enumeration>>
+        RECEIVED
+        SCREENING
+        SHORTLISTED
+        INTERVIEW_SCHEDULED
+        INTERVIEWED
+        OFFER_EXTENDED
+        ACCEPTED
+        REJECTED
+        WITHDRAWN
+    }
+
+    class InterviewSchedule {
+        UUID id
+        UUID application_id
+        DateTime interview_date
+        String panel_members
+        InterviewType interview_type
+        String feedback
+        Decimal score
+    }
+
+    class InterviewType {
+        <<enumeration>>
+        PHONE
+        VIDEO
+        IN_PERSON
+        DEMO_LECTURE
+    }
+
+    class OfferLetter {
+        UUID id
+        UUID application_id
+        Decimal salary
+        Date start_date
+        String terms
+        OfferStatus status
+    }
+
+    class OfferStatus {
+        <<enumeration>>
+        DRAFT
+        SENT
+        ACCEPTED
+        DECLINED
+        EXPIRED
+    }
+
+    JobPosting "1" --> "*" JobApplication
+    JobApplication "1" --> "*" InterviewSchedule
+    JobApplication "1" --> "0..1" OfferLetter
+```
+
+## Transfer Credits Domain
+
+```mermaid
+classDiagram
+    class TransferCreditRequest {
+        UUID id
+        UUID student_id
+        String source_institution
+        RequestStatus status
+    }
+
+    class RequestStatus {
+        <<enumeration>>
+        SUBMITTED
+        UNDER_EVALUATION
+        PARTIALLY_APPROVED
+        APPROVED
+        REJECTED
+    }
+
+    class TransferCreditItem {
+        UUID id
+        UUID request_id
+        String external_course_name
+        String external_course_code
+        Integer credits
+        String grade
+        UUID equivalent_course_id
+        EvaluationStatus evaluation_status
+        UUID evaluator_id
+    }
+
+    class EvaluationStatus {
+        <<enumeration>>
+        PENDING
+        APPROVED
+        REJECTED
+    }
+
+    class ArticulationAgreement {
+        UUID id
+        String institution_name
+        Date valid_from
+        Date valid_to
+        AgreementStatus status
+    }
+
+    class AgreementStatus {
+        <<enumeration>>
+        ACTIVE
+        EXPIRED
+    }
+
+    class ArticulationMapping {
+        UUID id
+        UUID agreement_id
+        String external_course
+        UUID internal_course_id
+        String credit_mapping
+    }
+
+    TransferCreditRequest "1" --> "*" TransferCreditItem
+    ArticulationAgreement "1" --> "*" ArticulationMapping
+```
+
+## Scholarship & Financial Aid Domain
+
+```mermaid
+classDiagram
+    class ScholarshipProgram {
+        UUID id
+        String name
+        ScholarshipType type
+        Decimal amount
+        String eligibility_criteria
+        Integer max_recipients
+        Boolean renewable
+        ProgramStatus status
+    }
+
+    class ScholarshipType {
+        <<enumeration>>
+        MERIT
+        NEED_BASED
+        ATHLETIC
+        DEPARTMENTAL
+    }
+
+    class ProgramStatus {
+        <<enumeration>>
+        ACTIVE
+        INACTIVE
+    }
+
+    class ScholarshipApplication {
+        UUID id
+        UUID program_id
+        UUID student_id
+        UUID academic_year_id
+        ApplicationStatus status
+        Date applied_date
+    }
+
+    class ApplicationStatus {
+        <<enumeration>>
+        SUBMITTED
+        UNDER_REVIEW
+        APPROVED
+        REJECTED
+        WAITLISTED
+    }
+
+    class ScholarshipAward {
+        UUID id
+        UUID application_id
+        UUID student_id
+        Decimal amount
+        String disbursement_schedule
+        AwardStatus status
+        Boolean renewal_eligible
+    }
+
+    class AwardStatus {
+        <<enumeration>>
+        AWARDED
+        ACTIVE
+        SUSPENDED
+        REVOKED
+        COMPLETED
+    }
+
+    class AidDisbursement {
+        UUID id
+        UUID award_id
+        Decimal amount
+        Date disbursement_date
+        UUID semester_id
+        DisbursementStatus status
+    }
+
+    class DisbursementStatus {
+        <<enumeration>>
+        PENDING
+        PROCESSED
+        FAILED
+    }
+
+    ScholarshipProgram "1" --> "*" ScholarshipApplication
+    ScholarshipApplication "1" --> "0..1" ScholarshipAward
+    ScholarshipAward "1" --> "*" AidDisbursement
+```
+
+## Facility Management Domain
+
+```mermaid
+classDiagram
+    class Facility {
+        UUID id
+        String name
+        String building
+        FacilityType type
+        Integer capacity
+        String amenities
+        Boolean is_active
+    }
+
+    class FacilityType {
+        <<enumeration>>
+        CLASSROOM
+        LAB
+        AUDITORIUM
+        CONFERENCE
+        LIBRARY
+        SPORTS
+    }
+
+    class RoomBooking {
+        UUID id
+        UUID facility_id
+        UUID booked_by
+        String purpose
+        DateTime start_time
+        DateTime end_time
+        BookingStatus status
+        BookingPriority priority
+    }
+
+    class BookingStatus {
+        <<enumeration>>
+        REQUESTED
+        APPROVED
+        REJECTED
+        CANCELLED
+        COMPLETED
+    }
+
+    class BookingPriority {
+        <<enumeration>>
+        ACADEMIC
+        EXAM
+        EVENT
+        MAINTENANCE
+    }
+
+    class MaintenanceRequest {
+        UUID id
+        UUID facility_id
+        UUID reported_by
+        String issue_description
+        MaintenancePriority priority
+        MaintenanceStatus status
+    }
+
+    class MaintenancePriority {
+        <<enumeration>>
+        LOW
+        MEDIUM
+        HIGH
+        CRITICAL
+    }
+
+    class MaintenanceStatus {
+        <<enumeration>>
+        REPORTED
+        ASSIGNED
+        IN_PROGRESS
+        COMPLETED
+    }
+
+    Facility "1" --> "*" RoomBooking
+    Facility "1" --> "*" MaintenanceRequest
+```
+
 ## Key Domain Concepts
 
 ### 1. User Hierarchy

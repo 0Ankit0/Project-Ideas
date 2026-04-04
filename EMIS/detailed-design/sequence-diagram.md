@@ -982,3 +982,635 @@ sequenceDiagram
     end
     SEOAPI-->>Browser: 200 {programs[], meta: {canonical_url, og_tags}}
 ```
+
+## 21. Graduation
+
+### 21.1 Graduation Application & Degree Audit
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student
+    participant Portal as Student Portal
+    participant GradAPI as Graduation API
+    participant AuditSvc as Degree Audit Service
+    participant EnrollDB as Enrollment DB
+    participant FinSvc as Finance Service
+    participant DiscSvc as Discipline Service
+    participant NotifSvc as Notification Service
+    participant DiplomaSvc as Diploma Service
+
+    Student->>Portal: Click "Apply for Graduation"
+    Portal->>GradAPI: GET /graduation/eligibility-check
+    GradAPI->>AuditSvc: Run degree audit
+    AuditSvc->>EnrollDB: Query all completed courses, credits, GPA
+    EnrollDB-->>AuditSvc: Academic record
+    AuditSvc->>AuditSvc: Check: credits, required courses, CGPA, residency
+    AuditSvc->>FinSvc: Check financial holds
+    FinSvc-->>AuditSvc: No holds / Hold exists
+    AuditSvc->>DiscSvc: Check disciplinary holds
+    DiscSvc-->>AuditSvc: No holds / Hold exists
+    AuditSvc-->>GradAPI: Audit result (PASSED/FAILED)
+    
+    alt Audit PASSED
+        GradAPI-->>Portal: Eligible — show application form
+        Student->>Portal: Submit graduation application
+        Portal->>GradAPI: POST /graduation/applications/
+        GradAPI->>GradAPI: Create application (SUBMITTED)
+        GradAPI->>NotifSvc: Notify registrar
+        GradAPI-->>Portal: 201 {application_number, status: SUBMITTED}
+        
+        Note over GradAPI: Registrar reviews
+        GradAPI->>GradAPI: Approve application
+        GradAPI->>GradAPI: Determine honors (CGPA-based)
+        GradAPI->>DiplomaSvc: Generate diploma
+        DiplomaSvc->>DiplomaSvc: Assign diploma number (DIP-YYYY-XXXXXX)
+        DiplomaSvc-->>GradAPI: Diploma generated
+        GradAPI->>GradAPI: Status → CONFERRED
+        GradAPI->>NotifSvc: Notify student of graduation
+    else Audit FAILED
+        GradAPI-->>Portal: Not eligible — show missing requirements
+    end
+```
+
+## 22. Student Discipline
+
+### 22.1 Disciplinary Case Processing
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Faculty
+    actor Student
+    participant DiscAPI as Discipline API
+    participant CaseSvc as Case Service
+    participant CommSvc as Committee Service
+    participant EnrollSvc as Enrollment Service
+    participant NotifSvc as Notification Service
+    participant AuditLog as Audit Log
+
+    Faculty->>DiscAPI: POST /discipline/cases/ (report incident)
+    DiscAPI->>CaseSvc: Create case (REPORTED)
+    CaseSvc->>AuditLog: Log case creation
+    CaseSvc->>NotifSvc: Notify student of report
+    CaseSvc->>NotifSvc: Notify discipline committee
+    DiscAPI-->>Faculty: 201 {case_number}
+
+    Note over CaseSvc: Investigation phase
+    CaseSvc->>CaseSvc: Status → UNDER_INVESTIGATION
+
+    CaseSvc->>CommSvc: Assign panel (conflict check)
+    CommSvc->>CommSvc: Verify no conflicts of interest
+    CommSvc-->>CaseSvc: Panel assigned
+
+    CaseSvc->>CaseSvc: Status → HEARING_SCHEDULED
+    CaseSvc->>NotifSvc: Notify student (≥5 business days notice)
+
+    Note over CaseSvc: Hearing conducted
+    CaseSvc->>CaseSvc: Record hearing notes, evidence
+    CaseSvc->>CaseSvc: Status → DECISION_ISSUED
+    CaseSvc->>CaseSvc: Set sanction (e.g., SUSPENSION)
+
+    alt Sanction is SUSPENSION or EXPULSION
+        CaseSvc->>EnrollSvc: Withdraw from courses (grade: W)
+        CaseSvc->>EnrollSvc: Block future registration
+    end
+
+    CaseSvc->>NotifSvc: Notify student of decision
+    CaseSvc->>AuditLog: Log decision
+
+    Note over Student: Appeal window (10 business days)
+    
+    alt Student Appeals
+        Student->>DiscAPI: POST /discipline/cases/{id}/appeals/
+        DiscAPI->>CaseSvc: Create appeal
+        CaseSvc->>CommSvc: Assign appeals board (different panel)
+        CommSvc-->>CaseSvc: Appeals board assigned
+        CaseSvc->>CaseSvc: Review appeal
+        CaseSvc->>CaseSvc: Decision: UPHELD / MODIFIED / REVERSED
+        CaseSvc->>NotifSvc: Notify student of appeal outcome
+        CaseSvc->>AuditLog: Log appeal decision
+    end
+```
+
+## 23. Grade Appeal
+
+### 23.1 Grade Appeal Escalation
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student
+    actor Faculty
+    actor DeptHead as Department Head
+    actor Committee as Appeals Committee
+    participant AppealAPI as Grade Appeal API
+    participant GradeSvc as Grade Service
+    participant NotifSvc as Notification Service
+
+    Student->>AppealAPI: POST /grade-appeals/ (within 15 days)
+    AppealAPI->>AppealAPI: Validate deadline
+    AppealAPI->>AppealAPI: Create appeal (SUBMITTED, level: FACULTY)
+    AppealAPI->>NotifSvc: Notify faculty
+    AppealAPI-->>Student: 201 {appeal_number}
+
+    Note over Faculty: Faculty review (7 days)
+    Faculty->>AppealAPI: PATCH /grade-appeals/{id}/ (review)
+
+    alt Faculty Agrees
+        AppealAPI->>GradeSvc: Update grade (preserve original)
+        GradeSvc->>GradeSvc: Recalculate GPA/CGPA
+        AppealAPI->>AppealAPI: Status → RESOLVED
+        AppealAPI->>NotifSvc: Notify student (grade modified)
+    else Faculty Upholds
+        AppealAPI->>AppealAPI: Escalate to DEPT_HEAD_REVIEW
+        AppealAPI->>NotifSvc: Notify department head
+
+        Note over DeptHead: Dept Head review (7 days)
+        DeptHead->>AppealAPI: PATCH /grade-appeals/{id}/
+
+        alt Dept Head Modifies
+            AppealAPI->>GradeSvc: Update grade
+            GradeSvc->>GradeSvc: Recalculate GPA/CGPA
+            AppealAPI->>AppealAPI: Status → RESOLVED
+        else Dept Head Upholds
+            AppealAPI->>AppealAPI: Escalate to COMMITTEE_REVIEW
+            AppealAPI->>NotifSvc: Notify committee
+
+            Note over Committee: Committee review (14 days)
+            Committee->>AppealAPI: PATCH /grade-appeals/{id}/
+            AppealAPI->>AppealAPI: Final decision (binding)
+            
+            alt Grade Modified
+                AppealAPI->>GradeSvc: Update grade
+                GradeSvc->>GradeSvc: Recalculate GPA/CGPA
+            end
+            AppealAPI->>AppealAPI: Status → RESOLVED
+            AppealAPI->>NotifSvc: Notify student (final decision)
+        end
+    end
+```
+
+## 24. Faculty Recruitment
+
+### 24.1 Recruitment Pipeline
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor HR as HR Admin
+    actor Candidate
+    actor Panel as Interview Panel
+    participant RecruitAPI as Recruitment API
+    participant ScreenSvc as Screening Service
+    participant RoomSvc as Room Booking
+    participant NotifSvc as Notification Service
+    participant HRSvc as HR/Onboarding Service
+
+    HR->>RecruitAPI: POST /recruitment/postings/ (create position)
+    RecruitAPI-->>HR: 201 {position_number, status: DRAFT}
+    
+    HR->>RecruitAPI: PATCH /recruitment/postings/{id}/publish/
+    RecruitAPI->>RecruitAPI: Verify budget approval
+    RecruitAPI-->>HR: 200 {status: PUBLISHED}
+
+    Candidate->>RecruitAPI: POST /recruitment/postings/{id}/applications/
+    RecruitAPI->>ScreenSvc: Auto-screen (qualifications check)
+    ScreenSvc-->>RecruitAPI: {screening_passed: true, score: 82}
+    RecruitAPI-->>Candidate: 201 {application_number}
+
+    HR->>RecruitAPI: PATCH /recruitment/applications/{id}/ (shortlist)
+    RecruitAPI->>RecruitAPI: Status → SHORTLISTED
+
+    HR->>RecruitAPI: Schedule interview
+    RecruitAPI->>RecruitAPI: Validate panel (≥3 members, dept + external + HR)
+    RecruitAPI->>RoomSvc: Book interview room
+    RoomSvc-->>RecruitAPI: Room confirmed
+    RecruitAPI->>NotifSvc: Notify candidate and panel
+    RecruitAPI->>RecruitAPI: Status → INTERVIEW_SCHEDULED
+
+    Note over Panel: Interview conducted
+    Panel->>RecruitAPI: POST evaluations (each panel member)
+    RecruitAPI->>RecruitAPI: Aggregate scores
+
+    HR->>RecruitAPI: PATCH /recruitment/applications/{id}/ (extend offer)
+    RecruitAPI->>NotifSvc: Send offer letter to candidate
+
+    alt Candidate Accepts
+        Candidate->>RecruitAPI: Accept offer
+        RecruitAPI->>HRSvc: Initiate onboarding
+        HRSvc->>HRSvc: Create employee record, user account
+        HRSvc->>NotifSvc: Send onboarding checklist
+        RecruitAPI->>RecruitAPI: Status → HIRED
+    else Candidate Rejects or Offer Expires
+        RecruitAPI->>RecruitAPI: Status → REJECTED / EXPIRED
+        HR->>RecruitAPI: Consider next candidate
+    end
+```
+
+## 25. Academic Session Management
+
+### 25.1 Semester Lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    actor DeptHead as Department Head
+    participant SessionAPI as Session API
+    participant SemSvc as Semester Service
+    participant CourseSvc as Course Offering Service
+    participant EnrollSvc as Enrollment Service
+    participant GradeSvc as Grade Service
+    participant StandingSvc as Standing Service
+    participant NotifSvc as Notification Service
+
+    Admin->>SessionAPI: POST /academic-years/ (create year)
+    SessionAPI-->>Admin: 201 {status: PLANNING}
+    
+    Admin->>SessionAPI: POST /semesters/ (create semester)
+    SessionAPI-->>Admin: 201 {status: PLANNING}
+    
+    DeptHead->>SessionAPI: POST /semesters/{id}/course-offerings/
+    SessionAPI->>CourseSvc: Configure courses, sections, faculty
+    CourseSvc-->>SessionAPI: Offerings created
+
+    Admin->>SessionAPI: PATCH /semesters/{id}/status/ → REGISTRATION_OPEN
+    SessionAPI->>NotifSvc: Notify all students
+    SessionAPI->>EnrollSvc: Open registration
+
+    Note over EnrollSvc: Students register for courses
+
+    Admin->>SessionAPI: PATCH /semesters/{id}/status/ → ACTIVE
+    Note over SemSvc: Semester in progress (classes, attendance, assignments)
+
+    Admin->>SessionAPI: PATCH /semesters/{id}/status/ → EXAM_PERIOD
+    SessionAPI->>EnrollSvc: Block enrollment changes
+
+    Admin->>SessionAPI: PATCH /semesters/{id}/status/ → GRADING
+    SessionAPI->>GradeSvc: Open grading window
+
+    Note over GradeSvc: Faculty submit grades
+
+    Admin->>SessionAPI: PATCH /semesters/{id}/status/ → COMPLETED
+    SessionAPI->>SemSvc: Verify all grades submitted
+    alt All Grades Submitted
+        SessionAPI->>GradeSvc: Finalize GPA calculations
+        SessionAPI->>StandingSvc: Calculate academic standings
+        SessionAPI->>StandingSvc: Determine Dean's List
+        SessionAPI->>NotifSvc: Publish results to students
+        SessionAPI-->>Admin: 200 {status: COMPLETED}
+    else Missing Grades
+        SessionAPI-->>Admin: 422 SEMESTER_CLOSURE_BLOCKED
+    end
+```
+
+## 26. Transfer Credit Evaluation
+
+### 26.1 Transfer Credit Processing
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student as Transfer Student
+    actor Registrar
+    participant TransferAPI as Transfer Credit API
+    participant ArtSvc as Articulation Service
+    participant AuditSvc as Degree Audit Service
+    participant NotifSvc as Notification Service
+
+    Student->>TransferAPI: POST /transfer-credits/ (with transcripts)
+    TransferAPI-->>Student: 201 {status: SUBMITTED}
+    TransferAPI->>NotifSvc: Notify registrar
+
+    Registrar->>TransferAPI: GET /transfer-credits/{id}/
+    Registrar->>TransferAPI: Review course details
+
+    TransferAPI->>ArtSvc: Check articulation agreements
+    ArtSvc-->>TransferAPI: Pre-approved mapping found / not found
+
+    alt Pre-approved Mapping Exists
+        TransferAPI->>TransferAPI: Auto-map to equivalent course
+    else No Mapping
+        Registrar->>TransferAPI: Manual equivalency evaluation
+    end
+
+    Registrar->>TransferAPI: PATCH /transfer-credits/{id}/ (approve/reject)
+    TransferAPI->>TransferAPI: Validate: ≤40% total, grade ≥ B, residency OK
+    
+    alt Approved
+        TransferAPI->>AuditSvc: Update degree audit
+        TransferAPI->>NotifSvc: Notify student (approved)
+    else Rejected
+        TransferAPI->>NotifSvc: Notify student (rejected with reason)
+    end
+```
+
+## 27. Scholarship Processing
+
+### 27.1 Scholarship Application & Disbursement
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student
+    actor FinAid as Financial Aid Admin
+    participant ScholAPI as Scholarship API
+    participant EligSvc as Eligibility Service
+    participant FinSvc as Finance Service
+    participant NotifSvc as Notification Service
+
+    Student->>ScholAPI: GET /scholarships/ (browse available)
+    ScholAPI-->>Student: List of scholarships with criteria
+
+    Student->>ScholAPI: POST /scholarships/{id}/apply/
+    ScholAPI->>EligSvc: Validate eligibility (GPA, program, need)
+    
+    alt Eligible
+        ScholAPI-->>Student: 201 {status: APPLIED}
+        ScholAPI->>NotifSvc: Notify financial aid office
+    else Not Eligible
+        ScholAPI-->>Student: 422 ELIGIBILITY_CRITERIA_NOT_MET
+    end
+
+    FinAid->>ScholAPI: Review application, score applicant
+    FinAid->>ScholAPI: PATCH /scholarship-awards/{id}/ (award)
+    ScholAPI->>ScholAPI: Check fund balance
+    
+    alt Fund Available
+        ScholAPI->>ScholAPI: Status → AWARDED
+        ScholAPI->>NotifSvc: Notify student of award
+        
+        Note over FinAid: Disbursement
+        FinAid->>ScholAPI: PATCH /scholarship-awards/{id}/ (disburse)
+        ScholAPI->>FinSvc: Apply fee adjustment to invoice
+        FinSvc-->>ScholAPI: Invoice updated
+        ScholAPI->>ScholAPI: Status → DISBURSED
+
+        Note over ScholAPI: Semester end — renewal check
+        ScholAPI->>EligSvc: Check renewal criteria (GPA, standing)
+        alt Renewal Criteria Met
+            ScholAPI->>ScholAPI: renewal_status → ELIGIBLE
+        else GPA Below Threshold (Grace Period)
+            ScholAPI->>ScholAPI: renewal_status → WARNING
+            ScholAPI->>NotifSvc: Warn student
+        else Second Consecutive Failure
+            ScholAPI->>ScholAPI: Status → REVOKED
+            ScholAPI->>FinSvc: Reverse fee adjustment (next semester)
+            ScholAPI->>NotifSvc: Notify student of revocation
+        end
+    else Fund Depleted
+        ScholAPI->>ScholAPI: Status → WAITLISTED
+        ScholAPI->>NotifSvc: Notify student (waitlisted)
+    end
+```
+
+---
+
+## 28. Admission Cycle & Entrance Examination
+
+### 28.1 Admission Cycle & Entrance Examination Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant CycleAPI as Admission Cycle API
+    participant ExamAPI as Entrance Exam API
+    participant MeritAPI as Merit List API
+    participant ScholSvc as Scholarship Service
+    participant PortalSvc as Portal Service
+    participant NotifWorker as Notification Service
+
+    Admin->>CycleAPI: POST /api/admissions/cycles/ {program_id, name, dates, seat_limit}
+    CycleAPI->>CycleAPI: Create AdmissionCycle (status=DRAFT)
+    CycleAPI-->>Admin: 201 {cycle_id, status: DRAFT}
+
+    Admin->>CycleAPI: PATCH /api/admissions/cycles/{id}/publish/
+    CycleAPI->>CycleAPI: Validate dates and seat_limit
+    CycleAPI->>CycleAPI: Status → PUBLISHED
+    CycleAPI->>PortalSvc: Publish cycle to external portal
+    PortalSvc-->>CycleAPI: Published
+    CycleAPI->>NotifWorker: Publish admission.cycle.published event
+    CycleAPI-->>Admin: 200 {status: PUBLISHED, published_at}
+
+    Note over Applicant: Applicants apply during open window
+    actor Applicant
+    Applicant->>CycleAPI: POST /api/admissions/applications/ {cycle_id, personal_details, documents}
+    CycleAPI->>CycleAPI: Validate cycle is PUBLISHED and within dates
+    CycleAPI-->>Applicant: 201 {application_id, status: SUBMITTED}
+
+    Note over Admin: Configure entrance exam
+    Admin->>ExamAPI: POST /api/admissions/entrance-exams/ {cycle_id, title, duration, total_marks, passing_marks}
+    ExamAPI->>ExamAPI: Create EntranceExam (status=CONFIGURED)
+    ExamAPI-->>Admin: 201 {exam_id}
+
+    Admin->>ExamAPI: PATCH /api/admissions/entrance-exams/{id}/schedule/ {exam_date}
+    ExamAPI->>ExamAPI: Status → SCHEDULED
+    ExamAPI->>NotifWorker: Notify all applicants of exam date
+    ExamAPI-->>Admin: 200 {status: SCHEDULED}
+
+    Note over ExamAPI: Exam day
+    Admin->>ExamAPI: PATCH /api/admissions/entrance-exams/{id}/start/
+    ExamAPI->>ExamAPI: Status → IN_PROGRESS
+
+    Applicant->>ExamAPI: POST /api/admissions/entrance-exams/{id}/submit/ {answers}
+    ExamAPI->>ExamAPI: Record submission
+
+    Admin->>ExamAPI: PATCH /api/admissions/entrance-exams/{id}/complete/
+    ExamAPI->>ExamAPI: Status → COMPLETED
+    alt Auto-score enabled
+        ExamAPI->>ExamAPI: Calculate scores for all submissions
+        ExamAPI->>ExamAPI: Status → SCORES_FINALIZED
+    else Manual scoring
+        Admin->>ExamAPI: POST /api/admissions/entrance-exams/{id}/finalize-scores/
+        ExamAPI->>ExamAPI: Status → SCORES_FINALIZED
+    end
+    ExamAPI-->>Admin: 200 {status: SCORES_FINALIZED}
+
+    Note over Admin: Generate merit list
+    Admin->>MeritAPI: POST /api/admissions/merit-lists/ {cycle_id}
+    MeritAPI->>ExamAPI: Fetch all exam results for cycle
+    MeritAPI->>MeritAPI: Sort by score DESC, assign ranks
+    MeritAPI->>MeritAPI: Calculate cutoff based on seat_limit
+    MeritAPI->>MeritAPI: Create merit_list and merit_list_entries
+    MeritAPI-->>Admin: 201 {merit_list_id, total_ranked, cutoff_score}
+
+    Admin->>MeritAPI: PATCH /api/admissions/merit-lists/{id}/publish/
+    MeritAPI->>MeritAPI: Status → PUBLISHED
+    MeritAPI->>PortalSvc: Publish merit list to portal
+    MeritAPI->>NotifWorker: Notify all ranked applicants
+    MeritAPI-->>Admin: 200 {status: PUBLISHED}
+
+    Note over MeritAPI: Auto-award scholarships to top N
+    MeritAPI->>ScholSvc: Auto-award scholarships (top_n entries with scholarship_eligible=true)
+    ScholSvc->>ScholSvc: Create scholarship_award records
+    ScholSvc->>NotifWorker: Notify scholarship recipients
+    ScholSvc-->>MeritAPI: Scholarships awarded
+```
+
+---
+
+## 29. Applicant to Student Conversion
+
+### 29.1 Applicant to Student Conversion Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Staff as Admissions Staff
+    participant ConvAPI as Conversion API
+    participant AppRepo as Application Repository
+    participant FinSvc as Finance Service
+    participant DocSvc as Document Service
+    participant StudentSvc as Student Service
+    participant EnrollSvc as Enrollment Service
+    participant ClassSvc as Classroom Service
+    participant NotifWorker as Notification Service
+
+    Staff->>ConvAPI: POST /api/admissions/applications/{id}/convert/
+    ConvAPI->>AppRepo: Fetch application details
+    AppRepo-->>ConvAPI: Application (status=ACCEPTED)
+
+    alt Application not ACCEPTED
+        ConvAPI-->>Staff: 422 APPLICATION_NOT_IN_ACCEPTED_STATE
+    end
+
+    ConvAPI->>FinSvc: Check all bills cleared for applicant
+    alt Outstanding bills exist
+        FinSvc-->>ConvAPI: {cleared: false, outstanding_amount}
+        ConvAPI-->>Staff: 422 OUTSTANDING_BILLS {amount, invoice_ids}
+    end
+
+    ConvAPI->>DocSvc: Check all required documents verified
+    alt Documents not verified
+        DocSvc-->>ConvAPI: {verified: false, pending_docs}
+        ConvAPI-->>Staff: 422 DOCUMENTS_NOT_VERIFIED {pending_docs}
+    end
+
+    ConvAPI->>AppRepo: Check offer accepted
+    alt Offer not accepted
+        ConvAPI-->>Staff: 422 OFFER_NOT_ACCEPTED
+    end
+
+    Note over ConvAPI: All validations passed — begin conversion
+    ConvAPI->>AppRepo: Transition Application → CONVERTING
+    ConvAPI->>StudentSvc: POST /api/students/ {from_application_id}
+    StudentSvc->>StudentSvc: Create Student record, generate student_id
+    StudentSvc-->>ConvAPI: {student_id, student_record}
+
+    ConvAPI->>EnrollSvc: POST /api/enrollment/semester-enrollments/ {student_id, semester_id, program_semester_number: 1}
+    EnrollSvc->>EnrollSvc: Create SemesterEnrollment (is_repeat=false)
+    EnrollSvc-->>ConvAPI: {enrollment_id}
+
+    ConvAPI->>ClassSvc: POST /api/academic/classroom-assignments/ {student_id, semester_id}
+    ClassSvc->>ClassSvc: Assign to classroom based on program and capacity
+    ClassSvc-->>ConvAPI: {classroom_id}
+
+    ConvAPI->>AppRepo: Transition Application → ENROLLED
+    ConvAPI->>NotifWorker: Publish student.created event
+    NotifWorker-->>Applicant: Email: Welcome — Student ID and portal credentials
+    ConvAPI-->>Staff: 200 {student_id, enrollment_id, classroom_id}
+```
+
+---
+
+## 30. Semester Progression & Repeat
+
+### 30.1 Semester Progression & Repeat Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant ProgAPI as Progression API
+    participant StudentRepo as Student Repository
+    participant EnrollSvc as Enrollment Service
+    participant AcademicSvc as Academic Standing Service
+    participant ClassSvc as Classroom Service
+    participant FinSvc as Finance Service
+    participant NotifWorker as Notification Service
+
+    Admin->>ProgAPI: GET /api/academic/students/{id}/progression-status/
+    ProgAPI->>StudentRepo: Fetch student academic record
+    ProgAPI->>AcademicSvc: Check progression eligibility
+    AcademicSvc->>AcademicSvc: Evaluate GPA, credits earned, holds
+    AcademicSvc-->>ProgAPI: {eligible: true/false, reason, current_semester, next_semester}
+    ProgAPI-->>Admin: 200 {student_id, eligible, current_semester, recommended_action}
+
+    alt Assign Next Semester
+        Admin->>ProgAPI: POST /api/academic/students/{id}/assign-semester/ {action: "progress", semester_id}
+        ProgAPI->>FinSvc: Check no financial holds
+        alt Financial hold exists
+            ProgAPI-->>Admin: 422 FINANCIAL_HOLD_ACTIVE
+        end
+        ProgAPI->>AcademicSvc: Validate academic standing is OK
+        alt Academic standing not OK
+            ProgAPI-->>Admin: 422 ACADEMIC_STANDING_INSUFFICIENT
+        end
+        ProgAPI->>EnrollSvc: Create SemesterEnrollment (is_repeat=false, next program_semester_number)
+        EnrollSvc-->>ProgAPI: {enrollment_id}
+        ProgAPI->>ClassSvc: Assign classroom for new semester
+        ClassSvc-->>ProgAPI: {classroom_id}
+        ProgAPI->>NotifWorker: Notify student of new semester assignment
+        ProgAPI-->>Admin: 200 {enrollment_id, semester, classroom_id}
+
+    else Assign Repeat Semester
+        Admin->>ProgAPI: POST /api/academic/students/{id}/assign-semester/ {action: "repeat", repeat_semester_number}
+        ProgAPI->>EnrollSvc: Create SemesterEnrollment (is_repeat=true, repeat_of_semester_number)
+        EnrollSvc-->>ProgAPI: {enrollment_id}
+        ProgAPI->>ClassSvc: Assign classroom for repeat semester
+        ClassSvc-->>ProgAPI: {classroom_id}
+        ProgAPI->>NotifWorker: Notify student of repeat semester assignment
+        ProgAPI-->>Admin: 200 {enrollment_id, semester, is_repeat: true, classroom_id}
+    end
+```
+
+---
+
+## 31. Faculty-Subject Assignment
+
+### 31.1 Faculty-Subject Assignment Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor DeptHead as Dept Head / Admin
+    participant AssignAPI as Assignment API
+    participant SubjectRepo as Subject Repository
+    participant FacultySvc as Faculty Service
+    participant TimetableSvc as Timetable Service
+    participant NotifWorker as Notification Service
+
+    DeptHead->>AssignAPI: GET /api/academic/classrooms/{id}/subjects/?semester_id={id}
+    AssignAPI->>SubjectRepo: Fetch subjects for classroom's semester
+    SubjectRepo-->>AssignAPI: List of subjects with assigned/unassigned status
+    AssignAPI-->>DeptHead: 200 {subjects: [{id, name, faculty_assigned: null}, ...]}
+
+    loop For each subject needing faculty
+        DeptHead->>AssignAPI: POST /api/academic/faculty-subject-assignments/ {faculty_id, subject_id, classroom_id, semester_id}
+
+        AssignAPI->>FacultySvc: Check faculty teaching load limit
+        alt Load limit exceeded
+            AssignAPI-->>DeptHead: 422 FACULTY_LOAD_LIMIT_EXCEEDED {current_load, max_load}
+        end
+
+        AssignAPI->>TimetableSvc: Check timetable conflicts
+        alt Timetable conflict detected
+            AssignAPI-->>DeptHead: 409 TIMETABLE_CONFLICT {conflicting_slot}
+        end
+
+        AssignAPI->>FacultySvc: Validate faculty qualifications for subject
+        alt Qualification mismatch
+            AssignAPI-->>DeptHead: 422 QUALIFICATION_MISMATCH {required, faculty_qualifications}
+        end
+
+        AssignAPI->>AssignAPI: Create FacultySubjectAssignment
+        AssignAPI->>NotifWorker: Notify faculty of assignment
+        AssignAPI-->>DeptHead: 201 {assignment_id}
+    end
+
+    AssignAPI->>NotifWorker: Publish faculty.assignments.finalized event
+    NotifWorker-->>Faculty: Email: Teaching assignments for the semester
+    AssignAPI-->>DeptHead: 200 {all_subjects_assigned: true}
+```

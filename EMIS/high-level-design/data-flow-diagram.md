@@ -364,6 +364,284 @@ graph TB
     style P6_7 fill:#27AE60,color:#fff
 ```
 
+## Graduation Application & Degree Conferral Flow
+
+```mermaid
+flowchart TD
+    Student[Student] -->|Submit Graduation Application| P1[Receive Application]
+    P1 -->|Store Application| DS1[(Graduation Applications)]
+    P1 --> P2[Run Degree Audit]
+    P2 -->|Query Transcript| DS2[(Enrollments & Grades)]
+    P2 -->|Store Audit Result| DS3[(Degree Audit Records)]
+    P2 --> C1{Credits Complete?}
+    C1 -->|No| P3[Mark Ineligible]
+    C1 -->|Yes| C2{GPA Meets Threshold?}
+    C2 -->|No| P3
+    C2 -->|Yes| C3{Any Holds or Pending Grades?}
+    C3 -->|Yes| P3
+    P3 -->|Deficiency Report| P4[Notify Student: Ineligible]
+    P4 --> Student
+    C3 -->|No| P5[Mark Eligible & Approve]
+    P5 -->|Update Status| DS1
+    P5 --> P6[Generate Diploma Record]
+    P6 -->|Diploma Data| DS4[(Diploma Records)]
+    P6 --> P7[Update Alumni Status]
+    P7 -->|Status Update| DS5[(Student Records)]
+    P7 --> P8[Notify Student: Approved]
+    P8 --> Student
+
+    style Student fill:#4A90E2,color:#fff
+    style P1 fill:#3498DB,color:#fff
+    style P2 fill:#9B59B6,color:#fff
+    style P3 fill:#E74C3C,color:#fff
+    style P4 fill:#E74C3C,color:#fff
+    style P5 fill:#27AE60,color:#fff
+    style P6 fill:#F39C12,color:#fff
+    style P7 fill:#1ABC9C,color:#fff
+    style P8 fill:#27AE60,color:#fff
+    style C1 fill:#F39C12,color:#fff
+    style C2 fill:#F39C12,color:#fff
+    style C3 fill:#F39C12,color:#fff
+```
+
+## Student Discipline Case Flow
+
+```mermaid
+flowchart TD
+    Reporter[Reporter] -->|File Incident Report| P1[Receive Incident Report]
+    P1 -->|Store Case| DS1[(Disciplinary Cases)]
+    P1 --> P2[Investigate Case]
+    P2 --> P3[Schedule Hearing]
+    P3 -->|Store Hearing| DS2[(Hearing Records)]
+    P3 --> P4[Panel Reviews Case]
+    P4 --> C1{Violation Confirmed?}
+    C1 -->|No| P5[Close Case]
+    P5 -->|Update Status| DS1
+    C1 -->|Yes| P6[Apply Sanction]
+    P6 -->|Store Sanction| DS3[(Sanction Records)]
+    P6 --> P7[Notify Student]
+    P7 --> Student[Student]
+    P7 --> C2{Appeal Filed?}
+    C2 -->|No| P8[Close Case]
+    P8 -->|Update Status| DS1
+    C2 -->|Yes| P9[Review Appeal]
+    P9 --> C3{Appeal Decision}
+    C3 -->|Upheld| P8
+    C3 -->|Modified| P10[Modify Sanction]
+    P10 -->|Update Sanction| DS3
+    P10 --> P8
+    C3 -->|Overturned| P11[Remove Sanction]
+    P11 -->|Update Sanction| DS3
+    P11 --> P8
+
+    style Reporter fill:#95A5A6,color:#fff
+    style Student fill:#4A90E2,color:#fff
+    style P1 fill:#3498DB,color:#fff
+    style P2 fill:#9B59B6,color:#fff
+    style P3 fill:#E67E22,color:#fff
+    style P4 fill:#1ABC9C,color:#fff
+    style P5 fill:#27AE60,color:#fff
+    style P6 fill:#E74C3C,color:#fff
+    style P7 fill:#F39C12,color:#fff
+    style P8 fill:#27AE60,color:#fff
+    style P9 fill:#9B59B6,color:#fff
+    style P10 fill:#E67E22,color:#fff
+    style P11 fill:#1ABC9C,color:#fff
+    style C1 fill:#F39C12,color:#fff
+    style C2 fill:#F39C12,color:#fff
+    style C3 fill:#F39C12,color:#fff
+```
+
+## Grade Appeal Escalation Flow
+
+```mermaid
+flowchart TD
+    Student[Student] -->|Submit Grade Appeal| P1[Receive Grade Appeal]
+    P1 -->|Store Appeal| DS1[(Grade Appeals)]
+    P1 --> P2[Faculty Review]
+    P2 --> C1{Faculty Decision}
+    C1 -->|Grade Modified| P3[Update Grade]
+    P3 -->|New Grade| DS2[(Grade Records)]
+    P3 --> P8[Notify Student: Resolved]
+    C1 -->|Rejected| P9[Notify Student: Rejected]
+    C1 -->|Escalated| P4[Dept Head Review]
+    P4 --> C2{Dept Head Decision}
+    C2 -->|Grade Modified| P3
+    C2 -->|Rejected| P9
+    C2 -->|Escalated| P5[Committee Review]
+    P5 --> C3{Committee Decision}
+    C3 -->|Grade Modified| P6[Update Grade with New Value]
+    P6 -->|New Grade| DS2
+    P6 --> P7[Notify Student: Modified]
+    C3 -->|Upheld Original| P9
+    P8 --> Student
+    P7 --> Student
+    P9 --> Student
+
+    style Student fill:#4A90E2,color:#fff
+    style P1 fill:#3498DB,color:#fff
+    style P2 fill:#9B59B6,color:#fff
+    style P3 fill:#27AE60,color:#fff
+    style P4 fill:#E67E22,color:#fff
+    style P5 fill:#E74C3C,color:#fff
+    style P6 fill:#27AE60,color:#fff
+    style P7 fill:#1ABC9C,color:#fff
+    style P8 fill:#1ABC9C,color:#fff
+    style P9 fill:#95A5A6,color:#fff
+    style C1 fill:#F39C12,color:#fff
+    style C2 fill:#F39C12,color:#fff
+    style C3 fill:#F39C12,color:#fff
+```
+
+## Faculty Recruitment Flow
+
+```mermaid
+flowchart TD
+    Dept[Department] -->|Request Position| P1[Create Job Posting]
+    HR[HR Admin] -->|Define Requirements| P1
+    P1 -->|Store Posting| DS1[(Job Postings)]
+    P1 --> P2[Publish Posting]
+    P2 --> Applicant[Applicant]
+    Applicant -->|Submit Application| P3[Receive Application]
+    P3 -->|Store Application| DS2[(Job Applications)]
+    P3 --> P4[Screen Applications]
+    P4 --> P5[Shortlist Candidates]
+    P5 -->|Update Status| DS2
+    P5 --> P6[Schedule Interviews]
+    P6 -->|Store Schedule| DS3[(Interview Schedules)]
+    P6 --> P7[Conduct Interviews]
+    P7 --> C1{Suitable Candidate?}
+    C1 -->|No| P8[Re-open or Close Posting]
+    P8 -->|Update Posting| DS1
+    C1 -->|Yes| P9[Extend Offer]
+    P9 -->|Store Offer| DS4[(Offer Letters)]
+    P9 -->|Send Offer| Applicant
+    Applicant -->|Response| C2{Offer Accepted?}
+    C2 -->|No| P8
+    C2 -->|Yes| P10[Begin Onboarding]
+    P10 -->|Create Record| DS5[(Employee Records)]
+    P10 --> P11[Close Posting as Filled]
+    P11 -->|Update Posting| DS1
+
+    style Dept fill:#7B68EE,color:#fff
+    style HR fill:#E74C3C,color:#fff
+    style Applicant fill:#4A90E2,color:#fff
+    style P1 fill:#3498DB,color:#fff
+    style P2 fill:#9B59B6,color:#fff
+    style P3 fill:#E67E22,color:#fff
+    style P4 fill:#1ABC9C,color:#fff
+    style P5 fill:#F39C12,color:#fff
+    style P6 fill:#3498DB,color:#fff
+    style P7 fill:#9B59B6,color:#fff
+    style P8 fill:#95A5A6,color:#fff
+    style P9 fill:#27AE60,color:#fff
+    style P10 fill:#1ABC9C,color:#fff
+    style P11 fill:#27AE60,color:#fff
+    style C1 fill:#F39C12,color:#fff
+    style C2 fill:#F39C12,color:#fff
+```
+
+## Transfer Credit Evaluation Flow
+
+```mermaid
+flowchart TD
+    Student[Student] -->|Submit Transcript| P1[Receive Transfer Credit Request]
+    P1 -->|Store Request| DS1[(Transfer Credit Requests)]
+    P1 --> P2[Evaluate Each Course]
+    P2 --> P3[Check Articulation Agreements]
+    P3 -->|Query Agreements| DS2[(Articulation Agreements)]
+    P3 --> C1{Agreement Exists?}
+    C1 -->|Yes| P4[Apply Pre-approved Mapping]
+    C1 -->|No| P5[Manual Course Evaluation]
+    P4 --> P6[Map to Internal Course]
+    P5 --> C2{Course Equivalent?}
+    C2 -->|No| P7[Reject Credit Item]
+    C2 -->|Yes| P6
+    P6 -->|Store Mapping| DS3[(Transfer Credit Items)]
+    P7 -->|Store Rejection| DS3
+    P6 --> P8[Apply Credit Limits]
+    P7 --> P8
+    P8 --> C3{Within 40% Max?}
+    C3 -->|No| P9[Cap at Maximum Allowed]
+    C3 -->|Yes| P10[Approve Transfer Credits]
+    P9 --> P10
+    P10 -->|Update Record| DS4[(Student Records)]
+    P10 --> P11[Notify Student]
+    P11 --> Student
+
+    style Student fill:#4A90E2,color:#fff
+    style P1 fill:#3498DB,color:#fff
+    style P2 fill:#9B59B6,color:#fff
+    style P3 fill:#E67E22,color:#fff
+    style P4 fill:#1ABC9C,color:#fff
+    style P5 fill:#E74C3C,color:#fff
+    style P6 fill:#F39C12,color:#fff
+    style P7 fill:#95A5A6,color:#fff
+    style P8 fill:#3498DB,color:#fff
+    style P9 fill:#E67E22,color:#fff
+    style P10 fill:#27AE60,color:#fff
+    style P11 fill:#1ABC9C,color:#fff
+    style C1 fill:#F39C12,color:#fff
+    style C2 fill:#F39C12,color:#fff
+    style C3 fill:#F39C12,color:#fff
+```
+
+## Scholarship Disbursement Flow
+
+```mermaid
+flowchart TD
+    Student[Student] -->|Submit Application| P1[Receive Scholarship Application]
+    P1 -->|Store Application| DS1[(Scholarship Applications)]
+    P1 --> P2[Check Eligibility]
+    P2 -->|Query Programs| DS2[(Scholarship Programs)]
+    P2 --> C1{Eligible?}
+    C1 -->|No| P3[Reject Application]
+    P3 --> P12[Notify Student: Rejected]
+    P12 --> Student
+    C1 -->|Yes| P4[Committee Review]
+    P4 --> C2{Award Decision}
+    C2 -->|Rejected| P3
+    C2 -->|Waitlisted| P5[Add to Waitlist]
+    P5 -->|Update Status| DS1
+    C2 -->|Approved| P6[Validate Stacking Rules]
+    P6 --> C3{Stacking OK?}
+    C3 -->|No| P7[Adjust Award Amount]
+    C3 -->|Yes| P8[Create Scholarship Award]
+    P7 --> P8
+    P8 -->|Store Award| DS3[(Scholarship Awards)]
+    P8 --> P9[Schedule Disbursement]
+    P9 -->|Store Disbursement| DS4[(Aid Disbursements)]
+    P9 --> P10[Apply Funds to Student Account]
+    P10 -->|Update Balance| DS5[(Student Accounts)]
+    P10 --> P11[Notify Student: Awarded]
+    P11 --> Student
+    P9 --> P13[Renewal Check Each Semester]
+    P13 --> C4{Meets Renewal Criteria?}
+    C4 -->|Yes| P9
+    C4 -->|No| P14[Suspend or Revoke Award]
+    P14 -->|Update Award| DS3
+
+    style Student fill:#4A90E2,color:#fff
+    style P1 fill:#3498DB,color:#fff
+    style P2 fill:#9B59B6,color:#fff
+    style P3 fill:#E74C3C,color:#fff
+    style P4 fill:#E67E22,color:#fff
+    style P5 fill:#F39C12,color:#fff
+    style P6 fill:#1ABC9C,color:#fff
+    style P7 fill:#E67E22,color:#fff
+    style P8 fill:#27AE60,color:#fff
+    style P9 fill:#3498DB,color:#fff
+    style P10 fill:#16A085,color:#fff
+    style P11 fill:#27AE60,color:#fff
+    style P12 fill:#E74C3C,color:#fff
+    style P13 fill:#9B59B6,color:#fff
+    style P14 fill:#E74C3C,color:#fff
+    style C1 fill:#F39C12,color:#fff
+    style C2 fill:#F39C12,color:#fff
+    style C3 fill:#F39C12,color:#fff
+    style C4 fill:#F39C12,color:#fff
+```
+
 ## Data Store Descriptions
 
 | Store ID | Name | Description | Key Entities |
