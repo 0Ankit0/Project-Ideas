@@ -22,19 +22,30 @@
 
 | Domain File | Business Impact | Likelihood | Primary File | Critical EC Count |
 |-------------|-----------------|------------|--------------|-------------------|
+| Admission & Application | 🔴 Critical — affects enrollment pipeline, merit lists, scholarships | High (peak: admission season) | `admission-and-application.md` | 5 |
 | Academic Operations | 🔴 Critical — affects graduation, GPA, transcripts | Medium–High | `academic-operations.md` | 6 |
-| Enrollment & Registration | 🔴 Critical — affects course access, student standing | High (peak: add/drop) | `enrollment-and-registration.md` | 5 |
+| Enrollment & Registration | 🔴 Critical — affects course access, student standing | High (peak: add/drop) | `enrollment-and-registration.md` | 8 |
 | Finance & Payments | 🔴 Critical — revenue, audit, student holds, compliance | High (peak: semester start) | `finance-and-payments.md` | 7 |
 | Notifications | 🟠 High — FERPA risk, deadline misses, consent | Medium | `notifications.md` | 4 |
 | Security & Compliance | 🔴 Critical — data breach, FERPA/PDPA, regulatory fine | Low–Medium (high severity) | `security-and-compliance.md` | 8 |
 | API & UI | 🟠 High — double payments, data loss, injection | Medium–High | `api-and-ui.md` | 4 |
 | Operations | 🔴 Critical — data loss, RPO breach, downtime | Low (catastrophic if hit) | `operations.md` | 5 |
+| Graduation, Discipline & Standing | 🔴 Critical — affects degrees, due process, standing | Medium | `graduation-discipline-standing.md` | 11 |
+| Recruitment, Transfer, Scholarship & Facility | 🟠 High — affects hiring, credits, finances, space | Medium | `recruitment-transfer-scholarship-facility.md` | 10 |
 
-**Total documented edge cases: 63** across 7 domain files.
+**Total documented edge cases: 94** across 10 domain files.
 
 ---
 
 ## Top Critical Edge Cases
+
+### Admission & Application (`admission-and-application.md`)
+
+| EC-ID | Name | Why Critical |
+|-------|------|-------------|
+| EC-ADMIT-001 | Admission cycle published without exam | Pipeline stalls — applicants cannot take entrance exam, blocking merit list and enrollment; application fee refund burden |
+| EC-ADMIT-004 | Conversion race condition on bill payment | Student paid but conversion blocked due to in-flight payment; delays onboarding past semester start |
+| EC-ADMIT-005 | Conversion after seats full | Accepted applicant cannot enroll despite completing all requirements; legal and reputational risk |
 
 ### Academic Operations (`academic-operations.md`)
 
@@ -51,6 +62,8 @@
 | EC-ENROLL-001 | Accepted application enrollment deadline missed | Auto-expiry with no recovery path creates enrolment loss and re-admission complexity; affects revenue and accreditation headcounts |
 | EC-ENROLL-010 | System crash during bulk enrollment | Partial commits leave students in unknown states — some enrolled, some not — with no transactional rollback visibility |
 | EC-ENROLL-006 | Batch import with duplicates | Duplicate student records create split academic histories, GPA miscalculation, and financial account confusion that can persist for years |
+| EC-ENROLL-012 | Progression with incomplete grades | Student assigned to next semester before grades finalized; may enroll in courses without prerequisites; academic standing incorrect |
+| EC-ENROLL-013 | Faculty double-booked across classrooms | Faculty assigned to two classrooms at same time slot; one class has no instructor; late discovery cascades across timetable |
 
 ### Finance & Payments (`finance-and-payments.md`)
 
@@ -91,6 +104,22 @@
 | EC-OPS-001 | DB failover during active fee payment | In-flight transaction may commit at DB level but not at application level — or vice versa; financial inconsistency |
 | EC-OPS-004 | DB migration failure mid-deployment | Partial schema change leaves DB in inconsistent state; rollback may not be possible without data loss |
 | EC-OPS-006 | Backup fails 7 days undetected | RPO breach means a failure could result in up to 7 days of unrecoverable academic and financial data loss |
+
+### Graduation, Discipline & Standing (`graduation-discipline-standing.md`)
+
+| EC-ID | Name | Why Critical |
+|-------|------|-------------|
+| EC-GRAD-001 | Degree audit passes with incomplete grade | Student graduates without completing coursework; accreditation risk |
+| EC-DISC-002 | Sanction enforcement fails to withdraw student | Suspended student continues attending classes; policy violation |
+| EC-STAND-001 | Standing calculated with incomplete grades | Students incorrectly placed on probation based on partial data |
+
+### Recruitment, Transfer, Scholarship & Facility (`recruitment-transfer-scholarship-facility.md`)
+
+| EC-ID | Name | Why Critical |
+|-------|------|-------------|
+| EC-RECRUIT-001 | Background check returns after onboarding | Unqualified faculty teaching courses; grades may be challenged |
+| EC-SCHOL-002 | Fund over-committed due to concurrent awards | Donor fund overdrawn; awards may need rescinding |
+| EC-FACILITY-001 | Exam preempts booking without notice | Room conflict disrupts planned events |
 
 ---
 
@@ -302,6 +331,7 @@ Move the EC entry under a `## Resolved Edge Cases` section at the bottom of the 
 
 | Domain | Owner Team | Escalation |
 |--------|-----------|-----------|
+| Admission & Application | Registrar Engineering | VP Academic Affairs |
 | Academic Operations | Registrar Engineering | VP Academic Affairs |
 | Enrollment & Registration | Registrar Engineering | Registrar |
 | Finance & Payments | Finance Engineering | CFO + External Auditor |

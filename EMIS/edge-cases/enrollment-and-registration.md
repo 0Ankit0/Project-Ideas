@@ -2,7 +2,7 @@
 
 Domain-specific failure modes, impact assessments, and mitigation strategies for student enrollment and course registration workflows.
 
-Edge case IDs in this file are permanent: **EC-ENROLL-001 through EC-ENROLL-010**.
+Edge case IDs in this file are permanent: **EC-ENROLL-001 through EC-ENROLL-014**.
 
 ---
 
@@ -123,6 +123,54 @@ Edge case IDs in this file are permanent: **EC-ENROLL-001 through EC-ENROLL-010*
 | **Detection** | Withdrawal endpoint branches on `AcademicCalendar.get_current_phase(semester_id)`: before census → `status=DROPPED` (no grade), after census → `status=WITHDRAWN` + create `Grade(letter_grade='W')`. |
 | **Mitigation / Recovery** | (1) Registrar runs a semester-end audit comparing enrollment records with grades to detect any missing W entries. (2) Missing W grades are added via a grade amendment with `reason_code='AUDIT_CORRECTION'`. |
 | **Prevention** | Withdrawal service has comprehensive unit tests covering pre-census, post-census, and post-final-exam scenarios. The census date is a required academic calendar event that raises a validation error during semester setup if absent. |
+
+---
+
+## EC-ENROLL-011 — Semester Repeat Student Assigned to Full Classroom
+
+| Field | Detail |
+|---|---|
+| **Failure Mode** | Admin assigns a repeating student to a classroom that is already at maximum capacity with regular (progressing) students. The system does not distinguish between repeat and regular students during classroom assignment, so the repeat student is added, exceeding the room's physical and pedagogical capacity. |
+| **Impact** | Overcrowded classroom degrades quality of education for all students. Fire safety capacity may be violated. Faculty workload increases without compensation. If discovered post-assignment, displacing a student is disruptive and contentious. |
+| **Detection** | Capacity check during classroom assignment: `SELECT c.max_capacity, COUNT(e.id) AS current_count FROM classroom c LEFT JOIN enrollment e ON e.classroom_id = c.id AND e.semester_id = ? WHERE c.id = ? GROUP BY c.max_capacity HAVING COUNT(e.id) >= c.max_capacity`. Alert: `emis.enrollment.classroom_over_capacity`. |
+| **Mitigation / Recovery** | (1) Confirm the incident — identify the overcrowded classroom and the repeat student assignment. (2) Suggest alternative classrooms with available seats for the same course and semester. (3) If no alternatives exist, allow admin override with documented reason (e.g., "temporary overcrowding approved by department head"). (4) Log the override in AuditLog with justification. (5) Notify the faculty member of the adjusted class size. (6) Write incident report and update this document if new findings. |
+| **Prevention** | Reserve a configurable percentage of seats (default: 5%) in each classroom for repeat students: `classroom.reserved_repeat_seats = CEIL(classroom.max_capacity * 0.05)`. The `ClassroomAssignmentService.assign()` method must check `current_count < (max_capacity - reserved_repeat_seats)` for regular students and `current_count < max_capacity` for repeat students. UI shows available seats split by regular and reserved categories. |
+
+---
+
+## EC-ENROLL-012 — Student Progression With Incomplete Previous Semester Grades
+
+| Field | Detail |
+|---|---|
+| **Failure Mode** | Admin attempts to assign a student to the next semester, but the student's previous semester grades have not been fully finalized. Some courses still show `grade_status = 'PENDING'` (faculty has not submitted grades, or grades are under review). The system cannot determine whether the student should progress or repeat, but allows the assignment anyway. |
+| **Impact** | Premature semester assignment — student may be placed in the next semester when they should repeat. If grades are later finalized as failing, the student is enrolled in courses for which they lack prerequisites. Academic standing calculation is incorrect. Transcript shows enrollment in advanced courses without completing foundational ones. |
+| **Detection** | Grade completeness check before progression: `SELECT c.course_name, g.status FROM enrollment e JOIN course c ON c.id = e.course_id LEFT JOIN grade g ON g.enrollment_id = e.id WHERE e.student_id = ? AND e.semester_id = ? AND (g.status IS NULL OR g.status != 'FINALIZED')`. Alert: `emis.enrollment.progression_incomplete_grades`. |
+| **Mitigation / Recovery** | (1) Confirm the incident — identify the student and list all courses with pending grades. (2) Block semester progression until all enrolled courses have `grade.status = 'FINALIZED'`. (3) Show the admin a clear list of pending courses and the responsible faculty members. (4) Notify faculty with pending grades that progression is blocked pending their submission. (5) Once all grades are finalized, re-evaluate academic standing and allow progression or assign repeat. (6) Write incident report and update this document if new findings. |
+| **Prevention** | The `SemesterProgressionService.assign_next_semester()` method must call `validate_grade_completeness(student_id, current_semester_id)` before allowing assignment. Return 422 `GRADES_NOT_FINALIZED` with the list of pending courses. Implement a semester closure checklist that requires all grades finalized before the progression window opens. Add a dashboard widget showing grade submission progress per course section for registrar visibility. |
+
+---
+
+## EC-ENROLL-013 — Faculty Assignment Conflict — Same Faculty, Same Time Slot, Different Classrooms
+
+| Field | Detail |
+|---|---|
+| **Failure Mode** | Admin assigns a faculty member to teach Subject A in Classroom A at 10:00 AM on Mondays, and separately assigns the same faculty member to teach Subject B in Classroom B at the same time slot. The system processes each assignment independently without checking for scheduling conflicts across classrooms. |
+| **Impact** | Faculty member cannot physically teach both classes simultaneously. One class will have no instructor, disrupting the academic schedule. Students in the unattended class lose instructional time. If discovered late, rescheduling cascades across the timetable. |
+| **Detection** | Timetable conflict check during faculty-subject assignment: `SELECT ta.id, ta.classroom_id, ta.subject_id, ts.day_of_week, ts.start_time, ts.end_time FROM teaching_assignment ta JOIN time_slot ts ON ts.id = ta.time_slot_id WHERE ta.faculty_id = ? AND ts.semester_id = ? AND ts.day_of_week = ? AND ts.start_time < ? AND ts.end_time > ?`. Alert: `emis.enrollment.faculty_schedule_conflict`. |
+| **Mitigation / Recovery** | (1) Confirm the incident — identify the conflicting assignments with exact time slots and classrooms. (2) Reject the conflicting assignment with a clear error message showing the existing schedule: `FACULTY_SCHEDULE_CONFLICT: Dr. X is already assigned to CS101 in Room 301 at Mon 10:00-11:00`. (3) Suggest alternative time slots where the faculty member is available. (4) Suggest alternative faculty members who are available at the requested time slot. (5) Allow admin to reassign one of the conflicting slots. (6) Write incident report and update this document if new findings. |
+| **Prevention** | The `TeachingAssignmentService.assign()` method must call `validate_faculty_schedule(faculty_id, time_slot_id)` before creating the assignment. Check for overlapping time slots (not just exact matches) using interval overlap logic: `existing.start_time < new.end_time AND existing.end_time > new.start_time`. Assignment UI must display the faculty member's existing weekly schedule in real-time as assignments are made, with conflicting slots highlighted in red. Add database constraint: unique index on `(faculty_id, semester_id, day_of_week, start_time)` to prevent conflicts at the data level. |
+
+---
+
+## EC-ENROLL-014 — Bulk Semester Progression Partial Failure
+
+| Field | Detail |
+|---|---|
+| **Failure Mode** | Admin initiates bulk semester progression for 200 students. The system processes each student sequentially. 192 students are successfully assigned to the next semester, but 8 fail: 5 have financial holds, 3 have incomplete grades (academic standing issues). The admin receives a generic "Progression completed" message without clear indication of the 8 failures. |
+| **Impact** | 8 students are not progressed but admin believes the entire batch succeeded. These students do not appear in the next semester's enrollment, miss course registration, and discover the issue only when classes begin. Support burden increases. If financial holds are the cause, students may have already resolved them but the progression was never retried. |
+| **Detection** | Detailed success/failure report generation: the bulk progression endpoint must return `{"total": 200, "succeeded": 192, "failed": 8, "failures": [{"student_id": "...", "reason": "FINANCIAL_HOLD", "details": "Outstanding invoice INV-2024-1234"}, ...]}`. Alert: `emis.enrollment.bulk_progression_partial_failure` when `failed_count > 0`. |
+| **Mitigation / Recovery** | (1) Confirm the incident — review the failure report with student IDs and specific failure reasons. (2) Process all valid assignments (do not roll back successful ones). (3) Generate a downloadable failure report CSV with columns: `student_id, student_name, failure_reason, details, suggested_action`. (4) Notify the admin via dashboard alert and email with the failure summary. (5) Allow admin to resolve individual issues (clear holds, finalize grades) and retry failed students individually or as a filtered batch. (6) Write incident report and update this document if new findings. |
+| **Prevention** | Implement a pre-validation endpoint `POST /api/semester-progression/validate` that checks all students in the batch before executing any changes. Return the full validation report showing which students will succeed and which will fail, with reasons. UI must display the pre-validation results and require admin confirmation before proceeding. Bulk progression uses a "report and continue" strategy (never all-or-nothing for large batches). Add a dry-run mode (`?dry_run=true`) consistent with the pattern in EC-ENROLL-008. |
 
 ---
 
