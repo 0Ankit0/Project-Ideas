@@ -23,6 +23,29 @@
 
 ---
 
+## UC-03: Manage Addresses
+
+**Primary Actor:** Customer
+**Preconditions:** Customer is authenticated.
+**Postconditions:** Address saved/updated/deleted; default address may be changed.
+
+**Main Flow (Add Address):**
+1. Customer navigates to addresses section.
+2. Customer selects Add New Address.
+3. Customer fills in address fields (label, line1, line2, city, state, postal code, country).
+4. System validates postal code against active delivery zones.
+5. System displays serviceability status (serviceable / not serviceable).
+6. Customer saves address.
+7. System creates address record; if first address, sets as default automatically.
+
+**Alternative Flows:**
+- **4a.** Postal code not in any active delivery zone → System saves address but marks as "not serviceable"; customer can still save for future use.
+- **6a.** Customer edits existing address → System updates record; if address is linked to active orders, shows warning.
+- **6b.** Customer deletes address → System checks active orders; if linked, shows error "Address linked to active order"; otherwise soft-deletes.
+- **6c.** Customer sets as default → System unsets previous default and sets new one.
+
+---
+
 ## UC-05: Search Products
 
 **Primary Actor:** Customer
@@ -40,6 +63,29 @@
 - **2a.** Empty query → System returns trending/popular products.
 - **4a.** No results found → System suggests spelling corrections and related categories.
 - **4b.** OpenSearch unavailable → System falls back to RDS full-text search with degraded performance.
+
+---
+
+## UC-07: Manage Cart
+
+**Primary Actor:** Customer
+**Preconditions:** Customer is authenticated (or guest session exists).
+**Postconditions:** Cart is updated with correct items, quantities, and pricing.
+
+**Main Flow:**
+1. Customer views current cart.
+2. System validates each item's current availability and price against catalog.
+3. System displays updated cart with current prices, tax, shipping, and discount.
+4. Customer adds item (specifies variant and quantity).
+5. System checks stock availability and adds item to cart.
+6. System recalculates cart totals.
+
+**Alternative Flows:**
+- **2a.** Cart item price changed since added → System shows updated price with notification banner.
+- **2b.** Cart item out of stock → System shows "Out of Stock" badge and disables checkout for that item.
+- **4a.** Item quantity exceeds available stock → System caps quantity to available stock and shows warning.
+- **5a.** Inventory reservation in progress (checkout TTL active) → System cannot add; shows "Item reserved by another customer."
+- **Guest-to-auth merge:** On login, system merges guest cart with authenticated cart; if conflicts exist, uses the higher quantity.
 
 ---
 
@@ -72,19 +118,23 @@
 ## UC-11: Track Order
 
 **Primary Actor:** Customer
-**Preconditions:** Customer has at least one existing order.
-**Postconditions:** Current order status and milestone history are displayed.
+**Preconditions:** Customer is authenticated; order exists in their account.
+**Postconditions:** Customer sees current status and milestone history.
 
 **Main Flow:**
-1. Customer navigates to order detail page.
-2. System retrieves order aggregate from database.
-3. System retrieves milestone history from DynamoDB status timeline.
-4. System displays current state, estimated delivery window, and timestamped milestones.
-5. If order is delivered, system displays POD (signature image + delivery photo).
+1. Customer navigates to order history.
+2. Customer selects an order.
+3. System loads order details: status, estimated delivery, line items, payment summary.
+4. System loads milestone history with timestamps.
+5. Customer views current status and progression.
 
 **Alternative Flows:**
-- **3a.** DynamoDB read fails → System shows current state from RDS without detailed milestones.
-- **5a.** POD images not yet uploaded (sync pending) → System shows "POD processing" placeholder.
+- **5a.** Order is `Delivered` → System shows POD link (signature + photo with presigned URL).
+- **5b.** Order has failed delivery attempt → System shows failure reason and reschedule info.
+- **5c.** Order is `ReturnedToWarehouse` → System shows return reason and refund eligibility.
+- **5d.** Return initiated → System shows return status and refund estimate.
+- **4a.** DynamoDB read fails → System shows current state from RDS without detailed milestones.
+- **5a (sync pending).** POD images not yet uploaded → System shows "POD processing" placeholder.
 
 ---
 
@@ -114,20 +164,63 @@
 ## UC-17: View Pick List
 
 **Primary Actor:** Warehouse Staff
-**Preconditions:** Staff is authenticated and assigned to a warehouse location.
-**Postconditions:** Staff sees all pending fulfillment tasks.
+**Preconditions:** Staff is authenticated; fulfillment tasks are assigned.
+**Postconditions:** Staff has all info needed to start picking.
 
 **Main Flow:**
-1. Staff opens fulfillment dashboard.
-2. System retrieves all tasks assigned to staff's warehouse in `Pending` or `InProgress` state.
-3. System sorts tasks by SLA deadline (most urgent first).
-4. Each task displays: order ID, items with quantities, bin locations, and SLA countdown.
-5. Staff selects a task and clicks "Start Picking".
-6. System transitions task to `InProgress` and locks it to the staff member.
+1. Staff logs into warehouse dashboard.
+2. System displays assigned tasks sorted by SLA deadline (colour-coded: green / yellow / red).
+3. Staff selects a task to view details.
+4. System shows: order ID, customer name, delivery zone, items list (product, variant, SKU, bin location, quantity), SLA countdown.
+5. Staff starts the task.
+6. System marks task as `IN_PROGRESS`; only one task can be in progress per staff member.
 
 **Alternative Flows:**
-- **2a.** No pending tasks → System displays "All caught up" message.
-- **5a.** Staff already has a task in progress → System warns and requires completing or releasing current task.
+- **3a.** No tasks assigned → Dashboard shows "No pending tasks."
+- **5a.** Another task already in progress → System shows "Complete current task first."
+- **SLA breach warning:** System sends push notification to supervisor if task is within 30 minutes of SLA deadline.
+
+---
+
+## UC-18: Verify Picks
+
+**Primary Actor:** Warehouse Staff
+**Preconditions:** Fulfillment task is `IN_PROGRESS`.
+**Postconditions:** All items verified; task ready for packing.
+
+**Main Flow:**
+1. Staff scans first item barcode with device camera or scanner.
+2. System looks up SKU from barcode.
+3. System validates SKU matches expected pick item.
+4. System increments scanned count for that item.
+5. Staff repeats for all items.
+6. Once all items scanned to expected quantities, system enables "Complete Picking" button.
+7. Staff confirms picking complete.
+8. System transitions task to `PICKED` state.
+
+**Alternative Flows:**
+- **3a.** SKU mismatch → System shows "Wrong Item!" with expected vs scanned; flags item for supervisor; staff must re-scan correct item.
+- **4a.** Quantity overcounted → System shows "Already scanned max quantity."
+- **6a.** Supervisor can override flagged mismatch → System records override with supervisor ID.
+
+---
+
+## UC-21: View Assignments
+
+**Primary Actor:** Delivery Staff
+**Preconditions:** Staff is authenticated; assignments exist for today.
+**Postconditions:** Staff sees all delivery assignments for the day.
+
+**Main Flow:**
+1. Staff opens delivery app.
+2. System loads assignments for today: customer name, delivery address, order summary, delivery window.
+3. System sorts assignments by suggested sequence (delivery zone proximity).
+4. Staff can view printable route sheet.
+5. New assignments trigger push notification.
+
+**Alternative Flows:**
+- **2a.** No assignments for today → Dashboard shows "No deliveries assigned."
+- **4a.** Reassignment occurs during shift → System sends push notification with updated assignment list.
 
 ---
 
@@ -169,9 +262,29 @@
 8. Customer receives delivery confirmation with POD download link.
 
 **Alternative Flows:**
+- **2a.** Recipient unavailable for signature → Staff records "left at door" with photo evidence only.
 - **5a.** Device offline → POD stored locally; sync triggered when connectivity resumes.
 - **5b.** S3 upload fails → System retries 3 times; after failure, alerts operations and keeps order in `OutForDelivery`.
-- **2a.** Recipient unavailable for signature → Staff records "left at door" with photo evidence only.
+
+---
+
+## UC-25: Manage Delivery Zones
+
+**Primary Actor:** Operations Manager
+**Preconditions:** Admin or Ops Manager role; platform is active.
+**Postconditions:** Delivery zone created/updated/deactivated.
+
+**Main Flow (Create Zone):**
+1. Ops Manager navigates to Delivery Zones.
+2. Ops Manager selects Create New Zone.
+3. Ops Manager fills in: name, postal codes (comma-separated), delivery fee, minimum order value, SLA target (hours).
+4. System validates postal codes (no overlap with existing active zones).
+5. System creates zone with effective date.
+
+**Alternative Flows:**
+- **4a.** Postal code overlap → System shows conflicting zone name; operator must resolve before saving.
+- **Deactivate zone:** Ops Manager selects Deactivate → System marks zone inactive; existing active orders not affected; new orders to those postal codes rejected until re-assigned to another zone.
+- **Edit zone:** Ops Manager updates fields → System versions the change with effective date.
 
 ---
 
@@ -199,19 +312,44 @@
 ## UC-28: Inspect Return
 
 **Primary Actor:** Warehouse Staff
-**Preconditions:** Returned item is received at warehouse.
-**Postconditions:** Inspection result recorded; refund triggered (if accepted) or rejection sent (if rejected).
+**Preconditions:** Return is in `PICKED_UP` state; item received at warehouse.
+**Postconditions:** Inspection completed; refund initiated or rejection sent.
 
 **Main Flow:**
-1. Staff opens pending inspection queue.
-2. Staff selects the return and reviews original order details and customer-stated reason.
-3. Staff physically inspects the returned item.
-4. Staff records inspection result: Accept, Reject (with reason), or Partial Accept.
-5. System processes result:
-   - Accept → Refund initiated; item returned to stock.
-   - Reject → Customer notified with rejection reason.
-   - Partial Accept → Partial refund initiated; customer notified.
-6. System emits `return.inspected.v1` event.
+1. Staff navigates to return inspection queue.
+2. Staff selects pending return.
+3. System shows: original order details, customer return reason, photo evidence (if any), expected item details.
+4. Staff physically inspects item against original condition.
+5. Staff records inspection result: Accept / Reject / Partial Accept.
+6. Staff adds optional notes.
+7. If Accept → System triggers automatic refund (full amount); updates inventory; sends notification to customer.
+8. If Partial Accept → Staff specifies accepted items; system calculates partial refund; sends notification.
+9. If Reject → Staff records rejection reason; system notifies customer with rejection reason and next steps.
 
 **Alternative Flows:**
-- **4a.** Item not matching order (wrong item returned) → Staff selects "Wrong Item" reason; operations manager notified for investigation.
+- **4a.** Item not arrived yet → Staff marks as "Not Received"; system updates return status.
+- **7a.** Refund API call fails → System retries 3 times; if all fail, escalates to Finance role.
+- **Wrong item returned:** Staff selects "Wrong Item" reason; operations manager notified for investigation.
+
+---
+
+## UC-30: Configure Settings
+
+**Primary Actor:** Admin
+**Preconditions:** Admin role.
+**Postconditions:** Platform config updated; change versioned and audited.
+
+**Main Flow:**
+1. Admin navigates to Platform Configuration.
+2. System shows current config values with descriptions and data types.
+3. Admin selects config key to update.
+4. Admin enters new value.
+5. System validates value against data type and allowed ranges.
+6. Admin confirms change.
+7. System creates new config version; applies immediately (within 1 min via AppConfig).
+8. System records AuditLog entry (actorId, key, oldValue, newValue, timestamp).
+
+**Alternative Flows:**
+- **5a.** Invalid value → System shows validation error with allowed range.
+- **View history:** Admin views history → System shows version history (version, value, updatedBy, updatedAt).
+- **Rollback:** Admin rolls back → System activates previous version; creates audit entry.
