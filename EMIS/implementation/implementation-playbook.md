@@ -50,13 +50,28 @@ Build and launch a production-ready **Education Management Information System** 
 - Ensures data accuracy and audit trail completeness required for accreditation.
 
 ### Finance & HR Team (3–4 engineers)
-- Owns: `finance`, `payment`, `hr`, `inventory` apps.
-- Responsible for fee structure configuration, invoice generation, online payment gateway integration (Stripe/Razorpay), payroll processing, leave management, and asset/stock management.
+- Owns: `finance`, `payment`, `hr`, `inventory`, `scholarships`, `recruitment` apps.
+- Responsible for fee structure configuration, invoice generation, online payment gateway integration (Stripe/Razorpay), payroll processing, leave management, asset/stock management, scholarship program management with disbursement and stacking rules, and faculty recruitment pipeline from job posting through offer acceptance.
 - Coordinates with Platform Team on payment saga idempotency and audit logging.
 
 ### LMS & Portal Team (3–4 engineers)
 - Owns: `lms`, `library`, `hostel`, `transport`, `portal`, `cms`, `seo`, `calendar`, `files` apps.
 - Responsible for course content delivery, assignments, quizzes, certificates, library circulation, hostel/transport management, role-specific portal UX, website CMS, and calendar management.
+
+### Academic Lifecycle Team (3–4 engineers)
+- Owns: `graduation`, `academic_standing`, `grade_appeals`, `academic_sessions` apps.
+- Responsible for graduation eligibility and degree audit workflows, diploma generation, honors determination, academic standing calculation (probation, dean's list, at-risk alerts), grade dispute escalation (faculty → department head → committee), and academic session/semester lifecycle management including registration windows and calendar events.
+- Integrates with Assessment & Compliance Team for grade data and with Finance & HR Team for graduation fee clearance.
+
+### Compliance & Conduct Team (2–3 engineers)
+- Owns: `discipline`, `transfer_credits` apps.
+- Responsible for student disciplinary case management (filings, hearings, sanctions, appeals, record sealing), transfer credit evaluation, articulation agreement management, and credit equivalency mapping with configurable credit limits.
+- Coordinates with Academic Core Team on student record updates and with Legal/Compliance on data retention policies.
+
+### Facilities & Administration Team (2–3 engineers)
+- Owns: `facilities`, `departments` apps.
+- Responsible for room and facility inventory, booking and conflict detection, utilization analytics, maintenance request workflows, department hierarchy management, curriculum change tracking, and course offering administration.
+- Integrates with Academic Core Team for timetable room allocation and with Platform Team for notification dispatch.
 
 ### DevOps / SRE Team (2–3 engineers)
 - Owns production reliability, incident response, runbooks, SLO/SLI definitions, capacity planning.
@@ -144,7 +159,7 @@ Build and launch a production-ready **Education Management Information System** 
 ### Phase 0 — Foundation (Weeks 1–4)
 
 **Deliverables:**
-- Django project scaffolding with 25-app structure
+- Django project scaffolding with 35-app structure
 - `core` app: BaseModel, UUIDs, soft-delete, audit mixin
 - `users` app: User model, RBAC, JWT auth, session auth, password policies
 - CI/CD pipeline fully operational (lint → test → build → staging deploy)
@@ -245,16 +260,62 @@ Build and launch a production-ready **Education Management Information System** 
 
 ---
 
+### Phase 6 — Academic Lifecycle (Weeks 35–42)
+
+**Deliverables:**
+- `academic_sessions` app: academic year and semester lifecycle management, registration window configuration, calendar event synchronization, semester open/close workflows
+- `academic_standing` app: standing determination engine (good standing, probation, suspension, dismissal), dean's list generation, at-risk student alerts, GPA threshold configuration
+- `graduation` app: graduation eligibility checks, degree audit engine with requirement matching, diploma PDF generation with institutional branding, honors classification (cum laude, magna cum laude, summa cum laude)
+- `grade_appeals` app: multi-level escalation workflow (faculty → department head → appeals committee), evidence submission, resolution tracking, grade amendment integration
+
+**Acceptance Criteria:**
+- Academic session created → semesters auto-generated → registration windows open and close on schedule
+- Student falls below GPA threshold → academic standing updated to probation → at-risk alert sent to advisor
+- Student applies for graduation → degree audit runs → eligible students approved → diploma PDF generated with honors classification
+- Student files grade appeal → escalates through faculty, department head, and committee levels → resolution applied to transcript
+
+---
+
+### Phase 7 — Support & Compliance Modules (Weeks 43–50)
+
+**Deliverables:**
+- `discipline` app: disciplinary case filing, hearing scheduling, sanction assignment, appeal process, record sealing for expunged cases
+- `transfer_credits` app: transfer credit evaluation workflow, articulation agreement management, course equivalency mapping, configurable credit limits per program
+- `scholarships` app: scholarship program creation, application and eligibility engine, disbursement processing with installment support, renewal evaluation based on academic standing, stacking rule enforcement to prevent over-award
+- `recruitment` app: faculty job posting with department approval, applicant tracking through pipeline stages, interview scheduling with calendar integration, offer generation and acceptance workflow
+- `facilities` app: room and facility inventory with capacity and equipment metadata, booking system with conflict detection, utilization analytics dashboard, maintenance request workflow with priority levels
+- `departments` app: department hierarchy and organizational structure, program administration, curriculum change tracking with approval workflow, course offering management per semester
+
+**Acceptance Criteria:**
+- Discipline case filed → hearing scheduled → sanction applied → student notified; appeal reverses sanction if upheld
+- Transfer credits submitted → evaluated against articulation agreements → approved credits mapped to equivalent courses and appear on transcript
+- Scholarship awarded → disbursement scheduled → funds applied to student invoice; renewal check runs at semester end based on GPA
+- Faculty position posted → applicants tracked → interviews scheduled → offer extended and accepted → onboarding initiated in HR
+- Room booked for event → conflict with existing timetable detected and rejected; maintenance request submitted and tracked to resolution
+- Department creates new course offering → curriculum change approved → course available for next semester registration
+
+---
+
 ## 6. Launch Readiness Checklist
 
 ### Functional Readiness
-- [ ] All 25 Django apps deployed and smoke-tested
+- [ ] All 35 Django apps deployed and smoke-tested
 - [ ] All 6 roles can log in and access their respective dashboards
 - [ ] End-to-end admissions → enrollment → course registration flow verified
 - [ ] Fee payment gateway tested with real sandbox credentials
 - [ ] Grade entry, GPA calculation, and transcript generation verified
 - [ ] Attendance marking and academic hold enforcement verified
 - [ ] Email and SMS notifications delivered in staging
+- [ ] Academic session lifecycle tested: year creation → semester open → registration window → semester close
+- [ ] Graduation workflow tested end-to-end: eligibility check → degree audit → diploma generation → honors classification
+- [ ] Discipline case lifecycle verified: case filing → hearing → sanction → appeal → record sealing
+- [ ] Academic standing engine verified: GPA threshold triggers → probation/dean's list assignment → at-risk alerts dispatched
+- [ ] Grade appeal escalation tested: faculty → department head → committee resolution → grade amendment applied
+- [ ] Transfer credit evaluation verified: submission → equivalency mapping → credit applied to transcript
+- [ ] Scholarship lifecycle tested: application → award → disbursement → renewal check → stacking rule enforcement
+- [ ] Recruitment pipeline verified: job posting → applicant tracking → interview scheduling → offer management
+- [ ] Facility booking tested: room reservation → conflict detection → utilization reporting → maintenance workflow
+- [ ] Department administration verified: hierarchy management → curriculum changes → course offering per semester
 
 ### Security Readiness
 - [ ] HTTPS enforced on all endpoints; HTTP redirects to HTTPS

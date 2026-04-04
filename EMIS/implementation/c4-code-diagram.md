@@ -341,6 +341,8 @@ flowchart TB
         admissions["admissions\n(Application, MeritList)"]
         faculty["faculty\n(Faculty, TeachingLoad)"]
         timetable["timetable\n(Slot, RoomAllocation)"]
+        academic_sessions["academic_sessions\n(AcademicYear, Semester, RegistrationWindow)"]
+        departments["departments\n(Department, Program, CurriculumChange)"]
     end
 
     subgraph Assessment["Assessment"]
@@ -348,11 +350,24 @@ flowchart TB
         attendance["attendance\n(AttendanceRecord, Leave)"]
     end
 
+    subgraph AcademicLifecycle["Academic Lifecycle"]
+        graduation["graduation\n(GraduationApplication, DegreeAudit, Diploma)"]
+        academic_standing["academic_standing\n(StandingRecord, Probation, DeansList)"]
+        grade_appeals["grade_appeals\n(GradeAppeal, Escalation, Resolution)"]
+        transfer_credits["transfer_credits\n(TransferEvaluation, ArticulationAgreement)"]
+    end
+
+    subgraph Compliance["Compliance & Conduct"]
+        discipline["discipline\n(DisciplinaryCase, Hearing, Sanction)"]
+    end
+
     subgraph Finance["Finance & HR"]
         finance["finance\n(FeeStructure, Invoice)"]
         payment["payment\n(PaymentSession, Transaction)"]
         hr["hr\n(Employee, Payroll, Leave)"]
         inventory["inventory\n(Asset, Stock, PurchaseOrder)"]
+        scholarships["scholarships\n(ScholarshipProgram, Application, Disbursement)"]
+        recruitment["recruitment\n(JobPosting, Applicant, Interview, Offer)"]
     end
 
     subgraph Services["Service Modules"]
@@ -360,6 +375,7 @@ flowchart TB
         library["library\n(Book, Issue, Fine)"]
         hostel["hostel\n(Room, Allocation, Mess)"]
         transport["transport\n(Route, Vehicle, Allocation)"]
+        facilities["facilities\n(Room, Booking, MaintenanceRequest)"]
     end
 
     subgraph Output["Output & Communication"]
@@ -420,6 +436,47 @@ flowchart TB
     transport --> core
     transport --> students
 
+    %% Academic Core extended dependencies
+    academic_sessions --> core
+    academic_sessions --> calendar
+    departments --> faculty
+    departments --> courses
+    departments --> core
+
+    %% Academic Lifecycle dependencies
+    graduation --> students
+    graduation --> courses
+    graduation --> academic_standing
+    graduation --> finance
+    academic_standing --> students
+    academic_standing --> courses
+    academic_standing --> notifications
+    grade_appeals --> students
+    grade_appeals --> courses
+    grade_appeals --> exams
+    grade_appeals --> faculty
+    transfer_credits --> students
+    transfer_credits --> courses
+    transfer_credits --> admissions
+
+    %% Compliance dependencies
+    discipline --> students
+    discipline --> users
+    discipline --> notifications
+
+    %% Extended Finance & HR dependencies
+    scholarships --> students
+    scholarships --> finance
+    scholarships --> academic_standing
+    recruitment --> hr
+    recruitment --> departments
+    recruitment --> users
+
+    %% Facilities dependencies
+    facilities --> timetable
+    facilities --> core
+    facilities --> notifications
+
     %% Output dependencies
     notifications --> core
     notifications --> users
@@ -447,6 +504,8 @@ flowchart TB
     style Foundation fill:#27AE60,color:#fff
     style Academic fill:#4A90E2,color:#fff
     style Assessment fill:#7B68EE,color:#fff
+    style AcademicLifecycle fill:#3498DB,color:#fff
+    style Compliance fill:#C0392B,color:#fff
     style Finance fill:#E67E22,color:#fff
     style Services fill:#E74C3C,color:#fff
     style Output fill:#95A5A6,color:#fff
@@ -531,3 +590,291 @@ The following rules must **never** be violated. They are checked in code review 
 6. **Transaction.atomic wraps all multi-table writes.** Any service operation that writes to more than one database table must be wrapped in `django.db.transaction.atomic()`. Partial writes that leave the database in an inconsistent state are not acceptable.
 
 7. **All database writes to sensitive tables are audited.** Writes to: `grades`, `gpa_records`, `fee_invoices`, `payments`, `student_status_history`, `user_roles`, `payroll_records` must insert a corresponding row into `core_audit_log` within the same transaction.
+
+---
+
+## 7. Code-Level Component Diagrams — New Modules
+
+### 7.1 Graduation App
+
+```mermaid
+flowchart TB
+    subgraph GraduationTransport["Transport Layer"]
+        GradViewSet["GraduationApplicationViewSet\n(api/views.py)"]
+        GradSerializer["GraduationSerializer\n(api/serializers.py)"]
+        GradPermissions["GraduationPermissions\n(api/permissions.py)"]
+        GradTemplateView["GraduationTemplateView\n(views.py)"]
+    end
+
+    subgraph GraduationApp["Application Layer"]
+        GraduationService["GraduationService\n(graduation/services.py)"]
+        DegreeAuditEngine["DegreeAuditEngine\n(graduation/services.py)"]
+        DiplomaGenerator["DiplomaGenerator\n(graduation/services.py)"]
+        HonorsCalculator["HonorsCalculator\n(graduation/services.py)"]
+    end
+
+    subgraph GraduationDomain["Domain Layer"]
+        GradApplication["GraduationApplication\n(graduation/models.py)"]
+        DegreeAudit["DegreeAuditResult\n(graduation/models.py)"]
+        Diploma["Diploma\n(graduation/models.py)"]
+        HonorsAward["HonorsAward\n(graduation/models.py)"]
+    end
+
+    subgraph GraduationInfra["Infrastructure Layer"]
+        GradORM["Django ORM\n(PostgreSQL)"]
+        GradCelery["Celery Tasks\n(graduation/tasks.py)"]
+        GradPDF["PDF Generator\n(weasyprint)"]
+    end
+
+    GradViewSet --> GradSerializer
+    GradViewSet --> GradPermissions
+    GradViewSet --> GraduationService
+    GradTemplateView --> GraduationService
+
+    GraduationService --> DegreeAuditEngine
+    GraduationService --> DiplomaGenerator
+    GraduationService --> HonorsCalculator
+    GraduationService --> GradApplication
+    DegreeAuditEngine --> DegreeAudit
+    DiplomaGenerator --> Diploma
+    HonorsCalculator --> HonorsAward
+
+    GradApplication --> GradORM
+    DegreeAudit --> GradORM
+    Diploma --> GradORM
+    GraduationService --> GradCelery
+    DiplomaGenerator --> GradPDF
+
+    style GraduationTransport fill:#4A90E2,color:#fff,stroke:#357ABD
+    style GraduationApp fill:#7B68EE,color:#fff,stroke:#6A5ACD
+    style GraduationDomain fill:#27AE60,color:#fff,stroke:#229954
+    style GraduationInfra fill:#E67E22,color:#fff,stroke:#D35400
+```
+
+### 7.2 Discipline App
+
+```mermaid
+flowchart TB
+    subgraph DisciplineTransport["Transport Layer"]
+        DiscViewSet["DisciplinaryCaseViewSet\n(api/views.py)"]
+        DiscSerializer["DisciplinaryCaseSerializer\n(api/serializers.py)"]
+        DiscPermissions["DisciplinePermissions\n(api/permissions.py)"]
+        DiscTemplateView["DisciplineTemplateView\n(views.py)"]
+    end
+
+    subgraph DisciplineApp["Application Layer"]
+        DisciplineService["DisciplineService\n(discipline/services.py)"]
+        HearingManager["HearingManager\n(discipline/services.py)"]
+        SanctionEngine["SanctionEngine\n(discipline/services.py)"]
+        AppealHandler["AppealHandler\n(discipline/services.py)"]
+        RecordSealingService["RecordSealingService\n(discipline/services.py)"]
+    end
+
+    subgraph DisciplineDomain["Domain Layer"]
+        DiscCase["DisciplinaryCase\n(discipline/models.py)"]
+        Hearing["Hearing\n(discipline/models.py)"]
+        Sanction["Sanction\n(discipline/models.py)"]
+        DiscAppeal["DisciplineAppeal\n(discipline/models.py)"]
+    end
+
+    subgraph DisciplineInfra["Infrastructure Layer"]
+        DiscORM["Django ORM\n(PostgreSQL)"]
+        DiscCelery["Celery Tasks\n(discipline/tasks.py)"]
+        DiscNotif["NotificationService\n(notifications/services.py)"]
+    end
+
+    DiscViewSet --> DiscSerializer
+    DiscViewSet --> DiscPermissions
+    DiscViewSet --> DisciplineService
+    DiscTemplateView --> DisciplineService
+
+    DisciplineService --> HearingManager
+    DisciplineService --> SanctionEngine
+    DisciplineService --> AppealHandler
+    DisciplineService --> RecordSealingService
+    DisciplineService --> DiscCase
+    HearingManager --> Hearing
+    SanctionEngine --> Sanction
+    AppealHandler --> DiscAppeal
+
+    DiscCase --> DiscORM
+    Hearing --> DiscORM
+    Sanction --> DiscORM
+    DiscAppeal --> DiscORM
+    DisciplineService --> DiscCelery
+    DisciplineService --> DiscNotif
+
+    style DisciplineTransport fill:#4A90E2,color:#fff,stroke:#357ABD
+    style DisciplineApp fill:#7B68EE,color:#fff,stroke:#6A5ACD
+    style DisciplineDomain fill:#27AE60,color:#fff,stroke:#229954
+    style DisciplineInfra fill:#E67E22,color:#fff,stroke:#D35400
+```
+
+### 7.3 Academic Sessions App
+
+```mermaid
+flowchart TB
+    subgraph SessionTransport["Transport Layer"]
+        SessionViewSet["SessionViewSet\n(api/views.py)"]
+        SessionSerializer["SessionSerializer\n(api/serializers.py)"]
+        SessionPermissions["SessionPermissions\n(api/permissions.py)"]
+        SessionTemplateView["SessionTemplateView\n(views.py)"]
+    end
+
+    subgraph SessionApp["Application Layer"]
+        SessionService["SessionService\n(academic_sessions/services.py)"]
+        RegistrationWindowManager["RegistrationWindowManager\n(academic_sessions/services.py)"]
+        CalendarSyncService["CalendarSyncService\n(academic_sessions/services.py)"]
+        SemesterLifecycleEngine["SemesterLifecycleEngine\n(academic_sessions/services.py)"]
+    end
+
+    subgraph SessionDomain["Domain Layer"]
+        AcademicYear["AcademicYear\n(academic_sessions/models.py)"]
+        Semester["Semester\n(academic_sessions/models.py)"]
+        RegWindow["RegistrationWindow\n(academic_sessions/models.py)"]
+        CalendarEvent["SessionCalendarEvent\n(academic_sessions/models.py)"]
+    end
+
+    subgraph SessionInfra["Infrastructure Layer"]
+        SessORM["Django ORM\n(PostgreSQL)"]
+        SessCelery["Celery Tasks\n(academic_sessions/tasks.py)"]
+        SessCache["Redis Cache\n(django-redis)"]
+    end
+
+    SessionViewSet --> SessionSerializer
+    SessionViewSet --> SessionPermissions
+    SessionViewSet --> SessionService
+    SessionTemplateView --> SessionService
+
+    SessionService --> RegistrationWindowManager
+    SessionService --> CalendarSyncService
+    SessionService --> SemesterLifecycleEngine
+    SessionService --> AcademicYear
+    SessionService --> Semester
+    RegistrationWindowManager --> RegWindow
+    CalendarSyncService --> CalendarEvent
+
+    AcademicYear --> SessORM
+    Semester --> SessORM
+    RegWindow --> SessORM
+    CalendarEvent --> SessORM
+    SessionService --> SessCelery
+    SessionService --> SessCache
+
+    style SessionTransport fill:#4A90E2,color:#fff,stroke:#357ABD
+    style SessionApp fill:#7B68EE,color:#fff,stroke:#6A5ACD
+    style SessionDomain fill:#27AE60,color:#fff,stroke:#229954
+    style SessionInfra fill:#E67E22,color:#fff,stroke:#D35400
+```
+
+### 7.4 Scholarships App
+
+```mermaid
+flowchart TB
+    subgraph ScholarshipTransport["Transport Layer"]
+        ScholViewSet["ScholarshipViewSet\n(api/views.py)"]
+        ScholSerializer["ScholarshipSerializer\n(api/serializers.py)"]
+        ScholPermissions["ScholarshipPermissions\n(api/permissions.py)"]
+        ScholTemplateView["ScholarshipTemplateView\n(views.py)"]
+    end
+
+    subgraph ScholarshipApp["Application Layer"]
+        ScholarshipService["ScholarshipService\n(scholarships/services.py)"]
+        DisbursementEngine["DisbursementEngine\n(scholarships/services.py)"]
+        StackingValidator["StackingValidator\n(scholarships/services.py)"]
+        RenewalEvaluator["RenewalEvaluator\n(scholarships/services.py)"]
+    end
+
+    subgraph ScholarshipDomain["Domain Layer"]
+        ScholProgram["ScholarshipProgram\n(scholarships/models.py)"]
+        ScholApplication["ScholarshipApplication\n(scholarships/models.py)"]
+        Disbursement["Disbursement\n(scholarships/models.py)"]
+        StackingRule["StackingRule\n(scholarships/models.py)"]
+    end
+
+    subgraph ScholarshipInfra["Infrastructure Layer"]
+        ScholORM["Django ORM\n(PostgreSQL)"]
+        ScholCelery["Celery Tasks\n(scholarships/tasks.py)"]
+    end
+
+    ScholViewSet --> ScholSerializer
+    ScholViewSet --> ScholPermissions
+    ScholViewSet --> ScholarshipService
+    ScholTemplateView --> ScholarshipService
+
+    ScholarshipService --> DisbursementEngine
+    ScholarshipService --> StackingValidator
+    ScholarshipService --> RenewalEvaluator
+    ScholarshipService --> ScholProgram
+    ScholarshipService --> ScholApplication
+    DisbursementEngine --> Disbursement
+    StackingValidator --> StackingRule
+
+    ScholProgram --> ScholORM
+    ScholApplication --> ScholORM
+    Disbursement --> ScholORM
+    StackingRule --> ScholORM
+    ScholarshipService --> ScholCelery
+
+    style ScholarshipTransport fill:#4A90E2,color:#fff,stroke:#357ABD
+    style ScholarshipApp fill:#7B68EE,color:#fff,stroke:#6A5ACD
+    style ScholarshipDomain fill:#27AE60,color:#fff,stroke:#229954
+    style ScholarshipInfra fill:#E67E22,color:#fff,stroke:#D35400
+```
+
+### 7.5 Recruitment App
+
+```mermaid
+flowchart TB
+    subgraph RecruitmentTransport["Transport Layer"]
+        RecViewSet["RecruitmentViewSet\n(api/views.py)"]
+        RecSerializer["RecruitmentSerializer\n(api/serializers.py)"]
+        RecPermissions["RecruitmentPermissions\n(api/permissions.py)"]
+        RecTemplateView["RecruitmentTemplateView\n(views.py)"]
+    end
+
+    subgraph RecruitmentApp["Application Layer"]
+        RecruitmentService["RecruitmentService\n(recruitment/services.py)"]
+        InterviewScheduler["InterviewScheduler\n(recruitment/services.py)"]
+        OfferManager["OfferManager\n(recruitment/services.py)"]
+        ApplicantTracker["ApplicantTracker\n(recruitment/services.py)"]
+    end
+
+    subgraph RecruitmentDomain["Domain Layer"]
+        JobPosting["JobPosting\n(recruitment/models.py)"]
+        Applicant["Applicant\n(recruitment/models.py)"]
+        Interview["Interview\n(recruitment/models.py)"]
+        Offer["Offer\n(recruitment/models.py)"]
+    end
+
+    subgraph RecruitmentInfra["Infrastructure Layer"]
+        RecORM["Django ORM\n(PostgreSQL)"]
+        RecCelery["Celery Tasks\n(recruitment/tasks.py)"]
+        RecNotif["NotificationService\n(notifications/services.py)"]
+    end
+
+    RecViewSet --> RecSerializer
+    RecViewSet --> RecPermissions
+    RecViewSet --> RecruitmentService
+    RecTemplateView --> RecruitmentService
+
+    RecruitmentService --> InterviewScheduler
+    RecruitmentService --> OfferManager
+    RecruitmentService --> ApplicantTracker
+    RecruitmentService --> JobPosting
+    ApplicantTracker --> Applicant
+    InterviewScheduler --> Interview
+    OfferManager --> Offer
+
+    JobPosting --> RecORM
+    Applicant --> RecORM
+    Interview --> RecORM
+    Offer --> RecORM
+    RecruitmentService --> RecCelery
+    RecruitmentService --> RecNotif
+
+    style RecruitmentTransport fill:#4A90E2,color:#fff,stroke:#357ABD
+    style RecruitmentApp fill:#7B68EE,color:#fff,stroke:#6A5ACD
+    style RecruitmentDomain fill:#27AE60,color:#fff,stroke:#229954
+    style RecruitmentInfra fill:#E67E22,color:#fff,stroke:#D35400
+```

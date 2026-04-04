@@ -14,18 +14,28 @@ emis/
 │   ├── users/              # Auth, RBAC, JWT, session, permissions
 │   ├── students/           # Student lifecycle management
 │   ├── admissions/         # Application and enrollment workflow
+│   ├── academic_sessions/  # Academic session & semester management
+│   ├── academic_standing/  # Academic standing & progress tracking
 │   ├── courses/            # Programs, courses, sections, enrollment
+│   ├── departments/        # Department & program administration
 │   ├── faculty/            # Faculty profiles and management
 │   ├── exams/              # Exam scheduling and grading
+│   ├── grade_appeals/      # Grade dispute & appeal management
+│   ├── graduation/         # Graduation & degree conferral
 │   ├── attendance/         # Daily attendance tracking
+│   ├── discipline/         # Student discipline & conduct management
 │   ├── timetable/          # Class scheduling and room allocation
+│   ├── facilities/         # Room & facility management
 │   ├── lms/                # Learning management system
 │   ├── finance/            # Fee management and invoicing
 │   ├── payment/            # Payment gateway integration
+│   ├── scholarships/       # Scholarship & financial aid management
 │   ├── library/            # Library catalog and circulation
 │   ├── hr/                 # HR, payroll, leave management
+│   ├── recruitment/        # Faculty recruitment & onboarding
 │   ├── hostel/             # Hostel and accommodation management
 │   ├── transport/          # Transport routes and allocation
+│   ├── transfer_credits/   # Transfer credits & course equivalency
 │   ├── inventory/          # Asset and stock management
 │   ├── analytics/          # Analytics dashboards
 │   ├── reports/            # Report generation
