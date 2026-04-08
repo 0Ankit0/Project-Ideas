@@ -49,6 +49,9 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | # | Folder | File | Description |
 |---|---|---|---|
 | 1 | `requirements/` | `requirements.md` | Functional and non-functional requirements |
@@ -92,6 +95,7 @@
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Reading Order
 
 Follow this sequence to build context progressively before implementation:
@@ -137,6 +141,7 @@ All diagrams use [Mermaid](https://mermaid.js.org/) syntax.
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | File | Phase | Status | Last Updated | Notes |
 |---|---|---|---|---|
 | `requirements/requirements.md` | Requirements | ✅ Complete | 2024-08 | FR + NFR + constraints |

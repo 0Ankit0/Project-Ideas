@@ -19,6 +19,7 @@ Application Hosting Platform is designed as a **Heroku/Render/Railway alternativ
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 - A GitHub or GitLab account with at least one repository containing an application
 - Basic familiarity with command-line interfaces
@@ -89,6 +90,9 @@ ahp env:set DATABASE_URL=... --app myapp
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 This documentation is organized into distinct sections for different audiences and purposes:
 
 ### **Requirements** (`requirements/`)
@@ -150,6 +154,7 @@ Failure modes and mitigation strategies:
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | File | Status | Purpose |
 |------|--------|---------|
 | README.md | ✓ Complete | Project overview and quick start |

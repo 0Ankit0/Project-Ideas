@@ -238,6 +238,7 @@ Rental Management System/
 │
 ├── README.md                              ← This file — project overview and navigation guide
 │
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements.md                    ← Full functional and non-functional requirements (FR, NFR, constraints)
 │   └── user-stories.md                    ← Agile user stories with acceptance criteria, organised by epic
@@ -258,6 +259,22 @@ Rental Management System/
 │   ├── domain-model.md                    ← Core domain entity relationships (ER notation, Mermaid)
 │   ├── data-flow-diagrams.md              ← DFDs showing data movement through key subsystems
 │   └── system-sequence-diagrams.md        ← System-level sequence diagrams for primary scenarios
+
+## Documentation Structure
+
+The canonical documentation layout is listed in the `📁 Documentation Structure` section above. The project root also includes [`traceability-matrix.md`](./traceability-matrix.md) for cross-phase requirement-to-implementation mapping.
+
+## Getting Started
+
+1. Start with [`traceability-matrix.md`](./traceability-matrix.md) to map each capability across requirements, analysis, design, infrastructure, implementation, and edge-case operations.
+2. Read `requirements/` and `analysis/` to confirm scope, actors, and business rules.
+3. Use `high-level-design/` and `detailed-design/` for architecture and contract-level build planning.
+4. Validate deployment and runtime safeguards in `infrastructure/`, `implementation/`, and `edge-cases/`.
+
+## Documentation Status
+
+- ✅ Cross-phase documentation is available for requirements, analysis, high-level design, detailed design, infrastructure, implementation, and edge-case operations.
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 │
 ├── detailed-design/
 │   ├── class-diagrams.md                  ← OOP class diagrams for all major bounded contexts

@@ -92,12 +92,14 @@ To make the repository robust and reduce the risk of missing documentation, this
    - required files are non-empty
    - each project README includes mandatory orientation sections
 
-3. Implementation guidance artifacts by project style:
+3. A standard project-root traceability artifact: `traceability-matrix.md`
+4. Implementation guidance artifacts by project style:
    - singular-template projects: `implementation-playbook.md`
    - generalized/plural-template projects: `implementation-guidelines.md` (+ `backend-status-matrix.md`)
 
 ## Common Documentation Phases (per project)
 
+- `traceability-matrix.md` (project root, cross-phase traceability)
 - `requirements/`
 - `analysis/`
 - `high-level-design/`
@@ -119,8 +121,9 @@ Successful output means configured projects satisfy baseline completeness and qu
 ## Suggested Usage Path
 
 1. Start with a project `README.md`
-2. Review `requirements/`
-3. Read `high-level-design/` for architecture context
-4. Use `detailed-design/` and `implementation/` for build planning
-5. Review `edge-cases/` for failure-mode handling and operational safeguards
-6. Review deployment readiness in `infrastructure/`
+2. Read the project `traceability-matrix.md` to map capabilities across phases
+3. Review `requirements/`
+4. Read `high-level-design/` for architecture context
+5. Use `detailed-design/` and `implementation/` for build planning
+6. Review `edge-cases/` for failure-mode handling and operational safeguards
+7. Review deployment readiness in `infrastructure/`

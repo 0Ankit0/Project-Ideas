@@ -42,6 +42,9 @@ A fully-documented, implementation-ready design for a generalized slot and time-
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | Path | Description |
 |------|-------------|
 | `requirements/requirements-document.md` | 40+ functional and non-functional requirements with MoSCoW priority |
@@ -85,6 +88,7 @@ A fully-documented, implementation-ready design for a generalized slot and time-
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### For Architects
 1. Read the system context: `analysis/system-context-diagram.md`
 2. Review the domain model: `high-level-design/domain-model.md`
@@ -188,6 +192,7 @@ graph TB
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | File | Status | Diagrams | Lines |
 |------|--------|----------|-------|
 | `README.md` | ✅ Complete | 1 | ~200 |

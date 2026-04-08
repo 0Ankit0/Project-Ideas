@@ -75,8 +75,12 @@ The engine is composed of six principal layers that work together to deliver per
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Smart Recommendation Engine/
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md
 │   └── user-stories.md
@@ -136,6 +140,7 @@ Smart Recommendation Engine/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### 1. Quick Start for Domain Adaptation
 
 The engine uses generic terminology (`Item`, `Action`, `User`) that maps cleanly onto any vertical. Rename the following entities in configuration and schema migrations:
@@ -257,6 +262,7 @@ Expected response:
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Phase | Document | Status | Lines | Last Updated |
 |-------|----------|--------|-------|--------------|
 | Requirements | requirements-document.md | ✅ Complete | 300+ | 2025-01-01 |

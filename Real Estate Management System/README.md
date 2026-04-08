@@ -104,9 +104,13 @@ The Real Estate Management System (REMS) serves property management companies, i
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Real Estate Management System/
 ├── README.md                          ← This file
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md       ← Functional & non-functional requirements (FR-01–FR-55+, NFR-01–NFR-22)
 │   └── user-stories.md                ← 45+ user stories with acceptance criteria
@@ -154,6 +158,7 @@ Real Estate Management System/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 - Node.js 20+, Docker Desktop, PostgreSQL 16, Redis 7.2
 - AWS CLI v2 configured with appropriate IAM permissions
@@ -210,6 +215,7 @@ npm run test:coverage     # Coverage report
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated | Owner |
 |----------|--------|-------------|-------|
 | Requirements Document | ✅ Complete | 2025-01 | Product Team |

@@ -34,8 +34,12 @@ Modern logistics operations span multiple carriers, geographies, and regulatory 
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Logistics Tracking System/
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md   ← Full functional & non-functional requirements
 │   └── user-stories.md            ← 40+ user stories with acceptance criteria
@@ -80,6 +84,7 @@ Logistics Tracking System/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. **Read requirements first** — `requirements/requirements-document.md` defines all functional requirements, NFRs, MVP scope, and constraints.
 2. **Review user stories** — `requirements/user-stories.md` provides role-based acceptance criteria used to drive feature implementation and QA.
 3. **Understand the domain** — `analysis/actors-and-roles.md` maps every stakeholder to permissions; `analysis/business-rules.md` captures invariants that must never be violated.
@@ -208,6 +213,7 @@ Every alert rule **must** link to: owning team, primary dashboard URL, 5-step tr
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated |
 |---|---|---|
 | `requirements/requirements-document.md` | ✅ Complete — 77 requirements across 11 modules | Current |

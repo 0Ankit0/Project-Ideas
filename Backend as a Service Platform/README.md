@@ -4,8 +4,12 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```text
 Backend as a Service Platform/
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md
 │   └── user-stories.md
@@ -76,6 +80,7 @@ Backend as a Service Platform/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. Read `requirements/requirements-document.md` for the capability scope and provider-abstraction model.
 2. Review `analysis/use-case-descriptions.md` for project setup, auth, data, storage, and provider switch workflows.
 3. Study `high-level-design/architecture-diagram.md` and `high-level-design/c4-context-container.md` for control-plane and data-plane boundaries.
@@ -85,6 +90,7 @@ Backend as a Service Platform/
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 - ✅ Requirements complete
 - ✅ Analysis complete
 - ✅ High-level design complete

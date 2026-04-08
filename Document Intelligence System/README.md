@@ -4,9 +4,13 @@ An enterprise-grade, AI-powered platform for automated document ingestion, OCR p
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Document Intelligence System/
 ├── README.md                          # This file — project overview and navigation
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md       # Functional (FR-01–FR-35) and non-functional requirements
 │   └── user-stories.md                # 20 user stories across 6 personas with acceptance criteria
@@ -70,6 +74,7 @@ Document Intelligence System/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 - Python 3.11+
@@ -120,6 +125,7 @@ curl -X POST http://localhost:8000/batches \
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated |
 |---|---|---|
 | Requirements Document | ✅ Complete | 2025-01 |

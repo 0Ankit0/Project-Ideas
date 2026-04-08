@@ -4,8 +4,12 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | Phase | Folder | Description |
 |-------|--------|-------------|
+| 0 | project root | [`traceability-matrix.md`](./traceability-matrix.md) maps requirements through operations across phases |
 | 1 | [requirements](./requirements/) | Functional & non-functional requirements, user stories |
 | 2 | [analysis](./analysis/) | Use cases, system context, activity & swimlane diagrams |
 | 3 | [high-level-design](./high-level-design/) | Sequence diagrams, domain model, DFD, architecture, C4 |
@@ -106,6 +110,7 @@ Phases
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. Start with `requirements/` to align scope and priorities.
 2. Review `analysis/` and `high-level-design/` for behavior and architecture context.
 3. Review `edge-cases/` before implementation to align failure handling and operational guardrails.
@@ -113,6 +118,7 @@ Phases
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 - ✅ Core documentation set is available across all seven phases.
 - ✅ Analysis coverage includes activity flow, swimlane/BPMN, data dictionary, business rules, and event catalog.
 - ✅ Edge-case pack includes operational, security/compliance, interface-surface, and domain scenario coverage.

@@ -44,6 +44,9 @@ The Finance Management System provides a single platform for every financial act
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ### requirements/
 
 | File | Description |
@@ -120,6 +123,7 @@ The Finance Management System provides a single platform for every financial act
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. **Clone the repository** and navigate to the `Finance-Management/` folder.
 2. **Read [`requirements/requirements.md`](./requirements/requirements.md)** to understand functional scope (FR-001–FR-060) and quality attributes (NFR-001–NFR-020).
 3. **Review [`requirements/user-stories.md`](./requirements/user-stories.md)** to understand actor goals and acceptance criteria.
@@ -134,6 +138,7 @@ The Finance Management System provides a single platform for every financial act
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | # | File | Status |
 |---|------|--------|
 | 1 | requirements/requirements.md | Complete |
@@ -179,6 +184,7 @@ The Finance Management System provides a single platform for every financial act
 
 | Phase | Folder | Description |
 |-------|--------|-------------|
+| 0 | project root | [`traceability-matrix.md`](./traceability-matrix.md) maps requirements through operations across phases |
 | 1 | [requirements](./requirements/) | Functional & non-functional requirements, user stories |
 | 2 | [analysis](./analysis/) | Use cases, system context, activity & swimlane diagrams |
 | 3 | [high-level-design](./high-level-design/) | Sequence diagrams, domain model, DFD, architecture, C4 |

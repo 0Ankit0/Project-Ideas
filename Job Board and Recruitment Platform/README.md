@@ -6,9 +6,13 @@ A full-featured, enterprise-grade recruitment platform that unifies job posting 
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Job Board and Recruitment Platform/
 ├── README.md                          ← You are here
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md       ← Functional & non-functional requirements (FR/NFR)
 │   └── user-stories.md                ← Role-based user stories with acceptance criteria
@@ -71,6 +75,7 @@ The platform enforces a fine-grained RBAC model across five primary personas: **
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 | Dependency | Minimum Version | Purpose |
@@ -276,6 +281,7 @@ VP of Talent, CHRO, and Talent Operations leads who consume analytics dashboards
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated |
 |---|---|---|
 | README.md | ✅ Complete | 2025-01 |

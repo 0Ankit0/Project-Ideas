@@ -4,6 +4,9 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | Phase | Folder | Description |
 |---|---|---|
 | 1 | [requirements](./requirements/) | Scope, FR/NFR, acceptance criteria, and user stories |
@@ -35,6 +38,7 @@ Diagrams are authored in Mermaid where applicable; export via VS Code Mermaid pr
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. Read `requirements/requirements.md` and `requirements/user-stories.md` to confirm scope and release boundaries.
 2. Follow `analysis/` and `high-level-design/` to understand system boundaries, dependencies, and architecture choices.
 3. Use `detailed-design/` and `implementation/` to plan engineering breakdown, milestones, and readiness checks.
@@ -42,6 +46,7 @@ Diagrams are authored in Mermaid where applicable; export via VS Code Mermaid pr
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 - ✅ Full Wave 1 documentation scaffold is present for this project.
 - ✅ Includes domain deep-dive (`detailed-design/ledger-and-settlement.md`) and operational edge-case pack.
 - ⏳ Keep diagrams and status matrix synchronized with implementation changes.

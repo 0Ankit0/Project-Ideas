@@ -6,6 +6,9 @@ A cloud-native, microservices-based neobank platform built for modern financial 
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | File | Description |
 |------|-------------|
 | **requirements/** | |
@@ -170,6 +173,7 @@ A dedicated **Card Processing Domain** bridges the internal card service to exte
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 - Docker Desktop 4.28+ with 8 GB RAM allocated
@@ -254,6 +258,7 @@ make test-performance ENV=staging
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated | Owner |
 |----------|--------|--------------|-------|
 | `requirements/requirements.md` | ✅ Complete | 2025-01-15 | Product |

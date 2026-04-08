@@ -24,6 +24,9 @@ The Supply Chain Management Platform is an enterprise-grade procurement and supp
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | Folder | File | Description |
 |---|---|---|
 | `requirements` | `requirements.md` | Functional requirements (FR-001 to FR-047) and non-functional requirements covering performance, scalability, security, and compliance |
@@ -64,6 +67,7 @@ The Supply Chain Management Platform is an enterprise-grade procurement and supp
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 - Familiarity with enterprise ERP concepts (SAP MM, Oracle Procurement, or equivalent)
@@ -85,6 +89,7 @@ The Supply Chain Management Platform is an enterprise-grade procurement and supp
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Folder | Status | Notes |
 |---|---|---|
 | `requirements` | Complete | FR-001 to FR-047 and NFR-001 to NFR-015 documented; US-001 to US-032 with acceptance criteria |

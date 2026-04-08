@@ -177,6 +177,9 @@ All inter-service communication uses **async events over Kafka** for write opera
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ### Phase 1 — Requirements
 
 | File | Description |
@@ -268,6 +271,7 @@ All inter-service communication uses **async events over Kafka** for write opera
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 Follow these steps to onboard to the documentation and begin development planning:
 
 1. **Understand the domain** — Read [`requirements/requirements.md`](./requirements/requirements.md) in full. Pay particular attention to the FR modules (Ticket Management, Routing, SLA, Bot) and the MVP scope table to confirm what is in scope for the first release.
@@ -288,6 +292,7 @@ Follow these steps to onboard to the documentation and begin development plannin
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Phase | File | Status |
 |---|---|---|
 | Requirements | `requirements/requirements.md` | ✅ Complete |

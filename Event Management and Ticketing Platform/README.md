@@ -87,9 +87,13 @@ Services communicate asynchronously via Kafka for event-driven workflows and syn
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Event Management and Ticketing Platform/
 ├── README.md                          ← This file
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md      ← Functional and non-functional requirements
 │   └── user-stories.md               ← User stories with acceptance criteria
@@ -130,6 +134,7 @@ Event Management and Ticketing Platform/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 - Docker 24+ and Docker Compose v2
 - Node.js 20 LTS (for the organizer portal frontend)
@@ -182,6 +187,7 @@ make test-load SCENARIO=flash-sale
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Location | Status |
 |---|---|---|
 | Requirements Document | `requirements/requirements-document.md` | ✅ Complete |

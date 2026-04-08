@@ -4,8 +4,12 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```text
 Restaurant Management System/
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md
 │   └── user-stories.md
@@ -77,6 +81,7 @@ Restaurant Management System/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. Read `requirements/requirements-document.md` for the complete operational scope and role model.
 2. Review `analysis/use-case-descriptions.md` for end-to-end guest, waiter, kitchen, inventory, and accounting workflows.
 3. Study `high-level-design/architecture-diagram.md` and `high-level-design/c4-context-container.md` for system boundaries.
@@ -86,6 +91,7 @@ Restaurant Management System/
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 - ✅ Requirements complete
 - ✅ Analysis complete
 - ✅ High-level design complete

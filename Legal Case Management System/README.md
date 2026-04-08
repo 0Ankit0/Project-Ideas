@@ -104,6 +104,9 @@ Law firms operate under strict professional responsibility rules, data privacy r
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | Folder | Contents | Purpose |
 |--------|----------|---------|
 | `requirements/` | `requirements-document.md`, `user-stories.md` | Full functional and non-functional specifications; role-based user stories with acceptance criteria |
@@ -118,6 +121,7 @@ Law firms operate under strict professional responsibility rules, data privacy r
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Navigating the Documentation
 
 This documentation repository follows the standard software development lifecycle from requirements capture through implementation guidance. New readers should work through the layers sequentially; experienced contributors may navigate directly to the relevant folder.
@@ -170,6 +174,7 @@ The LCMS is designed as a cloud-native, multi-tenant SaaS application deployable
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Path | Status |
 |----------|------|--------|
 | Requirements Document | `requirements/requirements-document.md` | Complete |

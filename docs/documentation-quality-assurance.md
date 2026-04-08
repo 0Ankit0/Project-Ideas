@@ -7,6 +7,7 @@ This document defines the minimum quality and completeness bar for every project
 Each project must include:
 
 - `README.md`
+- `traceability-matrix.md`
 - `requirements/`
 - `analysis/`
 - `high-level-design/`
@@ -25,7 +26,24 @@ Each project must include:
 Projects using the generalized/E-Commerce style should also include:
 - `implementation/backend-status-matrix.md`
 
-## 2) Required README Sections
+
+## 2) Traceability Matrix Policy
+
+Each project root must include `traceability-matrix.md` that links capabilities across:
+- requirements
+- analysis
+- high-level design
+- detailed design
+- infrastructure
+- implementation
+- edge-case and operations artifacts
+
+Policy requirements:
+- links must be exact and repo-relative
+- matrix evidence must map to existing project files
+- coverage gaps must be explicitly called out when a capability is weakly represented in a phase
+
+## 3) Required README Sections
 
 Each project README must include the following headings:
 
@@ -36,7 +54,7 @@ Each project README must include the following headings:
 
 These sections ensure each project is discoverable, actionable, and auditable.
 
-## 3) Content Robustness Expectations
+## 4) Content Robustness Expectations
 
 For all required documentation files:
 
@@ -60,7 +78,7 @@ For all projects, `edge-cases/` must include:
 
 Every edge-case scenario doc should explicitly cover failure mode, impact, detection, and recovery/mitigation
 
-## 4) Repository-level Validation Mechanism
+## 5) Repository-level Validation Mechanism
 
 Use the validator to enforce consistency:
 
@@ -75,7 +93,7 @@ Validator checks include:
 - non-empty file checks
 - required README section heading checks
 
-## 5) Project Coverage Matrix
+## 6) Project Coverage Matrix
 
 | Project | Coverage Status |
 |---|---|
@@ -121,7 +139,7 @@ Validator checks include:
 | Legal Case Management System | Covered by validator |
 | Application Hosting Platform | Covered by validator |
 
-## 6) Change Management Rules
+## 7) Change Management Rules
 
 When adding or renaming documentation files:
 

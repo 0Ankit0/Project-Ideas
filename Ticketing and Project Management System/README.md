@@ -4,8 +4,12 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```text
 Ticketing and Project Management System/
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md
 │   └── user-stories.md
@@ -73,6 +77,7 @@ Ticketing and Project Management System/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. Read `requirements/requirements-document.md` to understand scope and modules.
 2. Review `analysis/use-case-descriptions.md` for end-to-end workflows.
 3. Study `high-level-design/architecture-diagram.md` and `high-level-design/c4-context-container.md` for system boundaries.
@@ -82,6 +87,7 @@ Ticketing and Project Management System/
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 - ✅ Requirements complete
 - ✅ Analysis complete
 - ✅ High-level design complete

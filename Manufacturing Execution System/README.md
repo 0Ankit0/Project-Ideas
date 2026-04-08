@@ -18,6 +18,9 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | File | Path | Description |
 |------|------|-------------|
 | README | `README.md` | Project overview, architecture summary, and navigation guide |

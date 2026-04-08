@@ -39,8 +39,12 @@ Businesses managing their own delivery operations need a unified system that bri
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Order Management and Delivery System/
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md   ← Full functional & non-functional requirements
 │   └── user-stories.md            ← 35+ user stories with acceptance criteria
@@ -103,6 +107,7 @@ Order Management and Delivery System/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. **Read requirements first** — `requirements/requirements-document.md` defines all functional requirements across 11 modules and non-functional requirements for performance, security, and availability.
 2. **Review user stories** — `requirements/user-stories.md` provides role-based acceptance criteria for feature implementation and QA.
 3. **Understand the domain** — `analysis/use-case-diagram.md` maps actors to capabilities; `analysis/data-dictionary.md` defines all entities and constraints; `analysis/business-rules.md` captures invariants.
@@ -200,6 +205,7 @@ Order Management and Delivery System/
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated |
 |---|---|---|
 | `requirements/requirements-document.md` | ✅ Complete | Current |

@@ -20,9 +20,13 @@ A production-grade, multi-tenant IoT Device Management Platform that enables org
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 IoT Device Management Platform/
 ├── README.md                          ← This file
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements.md                ← Functional & non-functional requirements (REQ-XXX)
 │   └── user-stories.md                ← User stories with acceptance criteria (US-XXX)
@@ -71,6 +75,7 @@ IoT Device Management Platform/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 - Familiarity with MQTT protocol and IoT device connectivity
 - Understanding of X.509 certificates and PKI
@@ -101,6 +106,7 @@ IoT Device Management Platform/
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Section | Status | Last Updated | Notes |
 |---|---|---|---|
 | Requirements | Complete | 2024-01 | All REQ-XXX defined |

@@ -4,10 +4,13 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Healthcare Appointment System/
-├── requirements/
-├── analysis/
+├── traceability-matrix.md
+├── requirements/├── analysis/
 ├── high-level-design/
 ├── detailed-design/
 ├── infrastructure/
@@ -25,6 +28,7 @@ Healthcare Appointment System/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. Start with `requirements/requirements-document.md`
 2. Review `analysis/use-case-descriptions.md`
 3. Study `high-level-design/architecture-diagram.md`
@@ -34,6 +38,7 @@ Healthcare Appointment System/
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 - ✅ Requirements complete
 - ✅ Analysis complete
 - ✅ High-level design complete

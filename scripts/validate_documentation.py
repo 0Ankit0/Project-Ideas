@@ -51,6 +51,13 @@ ANALYSIS_QUALITY_GATES = {
     },
 }
 
+TRACEABILITY_REQUIRED_HEADINGS = [
+    "## Purpose",
+    "## Artifact Coverage",
+    "## End-to-End Traceability Matrix",
+    "## Coverage Gaps and Follow-Ups",
+]
+
 PLACEHOLDER_PATTERNS = [
     r"\bTODO\b",
     r"\bTBD\b",
@@ -910,6 +917,75 @@ def _validate_analysis_quality(
             )
 
 
+def _validate_traceability_quality(
+    project_name: str, file_path: Path, errors: List[ValidationError]
+) -> None:
+    text = file_path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+
+    if len(lines) < 20:
+        errors.append(
+            ValidationError(
+                project_name,
+                f"traceability-matrix.md is too short ({len(lines)} lines, expected at least 20)",
+            )
+        )
+
+    for heading in TRACEABILITY_REQUIRED_HEADINGS:
+        if heading not in text:
+            errors.append(
+                ValidationError(
+                    project_name,
+                    f"traceability-matrix.md missing heading: '{heading}'",
+                )
+            )
+
+    for pattern in PLACEHOLDER_PATTERNS:
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            errors.append(
+                ValidationError(
+                    project_name,
+                    "traceability-matrix.md contains placeholder text "
+                    f"matching '{pattern}'",
+                )
+            )
+
+    matrix_section = text.split("## End-to-End Traceability Matrix", maxsplit=1)
+    if len(matrix_section) == 2:
+        matrix_lines = matrix_section[1].splitlines()
+        table_rows = sum(
+            1
+            for line in matrix_lines
+            if line.startswith("| TM-")
+        )
+        if table_rows < 6:
+            errors.append(
+                ValidationError(
+                    project_name,
+                    "traceability-matrix.md has insufficient matrix rows "
+                    f"({table_rows}, expected at least 6)",
+                )
+            )
+
+    phase_hints = [
+        "./requirements/",
+        "./analysis/",
+        "./high-level-design/",
+        "./detailed-design/",
+        "./infrastructure/",
+        "./implementation/",
+        "./edge-cases/",
+    ]
+    referenced_phases = sum(1 for hint in phase_hints if hint in text)
+    if referenced_phases < 4:
+        errors.append(
+            ValidationError(
+                project_name,
+                "traceability-matrix.md does not reference enough documentation phases",
+            )
+        )
+
+
 def validate() -> List[ValidationError]:
     errors: List[ValidationError] = []
 
@@ -933,6 +1009,13 @@ def validate() -> List[ValidationError]:
                             f"README.md is missing required section heading: '{heading}'",
                         )
                     )
+        traceability_file = project_dir / "traceability-matrix.md"
+        if not traceability_file.exists():
+            errors.append(ValidationError(project_name, "traceability-matrix.md is missing"))
+        elif traceability_file.stat().st_size == 0:
+            errors.append(ValidationError(project_name, "traceability-matrix.md is empty"))
+        else:
+            _validate_traceability_quality(project_name, traceability_file, errors)
 
         for folder, expected_files in expected_map.items():
             folder_path = project_dir / folder

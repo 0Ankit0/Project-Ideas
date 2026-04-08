@@ -2,6 +2,9 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | Phase | Folder | Description |
 |---|---|---|
 | 1 | [requirements](./requirements/) | Scope, FR/NFR, acceptance criteria, and user stories |
@@ -31,6 +34,7 @@
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Phase | Status | Notes |
 |---|---|---|
 | Requirements | Complete | FR/NFR, acceptance criteria, and user stories documented |

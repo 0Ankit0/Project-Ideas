@@ -11,6 +11,9 @@
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | Folder / File | Type | Description |
 |---|---|---|
 | `requirements/` | Requirements | Functional requirements, user stories, acceptance criteria, and use cases |
@@ -79,6 +82,7 @@ PHI encrypted at rest with AES-256-GCM via AWS KMS customer-managed keys with pe
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 | Tool | Minimum Version | Purpose |
@@ -216,6 +220,7 @@ The platform treats HIPAA Privacy Rule (45 CFR Part 164 Subpart E) and Security 
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Path | Status |
 |---|---|---|
 | Platform README | `README.md` | Complete |

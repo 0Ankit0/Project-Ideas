@@ -61,10 +61,14 @@ This system solves those challenges with a cloud-native, event-driven architectu
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Fleet Management System/
 ├── README.md                                  ← This file — project overview and navigation
 │
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md              ← Functional (FR-01–FR-55) and non-functional requirements (NFR-01–NFR-22)
 │   └── user-stories.md                       ← 40+ user stories with Given/When/Then acceptance criteria
@@ -130,6 +134,7 @@ Executive dashboards show fleet utilization rate, cost-per-mile, on-time deliver
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 - Node.js 20+ and pnpm 9+
@@ -234,6 +239,7 @@ pnpm --filter @fleet/e2e run test:staging
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Section | Document | Status | Last Updated |
 |---|---|---|---|
 | Requirements | [requirements-document.md](./requirements/requirements-document.md) | ✅ Complete | 2025-01 |

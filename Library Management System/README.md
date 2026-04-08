@@ -8,10 +8,14 @@ The system is designed around five core bounded contexts — **Catalog**, **Circ
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```text
 Library Management System/
 ├── README.md                              ← You are here
 │
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md          ← Functional and non-functional requirements
 │   └── user-stories.md                   ← Epics and user stories by role
@@ -140,6 +144,7 @@ Library Management System/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. **Understand the scope** — Read [`requirements/requirements-document.md`](requirements/requirements-document.md) for the complete list of functional and non-functional requirements, including performance SLOs and compliance obligations.
 
 2. **Trace the workflows** — Review [`analysis/use-case-descriptions.md`](analysis/use-case-descriptions.md) for step-by-step flows covering all six roles, then study [`analysis/bpmn-swimlane-diagram.md`](analysis/bpmn-swimlane-diagram.md) for the BPMN-level process maps.
@@ -158,6 +163,7 @@ Library Management System/
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Section | Status | Notes |
 |---|---|---|
 | ✅ Requirements | Complete | Functional + NFR with acceptance criteria |

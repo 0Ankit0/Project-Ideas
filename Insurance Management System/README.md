@@ -8,6 +8,9 @@ The platform supports multiple lines of business: **Life**, **Health**, **Auto**
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | Directory | Description |
 |-----------|-------------|
 | `requirements/` | Functional and non-functional requirements, user stories |
@@ -82,6 +85,7 @@ The platform supports multiple lines of business: **Life**, **Health**, **Auto**
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 - Docker 24+ and Docker Compose v2
 - Kubernetes 1.28+ (for production deployment)
@@ -134,6 +138,7 @@ docker compose up -d
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated |
 |----------|--------|-------------|
 | Requirements | Complete | 2025-01 |

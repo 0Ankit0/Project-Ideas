@@ -39,6 +39,9 @@ The WMS is designed as a set of independently deployable domain services organiz
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | # | Folder | Contents |
 |---|---|---|
 | 1 | [`requirements/`](./requirements/) | Scope definition, 60+ functional requirements with acceptance criteria, non-functional requirements, integration test scenarios, traceability matrix, and user stories (40+ stories across 10 epics) |
@@ -53,6 +56,7 @@ The WMS is designed as a set of independently deployable domain services organiz
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. **Understand the scope**: Read [`requirements/requirements.md`](./requirements/requirements.md) to understand the functional and non-functional requirements, acceptance criteria, and business rule references.
 2. **Study the user workflows**: Read [`requirements/user-stories.md`](./requirements/user-stories.md) for the 40+ operator-perspective user stories with acceptance criteria grouped by epic.
 3. **Learn the business rules**: Use [`analysis/business-rules.md`](./analysis/business-rules.md) as the authoritative rule set. Every design decision and API guard traces back to a rule here.
@@ -66,6 +70,7 @@ The WMS is designed as a set of independently deployable domain services organiz
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | File | Phase | Status | ~Lines |
 |---|---|---|---|
 | `requirements/requirements.md` | Requirements | Complete | 420+ |

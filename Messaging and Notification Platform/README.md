@@ -93,6 +93,9 @@ The **Messaging and Notification Platform** is an enterprise-grade, horizontally
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ### Phase 1 — Requirements
 
 | File | Description |
@@ -169,6 +172,7 @@ The **Messaging and Notification Platform** is an enterprise-grade, horizontally
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Architecture Decisions
 
 Before diving into implementation, understand these foundational decisions:
@@ -241,6 +245,7 @@ Follow this sequence for a new team member onboarding:
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Phase | Folder | Files | Status | Coverage Notes |
 |---|---|---|---|---|
 | 1 – Requirements | `requirements/` | 2 | ✅ Complete | FR/NFR, 40+ requirements, user stories with ACs |

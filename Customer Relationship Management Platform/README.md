@@ -43,6 +43,9 @@ The platform is designed around a multi-tenant architecture supporting thousands
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | # | Document | Path | Description |
 |---|---|---|---|
 | 1 | Requirements Specification | [requirements/requirements.md](requirements/requirements.md) | Functional (FR-001–FR-035) and non-functional requirements (NFR-001–NFR-015) with priority and acceptance criteria |
@@ -87,6 +90,7 @@ The platform is designed around a multi-tenant architecture supporting thousands
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 - Node.js 20 LTS or later
@@ -147,6 +151,7 @@ npm run test:coverage    # Full coverage report
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Reviewed |
 |---|---|---|
 | requirements/requirements.md | Approved | 2025-07-15 |

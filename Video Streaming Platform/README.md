@@ -228,10 +228,14 @@ C4Context
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Video Streaming Platform/
 ├── README.md                          ← This file
 │
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements.md                ← Full functional + non-functional requirements
 │   └── user-stories.md                ← 30+ user stories across all personas
@@ -300,6 +304,7 @@ Video Streaming Platform/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Reading Order for Engineers
 
 **New to the project?** Follow this sequence:
@@ -328,6 +333,7 @@ Video Streaming Platform/
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | File | Status | Last Updated |
 |---|---|---|
 | `README.md` | ✅ Complete | 2025-01 |

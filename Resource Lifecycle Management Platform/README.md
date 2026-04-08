@@ -41,6 +41,9 @@ flowchart LR
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 | Directory | Contents |
 |-----------|----------|
 | `requirements/` | Functional and non-functional requirements, user stories |
@@ -94,6 +97,7 @@ flowchart LR
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 | Component | Version | Purpose |
@@ -161,6 +165,7 @@ Auth: `Authorization: Bearer <JWT>`
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated |
 |----------|--------|--------------|
 | Requirements | ✅ Complete | 2024-Q4 |

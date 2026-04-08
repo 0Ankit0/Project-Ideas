@@ -25,6 +25,7 @@ The Social Networking Platform is a full-stack distributed system designed for s
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 - Node.js 20+ / Python 3.11+ (backend services)
 - PostgreSQL 15+, Redis 7+, Apache Kafka 3+
@@ -51,9 +52,13 @@ The Social Networking Platform is a full-stack distributed system designed for s
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Social Networking Platform/
 ├── README.md                          ← This file
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements.md                ← Functional & non-functional requirements (REQ-XXX)
 │   └── user-stories.md                ← User stories with acceptance criteria (US-XXX)
@@ -102,6 +107,7 @@ Social Networking Platform/
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated |
 |---|---|---|
 | requirements/requirements.md | Complete | 2024-01 |

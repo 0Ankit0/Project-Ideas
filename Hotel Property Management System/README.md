@@ -6,10 +6,14 @@ A full-stack, cloud-native Property Management System (PMS) built for independen
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 Hotel Property Management System/
 ├── README.md                                  # Project overview, features, setup guide, and doc status
 │
+├── traceability-matrix.md
 ├── requirements/
 │   └── requirements-document.md              # Full functional and non-functional requirements (FR-*, NFR-*)
 │
@@ -110,6 +114,7 @@ Hotel Property Management System/
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 | Dependency     | Minimum Version | Purpose                                      |
@@ -214,6 +219,7 @@ curl http://localhost:3000/health
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document                               | Status   | Last Updated |
 |----------------------------------------|----------|--------------|
 | README.md                              | Complete | 2025-01-15   |

@@ -205,6 +205,7 @@ Generate revenue recognition schedules that spread deferred revenue across servi
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 1. **Read the Requirements** — Start with [`requirements/requirements.md`](requirements/requirements.md) to understand all functional and non-functional requirements. Review [`requirements/user-stories.md`](requirements/user-stories.md) for role-based feature expectations.
 
 2. **Review Plan Versioning Rules** — Read [`requirements/plan-versioning-and-lifecycle-requirements.md`](requirements/plan-versioning-and-lifecycle-requirements.md) to understand how plan changes interact with existing subscriptions and the grandfathering model.
@@ -224,6 +225,9 @@ Generate revenue recognition schedules that spread deferred revenue across servi
 ---
 
 ## Documentation Structure
+
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
 
 | Folder | Contents | Status |
 |---|---|---|
@@ -247,6 +251,7 @@ Generate revenue recognition schedules that spread deferred revenue across servi
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | Document | Status | Last Updated |
 |---|---|---|
 | README.md | Complete | 2025 |

@@ -173,6 +173,7 @@ ADS solves all of these challenges in a single, API-first platform.
 
 ## Getting Started
 
+- Review [`traceability-matrix.md`](./traceability-matrix.md) first to navigate requirement-to-implementation coverage across phases.
 ### Prerequisites
 
 ```bash
@@ -251,9 +252,13 @@ make test-coverage
 
 ## Documentation Structure
 
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+
 ```
 .
 ├── README.md                          ← This file
+├── traceability-matrix.md
 ├── requirements/
 │   ├── requirements-document.md       ← Functional & non-functional requirements
 │   └── user-stories.md                ← Epics and user stories
@@ -387,6 +392,7 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`
 
 ## Documentation Status
 
+- ✅ Traceability coverage is available via [`traceability-matrix.md`](./traceability-matrix.md).
 | File | Status | Lines | Last Updated |
 |------|--------|-------|--------------|
 | README.md | ✅ Complete | 200+ | 2025-01-01 |
