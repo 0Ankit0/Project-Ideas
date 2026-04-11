@@ -139,7 +139,20 @@ Validator checks include:
 | Legal Case Management System | Covered by validator |
 | Application Hosting Platform | Covered by validator |
 
-## 7) Change Management Rules
+## 7) Mermaid Diagram Authoring and Validation
+
+Mermaid diagram contributors must follow `docs/mermaid-authoring-rules.md` before adding or changing diagram blocks.
+
+Pre-commit validation commands:
+
+```bash
+python3 scripts/validate-mermaid.py
+python3 scripts/validate-mermaid.py $(git diff --name-only --cached -- '*.md')
+```
+
+CI also validates Mermaid blocks for changed Markdown files on pull requests.
+
+## 8) Change Management Rules
 
 When adding or renaming documentation files:
 

@@ -118,6 +118,14 @@ python3 scripts/validate_documentation.py
 
 Successful output means configured projects satisfy baseline completeness and quality gates.
 
+For Mermaid diagram quality checks:
+
+```bash
+python3 scripts/validate-mermaid.py
+```
+
+Authoring rules and pre-commit examples are documented in `docs/mermaid-authoring-rules.md`.
+
 ## Suggested Usage Path
 
 1. Start with a project `README.md`
