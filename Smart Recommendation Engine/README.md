@@ -106,11 +106,13 @@ Smart Recommendation Engine/
 │   ├── erd-database-schema.md
 │   ├── component-diagram.md
 │   ├── api-design.md
-│   └── c4-component.md
+│   ├── c4-component.md
+│   └── recommendation-pipeline-design.md
 ├── infrastructure/
 │   ├── deployment-diagram.md
 │   ├── network-infrastructure.md
-│   └── cloud-architecture.md
+│   ├── cloud-architecture.md
+│   └── realtime-serving-topology.md
 ├── edge-cases/
 │   ├── README.md
 │   ├── cold-start.md
@@ -119,11 +121,15 @@ Smart Recommendation Engine/
 │   ├── bias-fairness.md
 │   ├── api-and-sdk.md
 │   ├── security-and-compliance.md
-│   └── operations.md
-└── implementation/
-    ├── code-guidelines.md
-    ├── c4-code-diagram.md
-    └── implementation-playbook.md
+│   ├── operations.md
+│   └── recommendation-resilience.md
+├── implementation/
+│   ├── code-guidelines.md
+│   ├── c4-code-diagram.md
+│   ├── implementation-playbook.md
+│   └── mlops-orchestration.md
+├── monitoring/
+│   └── model-and-kpi-guardrails.md
 ```
 
 | Section | Purpose |
@@ -131,10 +137,11 @@ Smart Recommendation Engine/
 | **requirements/** | Functional & non-functional requirements, measurable acceptance criteria, and all user stories organized by persona (end user, ML engineer, data analyst, admin). |
 | **analysis/** | Domain analysis artifacts: use-case diagrams, system context, activity flows, BPMN swimlanes, data dictionary, business rules, and the full event catalog for Kafka topics. |
 | **high-level-design/** | Macro-level architecture: C4 context + container diagrams, domain model, data-flow diagram, and system sequence diagrams across the ML pipeline. |
-| **detailed-design/** | Implementation-level blueprints: class diagrams (Python), ERD/database schema, REST API contract, state machines, component wiring, and C4 component diagrams. |
-| **infrastructure/** | Deployment topology: Kubernetes manifests overview, cloud-provider architecture (AWS/GCP), network segmentation, and the ML model-serving infrastructure. |
-| **edge-cases/** | Operational runbooks and design decisions for cold start, feedback loops, model drift detection, bias & fairness, API edge cases, security/compliance, and day-2 operations. |
-| **implementation/** | Developer-facing guides: Python coding conventions, the C4 code-level diagram, and a step-by-step implementation playbook covering build, test, and go-live phases. |
+| **detailed-design/** | Implementation-level blueprints: class diagrams (Python), ERD/database schema, REST API contract, state machines, component wiring, C4 component diagrams, and the end-to-end candidate/ranking pipeline contract. |
+| **infrastructure/** | Deployment topology: Kubernetes manifests overview, cloud-provider architecture (AWS/GCP), network segmentation, stream processing layout, vector/index service topology, cache tiers, and fault-isolation controls. |
+| **edge-cases/** | Operational runbooks and design decisions for cold start, popularity bias, stale embeddings, missing features, degraded mode behavior, feedback loops, model drift, fairness, and day-2 operations. |
+| **implementation/** | Developer-facing guides: Python coding conventions, C4 code-level diagram, implementation playbook, and MLOps orchestration (training, registry promotion, realtime feature retrieval fallback). |
+| **monitoring/** | Model-quality + business KPI guardrails, alert thresholds, and automatic/manual rollback trigger policy. |
 
 ---
 

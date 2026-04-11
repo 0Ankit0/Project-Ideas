@@ -106,6 +106,11 @@ System is considered implementation-ready and production-capable when:
 4. Security, reliability, and operational controls are verified in staging.
 5. Stakeholders sign off on KPI and acceptance criteria.
 
+## 11. MLOps Execution Addendum
+- Execute training and promotion workflow from `implementation/mlops-orchestration.md`.
+- Enforce runtime fallback behavior matrix for missing/stale features before production promotion.
+- Verify guardrail dashboards and rollback triggers from `monitoring/model-and-kpi-guardrails.md`.
+
 ## Rollout Playbook Expansion
 ### Phase Gates
 1. **Pre-prod**: replay training data, run load tests, complete fairness scorecard.
