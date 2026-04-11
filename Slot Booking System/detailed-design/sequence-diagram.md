@@ -564,3 +564,141 @@ sequenceDiagram
     Book-->>API: PAYMENT_FAILED
   end
 ```
+
+---
+
+## SD-05: Reserve / Confirm / Cancel / Refund with Explicit Transaction Boundaries
+
+### SD-05A: Reserve Slot (Hold Creation)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant API as Booking API
+    participant IDS as Idempotency Store
+    participant LOCK as Lock Service (Redis)
+    participant DB as Booking DB
+    participant OUT as Outbox Relay
+    participant BUS as Event Bus
+
+    C->>API: POST /bookings/reserve (Idempotency-Key)
+    API->>IDS: checkOrCreate(key, fingerprint)
+    IDS-->>API: miss
+
+    rect rgb(235, 245, 255)
+    Note over API,DB: TX-R1 (single DB transaction)
+    API->>DB: INSERT booking(status=RESERVED_PENDING)
+    API->>DB: INSERT slot_hold(expires_at_utc, fencing_token)
+    API->>DB: INSERT outbox(event=SlotHeld)
+    DB-->>API: commit OK
+    end
+
+    API->>LOCK: SET NX PX slot_hold_key
+    LOCK-->>API: acquired
+    API-->>C: 201 Reserved (hold_expires_at_utc)
+
+    OUT->>DB: read unpublished outbox rows
+    OUT->>BUS: publish SlotHeld
+    OUT->>DB: mark outbox row published
+```
+
+### SD-05B: Confirm Booking (Payment Coupled)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant API as Booking API
+    participant IDS as Idempotency Store
+    participant PAY as Payment Service
+    participant PSP as Payment Gateway
+    participant DB as Booking DB
+    participant OUT as Outbox Relay
+
+    C->>API: POST /bookings/{id}/confirm
+    API->>IDS: checkOrCreate(key, fingerprint)
+    IDS-->>API: miss
+    API->>DB: SELECT hold + booking FOR UPDATE
+
+    alt hold expired
+        API-->>C: 409 HOLD_EXPIRED
+    else hold active
+        API->>PAY: authorizeAndCapture(booking_id)
+        PAY->>PSP: capture(amount)
+        PSP-->>PAY: success
+
+        rect rgb(235, 245, 255)
+        Note over API,DB: TX-C1 (single DB transaction)
+        API->>DB: UPDATE booking status=CONFIRMED
+        API->>DB: DELETE/RELEASE slot_hold
+        API->>DB: INSERT payment_record(status=CAPTURED)
+        API->>DB: INSERT outbox(event=BookingConfirmed)
+        DB-->>API: commit OK
+        end
+
+        API-->>C: 200 Confirmed
+        OUT->>DB: read outbox
+        OUT->>DB: mark published
+    end
+```
+
+### SD-05C: Cancel Booking
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant API as Booking API
+    participant DB as Booking DB
+    participant OUT as Outbox Relay
+    participant BUS as Event Bus
+
+    C->>API: POST /bookings/{id}/cancel
+
+    rect rgb(235, 245, 255)
+    Note over API,DB: TX-X1 (single DB transaction)
+    API->>DB: SELECT booking FOR UPDATE
+    API->>DB: UPDATE booking status=CANCELLED
+    API->>DB: RELEASE slot allocation/capacity counters
+    API->>DB: INSERT refund_case(status=REQUESTED)
+    API->>DB: INSERT outbox(event=BookingCancelled)
+    DB-->>API: commit OK
+    end
+
+    API-->>C: 202 Cancel accepted
+    OUT->>BUS: publish BookingCancelled
+```
+
+### SD-05D: Refund Processing
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant RF as Refund Worker
+    participant DB as Booking DB
+    participant PSP as Payment Gateway
+    participant OUT as Outbox Relay
+    participant BUS as Event Bus
+
+    RF->>DB: claim refund_case(status=REQUESTED)
+
+    rect rgb(235, 245, 255)
+    Note over RF,DB: TX-RF1 (single DB transaction)
+    RF->>DB: UPDATE refund_case status=INITIATED
+    RF->>DB: INSERT outbox(event=RefundInitiated)
+    DB-->>RF: commit OK
+    end
+
+    RF->>PSP: refund(payment_txn_id, amount)
+    PSP-->>RF: settled
+
+    rect rgb(235, 245, 255)
+    Note over RF,DB: TX-RF2 (single DB transaction)
+    RF->>DB: UPDATE refund_case status=SETTLED
+    RF->>DB: INSERT outbox(event=RefundSettled)
+    DB-->>RF: commit OK
+    end
+
+    OUT->>BUS: publish RefundSettled
+```

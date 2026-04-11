@@ -72,6 +72,7 @@ Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) prov
 | `infrastructure/deployment-diagram.md` | Kubernetes deployment topology |
 | `infrastructure/network-infrastructure.md` | VPC, subnets, security groups, and firewall rules |
 | `infrastructure/cloud-architecture.md` | AWS multi-AZ cloud architecture |
+| `infrastructure/booking-runtime-patterns.md` | Cache/lock/messaging/hotspot strategies for booking runtime |
 | `implementation/code-guidelines.md` | Language conventions, patterns, and quality gates |
 | `implementation/c4-code-diagram.md` | C4 code-level diagram for Booking aggregate |
 | `implementation/implementation-playbook.md` | Sprint-by-sprint delivery plan with acceptance criteria |

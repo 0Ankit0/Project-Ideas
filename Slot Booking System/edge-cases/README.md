@@ -44,3 +44,30 @@ This folder captures edge cases across availability, booking, cancellations, not
 - Duplicate client retries and duplicate payment callbacks.
 - Boundary-time cancellations (exact cutoff minute, timezone shifts, DST transitions).
 - Partial outage handling for notification and payment provider dependencies.
+
+## Additional Distributed-Flow Edge Cases
+
+### 1) Concurrent booking collisions
+- **Case**: Multiple users reserve the same high-demand slot within milliseconds.
+- **Mitigation**: Atomic hold + fencing tokens + deterministic conflict response (`409 SLOT_TAKEN`).
+- **Validation**: Load test with synchronized clients and conflict-rate SLO monitoring.
+
+### 2) Clock skew across clients/services
+- **Case**: Client clock or one service node drifts, causing incorrect hold countdown or premature expiry actions.
+- **Mitigation**: Treat server UTC as authority; include `server_now_utc` in all reserve/confirm responses; enforce NTP alarms.
+- **Validation**: Chaos test with +/-120s injected skew on selected nodes.
+
+### 3) Payment success after slot timeout
+- **Case**: PSP callback arrives after hold expired and slot was reallocated.
+- **Mitigation**: Never auto-confirm on stale hold; route to compensation saga (refund or operator intervention).
+- **Validation**: Simulate delayed webhook and verify `PAYMENT_LATE_AFTER_TIMEOUT` handling path.
+
+### 4) Stale availability reads
+- **Case**: User sees slot available from cache snapshot but slot was just taken.
+- **Mitigation**: Reserve call remains source of truth; include freshness metadata (`as_of_utc`) in availability responses.
+- **Validation**: Ensure stale read still leads to safe reserve rejection without double-booking.
+
+### 5) No-show penalty disputes
+- **Case**: Customer disputes no-show charge due to check-in proof mismatch.
+- **Mitigation**: Immutable audit trail for reminder notifications, check-in scans, geofence/device evidence, and policy version at booking time.
+- **Validation**: Replay dispute packet and verify reproducible policy decision outcome.
