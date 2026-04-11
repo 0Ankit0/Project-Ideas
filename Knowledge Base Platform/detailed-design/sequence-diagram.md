@@ -107,7 +107,7 @@ sequenceDiagram
 
         SS->>ES_SVC: embed(q)
         activate ES_SVC
-        ES_SVC->>ES_SVC: cacheKey = sha256(q); check embedding cache
+        ES_SVC->>ES_SVC: cacheKey = sha256(q) and check embedding cache
         ES_SVC->>OA: POST /embeddings{ model, input: q }
         OA-->>ES_SVC: { embedding: Float32[1536] }
         ES_SVC-->>SS: Float32[1536] queryEmbedding
@@ -160,7 +160,7 @@ sequenceDiagram
     User->>AIC: POST /api/v1/ai/conversations/:id/messages<br/>{ content: "How do I reset my password?" }
     activate AIC
 
-    AIC->>AIC: Validate JWT; resolve workspaceId from convId
+    AIC->>AIC: Validate JWT and resolve workspaceId from convId
     AIC->>AIC: Check token budget (workspace limit)
 
     AIC->>AS: sendMessage(convId, dto)
@@ -243,7 +243,7 @@ sequenceDiagram
 
     Author->>AC: POST /api/v1/articles/:id/submit-review
     activate AC
-    AC->>AC: Validate JWT; assert role = AUTHOR or EDITOR
+    AC->>AC: Validate JWT and assert role = AUTHOR or EDITOR
     AC->>AS: submitForReview(articleId, authorId)
     activate AS
 

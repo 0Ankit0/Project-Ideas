@@ -426,7 +426,7 @@ sequenceDiagram
     BillingSvc-->>InvoiceSvc: TimeEntryRecorded [v1.0] — add to WIP
     BillingSvc-->>AuditSvc: TimeEntryRecorded [v1.0]
 
-    InvoiceSvc->>InvoiceSvc: Assemble invoice; validate LEDES 98B
+    InvoiceSvc->>InvoiceSvc: Assemble invoice and validate LEDES 98B
     InvoiceSvc-->>ApprovalSvc: InvoiceGenerated [v1.0] — route per BR-007
     InvoiceSvc-->>TrustSvc: InvoiceGenerated [v1.0] — check retainer coverage
     InvoiceSvc-->>AuditSvc: InvoiceGenerated [v1.0]

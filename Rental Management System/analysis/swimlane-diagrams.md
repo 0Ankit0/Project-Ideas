@@ -32,11 +32,11 @@ sequenceDiagram
     alt Manual Confirmation
         O->>P: Review customer profile and booking
         O->>P: Approve booking
-        P->>P: Status = CONFIRMED; block asset calendar
+        P->>P: Status = CONFIRMED and block asset calendar
         P->>N: Notify customer of confirmation
         N->>C: Email + push notification
     else Instant Booking
-        P->>P: Status = CONFIRMED immediately; block asset calendar
+        P->>P: Status = CONFIRMED immediately and block asset calendar
         P->>N: Notify customer of confirmation
         N->>C: Email + push notification
     end
@@ -68,7 +68,7 @@ sequenceDiagram
 
     O->>ES: Countersign agreement
     ES->>P: Final signed document delivered
-    P->>P: Store signed PDF; link to booking
+    P->>P: Store signed PDF and link to booking
     P->>N: Send signed copy to both parties
     N->>C: Email with PDF attachment
     N->>O: Email with PDF attachment
@@ -103,7 +103,7 @@ sequenceDiagram
     C->>P: Review report and photos
     alt Customer Agrees
         C->>P: Countersign assessment
-        P->>P: Handover recorded; rental period begins
+        P->>P: Handover recorded and rental period begins
         P->>N: Notify owner - handover complete
         N->>O: In-app notification
     else Customer Disputes
@@ -111,7 +111,7 @@ sequenceDiagram
         P->>N: Notify owner of dispute
         N->>O: Email + in-app
         O->>P: Resolve dispute (accept or override)
-        P->>P: Record resolution; finalize handover
+        P->>P: Record resolution and finalize handover
     end
 ```
 
@@ -186,13 +186,13 @@ sequenceDiagram
     participant N as Notification Service
 
     O->>P: Log maintenance request (description, priority, photos)
-    P->>P: Create request (OPEN); block asset calendar
+    P->>P: Create request (OPEN) and block asset calendar
     P->>N: Notify relevant staff of new task
     N->>S: Email + push notification
 
     alt Staff Accepts
         S->>P: Accept task (status: ASSIGNED)
-        S->>P: Begin work; update to IN_PROGRESS
+        S->>P: Begin work and update to IN_PROGRESS
         S->>P: Add work notes, photos, materials used
         S->>P: Mark task COMPLETED
 
@@ -276,3 +276,40 @@ flowchart LR
 - Confirm every branch in this diagram maps to an API response code and domain event.
 - Verify retry/idempotency behavior for each transition to prevent duplicate charges or holds.
 - Ensure maintenance blocks and compliance checks can preempt transitions when required.
+
+---
+
+## Booking Cancellation and Refund Swimlane
+
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant P as Platform
+    participant O as Owner
+    participant PG as Payment Gateway
+    participant N as Notification Service
+
+    C->>P: Request cancellation with reason
+    P->>P: Evaluate cancellation window and policy rules
+    alt Auto-approved cancellation
+        P->>PG: Reverse hold and compute refund
+        PG-->>P: Refund initiated with reference
+        P->>P: Mark booking as CANCELLED
+        P->>N: Notify customer and owner about refund timeline
+        N->>C: Cancellation confirmed with refund ETA
+        N->>O: Booking calendar reopened notification
+    else Requires owner approval
+        P->>O: Send cancellation approval request
+        O->>P: Approve or decline request
+        alt Owner approves
+            P->>PG: Initiate partial or full refund
+            PG-->>P: Refund accepted
+            P->>P: Update booking status and refund status
+            P->>N: Send final cancellation summary
+        else Owner declines
+            P-->>C: Show decline reason and escalation path
+            P->>N: Notify support queue for manual review
+        end
+    end
+```
+

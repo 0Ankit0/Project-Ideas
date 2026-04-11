@@ -139,7 +139,7 @@ sequenceDiagram
     Job->>QB: POST /time_activities (resume from entry 1,101)
     QB-->>Job: 200 OK
     Job->>DB: UPDATE export_run SET status=COMPLETED
-    Job->>PM: Export complete; invoices ready for review
+    Job->>PM: Export complete and invoices ready for review
 ```
 
 ### Manual Steps

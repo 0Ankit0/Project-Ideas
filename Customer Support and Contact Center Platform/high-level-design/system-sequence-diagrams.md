@@ -185,7 +185,7 @@ sequenceDiagram
     IVR->>Agent: Incoming call ring + screen-pop notification (customer name, account, open tickets, last interaction)
     Agent->>IVR: Answers call (picks up headset)
     IVR->>Platform: Webhook POST /webhooks/telephony/call-answered {call_sid, agent_extension: "ext-302", answered_at, queue_wait_sec: 94}
-    Platform-->>IVR: HTTP 200 (acknowledged; call recording instruction: start)
+    Platform-->>IVR: HTTP 200 (acknowledged and call recording instruction: start)
     IVR-->>Customer: Connected to agent
     Note over Platform: Call recording active (dual-channel: customer + agent).<br/>Real-time ASR transcript stream begins.<br/>TKT-00789 status: IN_PROGRESS.
 

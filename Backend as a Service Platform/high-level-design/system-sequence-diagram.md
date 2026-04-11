@@ -40,8 +40,8 @@ sequenceDiagram
     CPS->>NATS: Publish EnvironmentProvisioned {envId, projectId, tenantId}
     NATS-->>AUTH: Consume EnvironmentProvisioned → create auth project namespace
     NATS-->>DATA: Consume EnvironmentProvisioned → create PG schema env_{envId}
-    AUTH->>PG: CREATE SCHEMA auth_{envId}; CREATE ROLE auth_{envId}_role
-    DATA->>PG: CREATE SCHEMA env_{envId}; CREATE ROLE env_{envId}_role;\nALTER DEFAULT PRIVILEGES... ENABLE RLS
+    AUTH->>PG: CREATE SCHEMA auth_{envId} and CREATE ROLE auth_{envId}_role
+    DATA->>PG: CREATE SCHEMA env_{envId} and CREATE ROLE env_{envId}_role and\nALTER DEFAULT PRIVILEGES... ENABLE RLS
     CPS-->>GW: 201 {environmentId}
     GW-->>DEV: 201 {environmentId}
 ```
@@ -87,7 +87,7 @@ sequenceDiagram
     SEC-->>CPS: Resolved credential (in-memory only)
 
     CPS->>PG: INSERT bindings (status: PENDING, encryptedConfig)
-    CPS->>ADAPT: Run readiness probe:\nCONNECT with resolved credentials\nSELECT 1; check latency < 500ms
+    CPS->>ADAPT: Run readiness probe:\nCONNECT with resolved credentials\nSELECT 1 and check latency < 500ms
     ADAPT-->>CPS: HealthProbeResult {success: true, latencyMs: 42}
 
     CPS->>PG: UPDATE bindings SET status = 'ACTIVE', healthLastCheckedAt = NOW()
@@ -132,7 +132,7 @@ sequenceDiagram
     GW->>GW: Validate JWT (project-scope token from SDK)
     GW->>AUTH: Forward + x-project-id: {projectId}
 
-    AUTH->>ADAPT: Validate email format; check password strength policy
+    AUTH->>ADAPT: Validate email format and check password strength policy
     ADAPT-->>AUTH: Validation result (pass)
 
     AUTH->>PG: SELECT * FROM auth_{envId}.users WHERE email = ?
@@ -195,13 +195,13 @@ sequenceDiagram
     GW->>DATA: Forward + x-tenant-id, x-project-id
 
     DATA->>PG_CTL: SELECT environments WHERE id IN (envId_dev, envId_staging)\nValidate same project, valid promotion chain order
-    PG_CTL-->>DATA: Both environments valid; promotion allowed
+    PG_CTL-->>DATA: Both environments valid and promotion allowed
 
     DATA->>PG_DEV: SELECT table definitions from control schema\nfor env_{envId_dev} (version snapshot)
     PG_DEV-->>DATA: TableDefinitions [{tableName, columns, indexes, rlsPolicies, version}]
 
     DATA->>PG_CTL: SELECT last applied migration version for env_{envId_staging}
-    PG_CTL-->>DATA: stagingVersion = 7; devVersion = 12
+    PG_CTL-->>DATA: stagingVersion = 7 and devVersion = 12
 
     DATA->>DATA: Compute diff: migrations 8..12\nGenerate DDL: ALTER TABLE, CREATE INDEX, etc.
     Note over DATA: Dry-run validation passes
@@ -209,7 +209,7 @@ sequenceDiagram
     DATA->>PG_CTL: INSERT INTO schema_promotions\n{source: envId_dev, target: envId_staging,\nfromVersion: 7, toVersion: 12, status: IN_PROGRESS}
 
     loop For each migration step 8..12
-        DATA->>PG_STG: BEGIN;\nSET search_path = env_{envId_staging};\n[DDL statement];\nCOMMIT;
+        DATA->>PG_STG: BEGIN and\nSET search_path = env_{envId_staging} and\n[DDL statement] and\nCOMMIT
         PG_STG-->>DATA: Statement applied
     end
 
@@ -328,7 +328,7 @@ sequenceDiagram
     Note over CPS,ADAPT_NEW: CANARY Phase 1: Route 10% traffic to RDS
     CPS->>ADAPT_OLD: Set traffic weight: 90%
     CPS->>ADAPT_NEW: Activate binding-rds (10% weight)
-    ADAPT_NEW-->>CPS: Probe OK; routing started
+    ADAPT_NEW-->>CPS: Probe OK and routing started
 
     Note over CPS,TSDB: Monitor for 5 minutes
     SLO->>TSDB: Query error_rate for binding-rds (last 5m)
@@ -360,3 +360,37 @@ sequenceDiagram
 | Old binding restored to ACTIVE on rollback | Previous binding state is preserved; rollback is a valid transition, not a delete-and-recreate |
 | `SwitchoverRolledBack` event drives PagerDuty alert | Operator is notified with rich context (error rate, environment, plan details) for post-mortem |
 | Switchover plan requires explicit APPROVE step | Two-person rule for production changes; draft plans cannot be accidentally executed |
+
+---
+
+## Diagram 7: API Key Rotation and Secret Propagation
+
+```mermaid
+sequenceDiagram
+    actor OPS as Platform Operator
+    participant GW as API Gateway
+    participant CPS as Control Plane Service
+    participant SEC as Secrets Service
+    participant VAULT as HashiCorp Vault
+    participant PG as PostgreSQL (Control)
+    participant NATS as NATS JetStream
+    participant AUD as Audit Service
+
+    OPS->>GW: POST /v1/tenants/{tenantId}/api-keys/rotate
+    GW->>CPS: Forward with operator identity
+    CPS->>PG: Validate tenant and key policy constraints
+    CPS->>SEC: Generate new API key material
+    SEC->>VAULT: Write baas/{tenantId}/keys/active
+    VAULT-->>SEC: Secret version created
+    SEC-->>CPS: keyId and key fingerprint
+
+    CPS->>PG: Mark previous key as DEPRECATED with grace_until
+    CPS->>PG: Insert new active key metadata
+    CPS->>NATS: Publish ApiKeyRotated {tenantId, keyId, graceUntil}
+    NATS-->>AUD: Consume ApiKeyRotated and write immutable audit log
+    AUD->>PG: INSERT audit_logs {action: API_KEY_ROTATED, actor, tenantId}
+
+    CPS-->>GW: 202 {status: "ROTATION_ACCEPTED", key_id, grace_until}
+    GW-->>OPS: 202 Rotation accepted with rollout guidance
+```
+

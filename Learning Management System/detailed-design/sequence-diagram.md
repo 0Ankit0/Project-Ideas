@@ -248,7 +248,7 @@ sequenceDiagram
         PRS->>KF: produce(progress-events)\n{enrollmentId, lessonId, percentComplete,\n completionStatus, tenantId, eventId}
         PRS-->>GW: 204 No Content
         GW-->>SW: 204
-        SW-->>L: Lesson marked complete; progress bar updated
+        SW-->>L: Lesson marked complete and progress bar updated
     end
 
     %% ── Step 3: Projection Worker consumes event ────────────────

@@ -212,7 +212,7 @@ sequenceDiagram
     participant Manager as Fleet Manager Dashboard
 
     GPS->>Ingestion: POST /v1/gps-pings (vehicleId, lat, lng, speed, heading, timestamp)
-    Ingestion->>Ingestion: Validate payload; check vehicleId exists
+    Ingestion->>Ingestion: Validate payload and check vehicleId exists
     Ingestion->>Kafka: Publish vehicle.location.updated (outbox pattern)
     Ingestion-->>GPS: 202 Accepted
 

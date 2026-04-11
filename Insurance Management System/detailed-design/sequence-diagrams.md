@@ -196,7 +196,7 @@ sequenceDiagram
         BS->>GPS: activateGracePeriod(policyNumber, invoiceId)
         activate GPS
         GPS->>GPS: Look up statutory grace days (stateCode + lineOfBusiness)
-        GPS->>GPS: graceStartDate = today; graceEndDate = today + graceDays
+        GPS->>GPS: graceStartDate = today and graceEndDate = today + graceDays
         GPS->>GPS: Persist GracePeriod (status=ACTIVE, statutoryBasis)
         GPS->>BS: Set invoice status = IN_GRACE_PERIOD
         GPS-->>BS: GracePeriodActivated (gracePeriodId, graceEndDate)

@@ -137,7 +137,7 @@ sequenceDiagram
 
     DocSvc-->>Gateway: 201 — {docId, batesRange, s3Key, status:"READY_TO_FILE"}
     Gateway-->>Portal: 201 response forwarded
-    Portal->>Attorney: Document validated; review & confirm filing
+    Portal->>Attorney: Document validated and review & confirm filing
 
     Attorney->>Portal: Confirm filing submission
     Portal->>Gateway: POST /api/v1/filings/{docId}/submit
@@ -200,7 +200,7 @@ sequenceDiagram
     BillingSvc->>MatterSvc: GET /matters/{matterId}/timekeepers<br/>→ validate billing arrangements
     MatterSvc-->>BillingSvc: {billingType:HOURLY, rates:{partner:650, associate:380, paralegal:175}}
 
-    BillingSvc->>BillingSvc: Aggregate unbilled time entries &<br/>disbursements for period;<br/>apply UTBMS task/activity codes;<br/>apply billing rules (minimum increments,<br/>rate caps per engagement letter)
+    BillingSvc->>BillingSvc: Aggregate unbilled time entries &<br/>disbursements for period and<br/>apply UTBMS task/activity codes and<br/>apply billing rules (minimum increments,<br/>rate caps per engagement letter)
 
     BillingSvc-->>Portal: Pre-bill summary<br/>{totalHours:42.3, totalFees:$18,420,<br/>disbursements:$1,240, adjustments:-$500}
     BillingSpec->>Portal: Review, apply write-downs, add narrative,<br/>approve for invoicing

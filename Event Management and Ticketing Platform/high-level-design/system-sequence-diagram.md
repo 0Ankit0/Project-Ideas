@@ -344,7 +344,7 @@ sequenceDiagram
         Note over STAFF: On reconnect, STAFF app flushes offline sync buffer
         STAFF->>GW: POST /check-in/sync { offlineCheckIns: [...] }
         GW->>CHECKIN: BulkRecordCheckIns(offlineCheckIns)
-        CHECKIN->>CHECKIN: Upsert check-in records; deduplicate by ticketId
+        CHECKIN->>CHECKIN: Upsert check-in records and deduplicate by ticketId
         CHECKIN-->>GW: 200 OK { processed, duplicates, conflicts }
         GW-->>STAFF: Sync result displayed to staff supervisor
     end
