@@ -69,3 +69,12 @@ For account `A-77`, compute `rolling_txn_count_5m=14`, `geo_entropy_24h=2.8`; if
 ## Operational Runbooks and Observability Notes
 - Monitor null-rate, freshness, and distribution drift per feature family.
 - Runbook includes emergency feature disable flags and fallback set activation.
+
+
+### 2.7. Feature Pipeline Backfill Consistency
+* **Scenario**: Historical backfill recomputes features with newer code than original production logic.
+* **Impact**: Online/offline feature skew and non-reproducible training outcomes.
+* **Solution**:
+	* **Version Pinning**: Backfill jobs must pin feature definition version used for target period.
+	* **Diff Checks**: Run distribution and row-level parity checks against sampled historical snapshots.
+	* **Cutover Rule**: Publish backfilled features only after parity threshold pass.

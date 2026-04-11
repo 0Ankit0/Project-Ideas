@@ -133,3 +133,89 @@ Release `2026.03.2`: 5% canary for 30 minutes; gates: latency p95 <=250 ms, prec
 ## Operational Runbooks and Observability Notes
 - Post-release watch window and ownership roster are mandatory.
 - Runbook includes emergency disable switches for high-risk policies.
+
+
+## 11. Model Versioning Contract
+
+### Version Identifier
+`<algorithm>-<major>.<minor>.<patch>+<feature_set_hash>-<train_date>`
+
+Example: `iforest-3.4.1+fset_a91c2d-2026-04-11`
+
+### Required Model Metadata
+- `model_id` (immutable UUID)
+- `model_version` (semantic + feature hash)
+- `feature_set_id` and `feature_schema_version`
+- `training_data_snapshot_id` and checksum
+- `metrics` (precision/recall/F1/AUC/calibration)
+- `approved_by` and approval timestamp
+- `rollback_parent_version`
+
+### Compatibility Rules
+- **Major** version changes require shadow + canary.
+- **Minor** changes require canary only.
+- **Patch** changes allowed with accelerated canary if no schema/runtime changes.
+- Scoring service must reject models with incompatible feature schema.
+
+## 12. Canary and Shadow Rollout Process
+
+1. Register candidate model and validate metadata contract.
+2. Start **shadow** mode (0% user impact, 100% mirrored traffic) for minimum 24 hours or 1M events.
+3. Evaluate shadow gates:
+   - weighted F1 regression <= 1.0%
+   - p95 latency increase <= 10%
+   - no severe explainability contract failures.
+4. Start **canary** traffic: 1% -> 5% -> 20% -> 50% -> 100%.
+5. Promotion gates at each step use 15-minute and 60-minute windows.
+6. Any failed gate triggers automatic rollback and incident creation.
+
+## 13. Drift Detection Thresholds
+
+| Signal | Threshold | Window | Action |
+|---|---|---|---|
+| Population Stability Index (PSI) | > 0.20 warning, > 0.30 critical | 24h rolling | warning opens ticket, critical blocks promotions |
+| Jensen-Shannon Divergence | > 0.10 warning, > 0.15 critical | 24h | same as above |
+| Score distribution shift (KS test p-value) | < 0.01 | 6h | trigger drift investigation |
+| Precision proxy drop | > 3% absolute | 24h | start expedited retraining evaluation |
+| False-positive rate increase | > 2x baseline | 12h | apply temporary suppression profile |
+
+## 14. Retraining Trigger Policy
+
+Retraining starts when **any critical trigger** or **two warning triggers** are observed.
+
+### Critical Triggers
+- PSI > 0.30 for >= 2 consecutive windows.
+- Precision proxy drop > 5% absolute for >= 6h.
+- False-positive storm for tier-1 tenants sustained >= 30m.
+- Feature schema drift marked breaking.
+
+### Warning Triggers
+- PSI > 0.20 once.
+- Delayed label backlog > 48h for > 20% of new anomalies.
+- Shadow-candidate outperforms primary by >= 2% weighted F1 for 3 days.
+
+### Guardrails
+- Minimum retrain interval per model family: 24h (except Sev1 override).
+- Retrain jobs must use point-in-time correct data snapshot.
+- All retrains generate a model card delta vs current production model.
+
+## 15. Rollback Playbooks
+
+### A) Model Quality Regression Rollback
+1. Freeze promotions and mark candidate as `blocked`.
+2. Shift traffic to last-known-good model version.
+3. Enable conservative threshold overlay to prevent false-positive storm.
+4. Start incident with quality diff report and cohort impact.
+5. Require post-incident approval before re-attempting rollout.
+
+### B) Model Runtime Failure Rollback
+1. Detect elevated 5xx/timeout from scoring adapter.
+2. Route to fallback model or rules-only scoring profile.
+3. Roll back serving manifest to prior stable digest.
+4. Reconcile queued events and annotate degraded decisions.
+
+### C) Feature Contract Break Rollback
+1. Detect feature schema mismatch at scoring boundary.
+2. Disable new feature version reads and pin previous `feature_set_id`.
+3. Trigger backfill correction workflow.
+4. Resume progressive rollout only after parity checks pass.

@@ -117,3 +117,32 @@ Defines internal components and interactions within detection service boundary.
 ## Operational Runbooks and Observability Notes
 - Component dependency graph is used for blast-radius during incidents.
 - Runbook maps alerts directly to component owner and mitigation steps.
+
+
+## SLA / SLO and Alerting Matrix (Component-Tied)
+
+| Component | SLA | SLO Target | Primary Alerts | Severity/Action |
+|---|---|---|---|---|
+| Kafka Consumer | 99.9% monthly availability | consumer lag < 60s p95 | lag > 120s (10m), rebalance thrash | Sev2 page data platform |
+| Stream Processor | 99.9% | event processing latency < 150ms p95 | checkpoint failures, backlog growth | Sev2 page + autoscale |
+| Feature Engine | 99.95% | feature freshness < 120s for 99% | freshness breach, null-rate spike | Sev2 if sustained >15m |
+| Anomaly Detector | 99.95% | scoring latency < 180ms p95, error rate < 0.5% | timeout >1%, 5xx burst | Sev1 page ML on-call |
+| Scoring Service | 99.95% | end-to-end detect path < 400ms p95 | queue saturation, SLA breach risk | Sev1 if >15m |
+| Alert Router/Rule Engine | 99.9% | alert dispatch start < 30s p95 | dispatch backlog, dedup failure | Sev2 page app on-call |
+| Channel Integrations | 99.9% | successful delivery ack > 99% | provider error > 3%, retries exhausted | Sev2 + failover channel |
+| MLflow Registry | 99.5% | model fetch latency < 200ms p95 | registry unreachability | Sev2; freeze deployments |
+| Training Service | 99.5% | scheduled training completion > 98% | failed job ratio > 10% | Sev3 ticket unless active incident |
+| Drift Monitor | 99.9% | drift checks complete within 30m cadence | missed drift run x2 | Sev2 page ML ops |
+| InfluxDB | 99.95% | write success > 99.9%, query p95 < 250ms | replication lag, write failures | Sev1 if persistent write loss |
+| PostgreSQL | 99.95% | commit latency < 50ms p95 | replication lag > 30s, failover event | Sev1 DBA page |
+| Redis | 99.95% | cache read p95 < 15ms, hit ratio > 92% | eviction storm, cluster failover | Sev2 page platform |
+| Audit Logs | 99.99% durability | ingest loss = 0 | append failures, checksum mismatch | Sev1 compliance incident |
+
+### Alert Routing Policy
+- **Sev1**: page immediately, incident commander assigned within 5 minutes.
+- **Sev2**: page on-call owning team, acknowledge within 15 minutes.
+- **Sev3**: ticket + business-hours triage unless user impact crosses threshold.
+
+### Error Budget Policy
+- If a component burns >25% of monthly error budget in 24h, freeze non-critical deployments for that owner team.
+- If >50% burn, require reliability review and mitigation plan before any model promotion.

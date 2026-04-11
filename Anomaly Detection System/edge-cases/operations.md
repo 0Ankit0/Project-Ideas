@@ -62,3 +62,12 @@ Defines operational incident management for platform reliability and anomaly-qua
 ## Operational Runbooks and Observability Notes
 - MTTR, MTTD, and repeated-incident rate are tracked per subsystem.
 - Runbook contains communication templates for internal and external stakeholders.
+
+
+### 8.6. Model Rollback During Live Incident
+* **Scenario**: Active incident is traced to a model rollout regression.
+* **Impact**: Sustained high false positives or missed true anomalies.
+* **Solution**:
+	* **Trigger**: Rollback if canary gates fail for two consecutive windows or Sev1 declared.
+	* **Execution**: Repoint serving alias to last-known-good model, clear incompatible feature cache entries.
+	* **Aftercare**: Reprocess buffered events and annotate affected decisions for audit.
