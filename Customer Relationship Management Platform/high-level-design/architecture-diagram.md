@@ -91,3 +91,52 @@ flowchart LR
 - Diagram identifies all tier-1 components with HA strategy and owner.
 - Observability must publish latency, success rate, and failure-class metrics for this document's scope.
 - Quarterly review confirms definitions and diagrams still match production behavior.
+
+## Workflow Automation and Integration Topology
+```mermaid
+flowchart TB
+    subgraph Automation[Automation Plane]
+      TriggerSvc[Trigger Service]
+      RuleSvc[Rule Evaluation Service]
+      Orchestrator[Workflow Orchestrator]
+      JobWorkers[Async Job Workers]
+    end
+
+    subgraph Core[Core Domain Services]
+      LeadSvc[Lead Service]
+      AccountSvc[Account/Contact Service]
+      OppSvc[Opportunity Service]
+      ActivitySvc[Activity Service]
+    end
+
+    subgraph Connectors[Integration Connectors]
+      EmailConn[Email Connector\nGmail/Outlook]
+      CalConn[Calendar Connector\nGoogle/Microsoft]
+      TelConn[Telephony Connector\nCTI/SIP]
+      ERPConn[ERP/Finance Connector]
+    end
+
+    TriggerSvc --> RuleSvc
+    RuleSvc --> Orchestrator
+    Orchestrator --> JobWorkers
+    JobWorkers --> LeadSvc
+    JobWorkers --> AccountSvc
+    JobWorkers --> OppSvc
+    JobWorkers --> ActivitySvc
+
+    EmailConn --> ActivitySvc
+    CalConn --> ActivitySvc
+    TelConn --> ActivitySvc
+    OppSvc --> ERPConn
+
+    ActivitySvc --> EventBus[(Event Bus)]
+    OppSvc --> EventBus
+    LeadSvc --> EventBus
+    EventBus --> Reconcile[Reconciliation Workers]
+    Reconcile --> AuditTrail[(Audit + Lineage Store)]
+```
+
+### Reliability Controls for Integrations
+- Connector circuit breakers isolate provider-specific outages without blocking core CRM writes.
+- Dead-letter queues are partitioned by connector and tenant for targeted replay.
+- Replay manager supports range replay by `occurred_at` and by provider object id.

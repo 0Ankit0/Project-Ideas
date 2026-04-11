@@ -942,3 +942,23 @@ The CRM Platform encompasses lead lifecycle management from initial capture thro
 ---
 
 *This document is maintained by the Product Management team. All requirement changes must be reviewed and approved by stakeholders before implementation.*
+
+### 4.1 Lifecycle Stage Traceability (Lead → Qualified → Opportunity → Closed)
+
+| Lifecycle Stage | Entry Criteria | Exit Criteria | Governing Requirements | Primary Events | Required Audit Evidence |
+|---|---|---|---|---|---|
+| Lead | Record created via form/API/import and tenant validated | Qualification decision recorded (`Qualified` or `Disqualified`) | FR-001, FR-002, FR-003, FR-004, FR-005, NFR-001, NFR-007 | `LeadCaptured`, `LeadScoreUpdated`, `LeadAssigned` | actor, source channel, validation result, dedupe decision |
+| Qualified | Lead meets MQL/SQL criteria and owner accepts | Converted to Contact/Account (+ optional Opportunity) or rejected with reason | FR-004, FR-005, FR-006, NFR-011 | `LeadQualified`, `LeadConverted` | qualification rule snapshot, owner acceptance, timestamped decision trail |
+| Opportunity | Opportunity exists in a configured pipeline stage | Closed Won/Lost with reason and final amount | FR-010, FR-011, FR-012, FR-013, NFR-004, NFR-011 | `DealCreated`, `DealStageChanged`, `DealForecastUpdated` | stage gate checks, probability changes, approval audit records |
+| Closed | Opportunity terminal state reached | Included in immutable reporting and retention workflows | FR-012, FR-013, FR-028, FR-029, FR-030, NFR-012 | `DealClosedWon` / `DealClosedLost` | closure reason, actor, amount, retention/deletion policy outcome |
+
+### 4.2 Verification Coverage by Lifecycle Stage
+- **Lead stage test coverage:** API contract tests, validation rule tests, dedupe false-positive/false-negative tests.
+- **Qualified stage test coverage:** qualification rule regression suite and conversion atomicity integration tests.
+- **Opportunity stage test coverage:** stage progression policy tests, forecast rollup consistency checks.
+- **Closed stage test coverage:** audit log completeness tests, data retention/erasure policy execution tests.
+
+### 4.3 Cross-Stage Lineage Requirements
+1. Every lifecycle transition MUST carry `correlation_id` and `tenant_id`.
+2. Every stage transition MUST store predecessor and successor record identifiers for graph traversal.
+3. Every terminal closure MUST be reproducible from immutable event history without relying on mutable projections.
