@@ -12,6 +12,25 @@ This folder captures cross-cutting scenarios that can break ticket intake, assig
 - `security-and-compliance.md`
 - `operations.md`
 
+## Full Cross-Cutting Edge-Case Catalog
+
+| Category | Edge Case | Primary Risk | Canonical Mitigation Artifact |
+|---|---|---|---|
+| Assignment & SLA | Stale assignment after assignee inactivity or schedule mismatch | Ticket remains owned but unworked, causing hidden SLA erosion | `assignment-and-sla.md` stale-assignment detector + reassignment workflow |
+| Assignment & SLA | SLA breach timing drift from clock skew/retry delays | Incorrect breach timestamps and escalations | `assignment-and-sla.md` drift detection + recompute controls |
+| Workflow Integrity | Conflicting status transitions from concurrent updates | Illegal state history and duplicate side effects | `assignment-and-sla.md` optimistic locking + idempotent transitions |
+| Attachments & Security | Malware scan delays creating long pending states | Unsafe downloads or blocked delivery timelines | `ticket-intake-and-attachments.md` pending-scan policy + secops escalation |
+| Project Planning | Dependency loops across tickets/tasks | Deadlocked plans and incorrect critical path | `project-planning-and-milestones.md` cycle detection + block propagation |
+| Change Management | Mid-sprint scope injection without governance | Milestone churn and SLA breach spillover | `change-management-and-replanning.md` change control gates |
+| API/UI | Divergent client/internal status rendering | User confusion and incorrect operational actions | `api-and-ui.md` contract tests and parity checks |
+| Security & Compliance | Privileged override without reason code | Audit non-compliance and abuse risk | `security-and-compliance.md` enforced reason code + immutable audit |
+| Operations | Queue backlog during regional degradation | Cascading latency and delayed escalations | `operations.md` priority queue degradation mode runbook |
+
+## Catalog Usage Rules
+- Every edge case must map to an owner team, detector signal, automated reaction, and manual fallback.
+- Every detector must have a dashboard metric and alert threshold documented before production rollout.
+- Every mitigation must be tested in at least one integration or game-day scenario each release quarter.
+
 ## Cross-Cutting Workflow and Operational Governance
 
 ### Readme: Document-Specific Scope
@@ -52,4 +71,3 @@ This folder captures cross-cutting scenarios that can break ticket intake, assig
 | Authorization Correctness | Role scope, tenant scope, and field visibility boundaries | Auth matrix review + API/UI parity checks |
 | Reporting Reproducibility | KPI formulas, dimensions, and source lineage | Recompute KPI from event data sample |
 | Operations Recoverability | Degraded-mode and compensation runbook steps | Tabletop/game-day evidence and postmortem template |
-
