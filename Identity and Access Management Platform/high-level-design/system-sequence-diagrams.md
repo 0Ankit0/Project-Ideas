@@ -138,7 +138,7 @@ sequenceDiagram
 
     %% ── Step 12: Response ───────────────────────────────────────────────
     AuthSvc-->>APIGW: HTTP 200 {<br/>access_token: "eyJ...",<br/>token_type: "Bearer",<br/>expires_in: 900,<br/>scope: "openid profile email"}
-    APIGW-->>Browser: HTTP 200<br/>Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Strict; Max-Age=86400<br/>Body: {access_token, token_type, expires_in, scope}
+    APIGW-->>Browser: HTTP 200<br/>Set-Cookie: refresh_token=... and HttpOnly and Secure and SameSite=Strict and Max-Age=86400<br/>Body: {access_token, token_type, expires_in, scope}
     Browser->>User: Authenticated — redirect to application
     note right of Browser: t=165 ms — total end-to-end latency (p50 target: 165 ms, p99 target: 350 ms)
 ```
@@ -239,7 +239,7 @@ sequenceDiagram
     IAMSP->>AuditSvc: Emit FederatedLoginSucceeded{<br/>userId, tenantId, sessionId,<br/>providerId, assuranceLevel,<br/>jitProvisioned, ip}
 
     %% ── Step 7: Redirect to original resource ───────────────────────────
-    IAMSP-->>Browser: HTTP 302 Redirect to RelayState (original URL)<br/>Set-Cookie: iam_session={sessionId}; HttpOnly; Secure; SameSite=Lax<br/>Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Strict
+    IAMSP-->>Browser: HTTP 302 Redirect to RelayState (original URL)<br/>Set-Cookie: iam_session={sessionId} and HttpOnly and Secure and SameSite=Lax<br/>Set-Cookie: refresh_token=... and HttpOnly and Secure and SameSite=Strict
     Browser->>SPApp: GET /dashboard (with iam_session cookie)
     SPApp->>SPApp: Validate iam_session → resolve access token<br/>Authorise access to dashboard
     SPApp-->>Browser: HTTP 200 /dashboard content
@@ -344,7 +344,7 @@ sequenceDiagram
     %% ── Step 8: Rotate refresh token ────────────────────────────────────
     TokenSvc->>TokenSvc: Generate new_refresh_token (256-bit random, opaque)<br/>new_generation = token.generation_number + 1
 
-    TokenSvc->>UserStore: BEGIN TRANSACTION<br/>  UPDATE refresh_tokens SET revoked = true<br/>  WHERE id = {currentTokenId};<br/><br/>  INSERT INTO refresh_tokens<br/>  (id, hash, family_id, generation_number,<br/>  user_id, tenant_id, session_id, expires_at)<br/>  VALUES (new_uuid, SHA256(new_token), family_id,<br/>  new_generation, userId, tenantId, sessionId,<br/>  now() + interval '24 hours');<br/><br/>  UPDATE token_families<br/>  SET max_generation = new_generation,<br/>  last_rotated_at = now()<br/>  WHERE id = {familyId};<br/>COMMIT;
+    TokenSvc->>UserStore: BEGIN TRANSACTION<br/>  UPDATE refresh_tokens SET revoked = true<br/>  WHERE id = {currentTokenId} and<br/><br/>  INSERT INTO refresh_tokens<br/>  (id, hash, family_id, generation_number,<br/>  user_id, tenant_id, session_id, expires_at)<br/>  VALUES (new_uuid, SHA256(new_token), family_id,<br/>  new_generation, userId, tenantId, sessionId,<br/>  now() + interval '24 hours') and<br/><br/>  UPDATE token_families<br/>  SET max_generation = new_generation,<br/>  last_rotated_at = now()<br/>  WHERE id = {familyId} and<br/>COMMIT
     note right of UserStore: Atomic token rotation in single transaction
 
     UserStore-->>TokenSvc: Transaction committed
@@ -360,6 +360,6 @@ sequenceDiagram
 
     %% ── Step 11: Return new tokens ──────────────────────────────────────
     TokenSvc-->>APIGW: HTTP 200 {<br/>access_token: "eyJ...",<br/>token_type: "Bearer",<br/>expires_in: 900,<br/>scope: "openid profile email"}
-    APIGW-->>Client: HTTP 200<br/>Set-Cookie: refresh_token={newOpaqueToken}; HttpOnly; Secure;<br/>SameSite=Strict; Max-Age=86400; Path=/auth/refresh<br/>Body: {access_token, token_type, expires_in, scope}
+    APIGW-->>Client: HTTP 200<br/>Set-Cookie: refresh_token={newOpaqueToken} and HttpOnly and Secure and<br/>SameSite=Strict and Max-Age=86400 and Path=/auth/refresh<br/>Body: {access_token, token_type, expires_in, scope}
     note right of Client: Old refresh token is now revoked<br/>New refresh token set in HttpOnly cookie<br/>Access token stored in memory (not localStorage)
 ```

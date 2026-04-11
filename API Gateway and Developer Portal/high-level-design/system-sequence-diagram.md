@@ -164,7 +164,7 @@ sequenceDiagram
     end
 
     AuthSvc->>AuthSvc: Issue portal session JWT (consumerId, email, role, exp: +1h)
-    AuthSvc-->>Portal: Set-Cookie: session={encrypted_jwt}; HttpOnly; Secure; SameSite=Strict
+    AuthSvc-->>Portal: Set-Cookie: session={encrypted_jwt} and HttpOnly and Secure and SameSite=Strict
     Portal-->>Dev: Redirect to /portal/dashboard
 
     Dev->>Portal: POST /portal/applications {name: "My App", description: "...", callbackUrls: [...]}
@@ -514,7 +514,7 @@ sequenceDiagram
     Client->>GW: GET /v1/orders (Authorization: ApiKey)
     GW->>GW: Auth, Rate Limit pass as normal
     GW->>GW: Transform Plugin reads route config: status = deprecated
-    GW->>GW: Inject response headers: Deprecation: "2025-09-01", Sunset: "Tue, 31 Dec 2025 00:00:00 GMT", Link: <https://docs.platform.io/migrate/v1-to-v2>; rel="successor-version"
+    GW->>GW: Inject response headers: Deprecation: "2025-09-01", Sunset: "Tue, 31 Dec 2025 00:00:00 GMT", Link: <https://docs.platform.io/migrate/v1-to-v2> and rel="successor-version"
     GW->>GW: Proxy to upstream as normal (v1 still operational until sunset date)
     GW-->>Client: 200 OK {orders data} + Deprecation, Sunset, Link headers
 

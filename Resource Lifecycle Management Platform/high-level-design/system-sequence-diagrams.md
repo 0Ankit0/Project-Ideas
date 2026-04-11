@@ -28,9 +28,9 @@ sequenceDiagram
   end
   PS->>PE: evaluate({action: PROVISION, tenant_id, category})
   PE-->>PS: permit (quota OK)
-  PS->>DB: BEGIN TX; INSERT resource (state=PENDING); INSERT outbox; INSERT audit; COMMIT
+  PS->>DB: BEGIN TX and INSERT resource (state=PENDING) and INSERT outbox and INSERT audit and COMMIT
   PS->>PS: Check mandatory fields → transition to AVAILABLE
-  PS->>DB: UPDATE resource state=AVAILABLE; INSERT audit
+  PS->>DB: UPDATE resource state=AVAILABLE and INSERT audit
   PS-->>GW: 201 {resource_id, state: AVAILABLE}
   GW-->>RM: 201 {resource_id}
   OB->>DB: SELECT pending outbox records
@@ -69,7 +69,7 @@ sequenceDiagram
   end
   AS->>PE: evaluate({quota, eligibility, priority})
   PE-->>AS: permit
-  AS->>DB: BEGIN TX; INSERT reservation(CONFIRMED); SET sla_due_at; INSERT outbox; INSERT audit; COMMIT
+  AS->>DB: BEGIN TX and INSERT reservation(CONFIRMED) and SET sla_due_at and INSERT outbox and INSERT audit and COMMIT
   AS->>RC: SET idempotency_key → reservation_id (TTL 24h)
   AS-->>GW: 201 {reservation_id, sla_due_at}
   GW-->>REQ: 201
@@ -172,7 +172,7 @@ sequenceDiagram
 
   OPS->>GW: POST /allocations/{id}/force-return {approver_id, reason_code}
   GW->>CS: Execute forced return
-  CS->>DB: UPDATE allocation state=FORCED_RETURN; INSERT outbox; INSERT audit
+  CS->>DB: UPDATE allocation state=FORCED_RETURN and INSERT outbox and INSERT audit
   EB->>NS: Notify custodian + manager of forced return
 ```
 
@@ -210,3 +210,39 @@ sequenceDiagram
 - Detailed sequence diagrams: [../detailed-design/sequence-diagrams.md](../detailed-design/sequence-diagrams.md)
 - Activity diagrams: [../analysis/activity-diagrams.md](../analysis/activity-diagrams.md)
 - State machine: [../detailed-design/state-machine-diagrams.md](../detailed-design/state-machine-diagrams.md)
+
+---
+
+## 7. Maintenance Escalation and Return-to-Service Sequence
+
+```mermaid
+sequenceDiagram
+  participant OPS as Operations
+  participant GW as API Gateway
+  participant MS as Maintenance Service
+  participant PE as Policy Engine
+  participant DB as PostgreSQL
+  participant EB as Event Bus
+  participant NS as Notification Service
+
+  OPS->>GW: POST /maintenance/{resource_id}/start {issue_type, severity}
+  GW->>MS: Forward command with operator context
+  MS->>DB: SELECT resource FOR UPDATE
+  MS->>PE: evaluate({action: START_MAINTENANCE, severity, tenant_id})
+  PE-->>MS: permit
+  MS->>DB: BEGIN TX\nUPDATE resource state=MAINTENANCE\nINSERT maintenance_ticket state=OPEN\nINSERT outbox rlmp.maintenance.started\nCOMMIT
+  MS-->>GW: 202 {ticket_id, state: "OPEN"}
+  EB->>NS: rlmp.maintenance.started → notify requester and manager
+
+  OPS->>GW: POST /maintenance/{ticket_id}/complete {resolution_notes}
+  GW->>MS: Complete ticket
+  MS->>DB: BEGIN TX\nUPDATE maintenance_ticket state=COMPLETED\nUPDATE resource state=INSPECTION\nINSERT outbox rlmp.maintenance.completed\nCOMMIT
+  MS->>EB: Publish rlmp.maintenance.completed
+  EB->>NS: Notify inspection team to validate readiness
+
+  OPS->>GW: POST /resources/{resource_id}/return-to-service
+  GW->>MS: Request return to service
+  MS->>DB: UPDATE resource state=AVAILABLE and set maintenance_cleared_at
+  GW-->>OPS: 200 {resource_id, state: "AVAILABLE"}
+```
+

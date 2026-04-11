@@ -123,7 +123,7 @@ sequenceDiagram
   Note over DB: Client A acquires lock first
   DB-->>AS: Lock acquired (Client A)
   AS->>DB: SELECT overlapping CONFIRMED → []
-  AS->>DB: INSERT reservation A; COMMIT
+  AS->>DB: INSERT reservation A and COMMIT
   AS-->>CA: 201 CONFIRMED
 
   Note over DB: Client B now acquires lock

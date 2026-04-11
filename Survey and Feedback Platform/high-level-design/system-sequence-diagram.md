@@ -289,7 +289,7 @@ sequenceDiagram
         AuthSvc->>+Redis: DEL oauth_state:{state}
         Redis-->>-AuthSvc: OK
         AuthSvc-->>-APIGW: 200 OK {access_token, refresh_token, user: {id, email, name, workspace_id}}
-        APIGW-->>-Browser: Set-Cookie: refresh_token (httpOnly, secure, SameSite=Strict); Body: {access_token, user}
+        APIGW-->>-Browser: Set-Cookie: refresh_token (httpOnly, secure, SameSite=Strict) and Body: {access_token, user}
         Browser-->>User: Redirect to dashboard, user authenticated
     end
 ```

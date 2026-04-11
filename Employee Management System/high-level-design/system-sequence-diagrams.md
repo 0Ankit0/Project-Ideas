@@ -123,12 +123,12 @@ sequenceDiagram
     Biometric->>EMS: POST /attendance/punch {employee_id, timestamp, type: "check_in"}
     EMS-->>Biometric: 201 Created {attendance_id}
 
-    EMS->>EMS: Map to employee shift; flag if late
+    EMS->>EMS: Map to employee shift and flag if late
 
     Biometric->>EMS: POST /attendance/punch {employee_id, timestamp, type: "check_out"}
     EMS-->>Biometric: 201 Created
 
-    EMS->>EMS: Calculate worked hours; flag anomalies
+    EMS->>EMS: Calculate worked hours and flag anomalies
 
     Employee->>EMS: GET /attendance/me?date={date}
     EMS-->>Employee: Attendance record with hours and flags

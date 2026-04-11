@@ -27,7 +27,7 @@ sequenceDiagram
   DB-->>AS: [] (no conflict for ClientA)
   AS->>PE: Evaluate quota + eligibility (ClientA)
   PE-->>AS: permit
-  AS->>DB: INSERT reservation (ClientA, CONFIRMED); INSERT outbox; COMMIT
+  AS->>DB: INSERT reservation (ClientA, CONFIRMED) and INSERT outbox and COMMIT
   AS-->>ClientA: 201 {reservation_id}
 
   Note over Lock: ClientB lock acquired

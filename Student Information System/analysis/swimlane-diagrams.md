@@ -249,7 +249,7 @@ sequenceDiagram
     STU->>SIS: Request hall ticket
     SIS->>SIS: Check attendance eligibility
     alt Attendance Below Threshold
-        SIS-->>STU: Block hall ticket; notify of debarment
+        SIS-->>STU: Block hall ticket and notify of debarment
     else Eligible
         SIS-->>STU: Generate and deliver hall ticket
     end

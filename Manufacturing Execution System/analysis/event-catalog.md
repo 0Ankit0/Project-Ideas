@@ -323,13 +323,13 @@ sequenceDiagram
     ERPSync-)TraceSvc: ERPSyncCompleted — update genealogy with SAP doc ref
 
     Inspector->>QualSvc: Record defect on in-process inspection
-    QualSvc->>QualSvc: Persist Defect record; calculate cumulative defect rate
+    QualSvc->>QualSvc: Persist Defect record and calculate cumulative defect rate
     QualSvc-)RuleEng: DefectRecorded [async] → evaluate BR-004
     RuleEng->>RuleEng: Defect rate 7.2% > 5% threshold — BREACH
     RuleEng->>MatSvc: Place quality hold on linked batches [sync action]
     MatSvc->>MatSvc: Set batch status = QUARANTINE
     RuleEng-)QualSvc: QualityHoldPlaced [async]
-    QualSvc->>QualSvc: Suspend IN_PROGRESS operations; generate NCR
+    QualSvc->>QualSvc: Suspend IN_PROGRESS operations and generate NCR
     QualSvc-)TraceSvc: QualityHoldPlaced — update genealogy with hold reference
 ```
 

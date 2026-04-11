@@ -39,7 +39,7 @@ sequenceDiagram
     Note over AS,RC: TTL 10 minutes; ties txnId to hashed NID for verification step
     AS-->>DAV: OTPRequestResult{txn_id, mobile_hint, expires_in: 600}
     DAV-->>NP: HTTP 200 {txn_id, mobile_hint, expires_in: 600}
-    NP->>NP: Store txn_id in component province; show OTP input form
+    NP->>NP: Store txn_id in component province and show OTP input form
     NP-->>CB: Display "OTP sent to xxxxxx7890" with 10-minute countdown timer
 
     CB->>NP: User enters 6-digit OTP and clicks "Verify"
@@ -71,7 +71,7 @@ sequenceDiagram
     DAV->>CW: audit_login.delay(citizen.id, request.META['REMOTE_ADDR'], 'AADHAAR_OTP')
     CW->>CW: AuditLogModel.objects.create(actor=citizen, action='LOGIN', ...)
     DAV-->>NP: HTTP 200 {access_token, refresh_token, citizen_profile}
-    NP->>NP: Store access_token in memory; Set refresh_token as HttpOnly Secure SameSite=Strict cookie
+    NP->>NP: Store access_token in memory and Set refresh_token as HttpOnly Secure SameSite=Strict cookie
     NP->>NP: Initialize Zustand auth store with citizen_profile
     NP-->>CB: Redirect to /dashboard
 ```
@@ -140,7 +140,7 @@ sequenceDiagram
     Note over ACV: Validate all required documents are uploaded; validate all form steps complete
     ACV->>WE: WorkflowEngine.transition(application, trigger='submit_application', actor_id=citizen.id)
     WE->>WE: validate_transition('DRAFT', 'submit_application') → to_state='SUBMITTED'
-    WE->>AM: application.status = 'SUBMITTED'; application.submitted_at = now()
+    WE->>AM: application.status = 'SUBMITTED' and application.submitted_at = now()
     AM-->>WE: Saved
     WE->>WE: WorkflowStepModel.objects.create(application=app, step_name='SUBMISSION', status='COMPLETED', ...)
     WE->>WE: application_state_changed.send(sender=application, old_state='DRAFT', new_state='SUBMITTED')
@@ -198,7 +198,7 @@ sequenceDiagram
     PGC->>PGW: POST /paygov/api/v2/orders {merchantId, orderId, amount, callbackUrl, hmac}
     PGW-->>PGC: {orderId, redirectUrl, paygovOrderId}
     PGC-->>PS: OrderResult{order_id, redirect_url, paygov_order_id}
-    PS->>PM: payment.gateway_txn_id = paygov_order_id; payment.status = 'PENDING'
+    PS->>PM: payment.gateway_txn_id = paygov_order_id and payment.status = 'PENDING'
     PM-->>PS: Saved
     PS->>RC: DEL payment_lock:{application_id}
     PS-->>PIV: Payment{id, redirect_url, amount}
@@ -219,7 +219,7 @@ sequenceDiagram
     PWH-->>PGW: HTTP 200 (acknowledge receipt immediately)
 
     CW->>PM: payment.mark_completed(txn_id=payload['txnId'])
-    PM-->>CW: payment.status = 'COMPLETED'; payment.completed_at = now()
+    PM-->>CW: payment.status = 'COMPLETED' and payment.completed_at = now()
     CW->>AS: ApplicationService.on_payment_confirmed(application_id)
     AS->>AS: WorkflowEngine.transition(application, 'payment_confirmed')
     AS->>AS: application.status → 'PAYMENT_COMPLETED'
@@ -254,7 +254,7 @@ sequenceDiagram
     DV-->>DV: Response returned to client immediately (non-blocking)
 
     RQ->>CW: Worker picks up task from 'documents' queue
-    CW->>CW: task.max_retries = 3; task.default_retry_delay = 60s
+    CW->>CW: task.max_retries = 3 and task.default_retry_delay = 60s
     CW->>S3: s3_client.get_object(Key=s3_key)
     S3-->>CW: file_bytes (streamed)
     CW->>MAL: MalwareScanner.scan(file_bytes)
@@ -264,7 +264,7 @@ sequenceDiagram
         MAL-->>CW: ScanResult{clean: True}
         CW->>DB: ApplicationDocumentModel.objects.filter(id=doc_id).update(scan_status='CLEAN')
         DB-->>CW: 1 row updated
-        CW->>CW: Task completed successfully; result stored in Redis backend (TTL 1h)
+        CW->>CW: Task completed successfully and result stored in Redis backend (TTL 1h)
     else Infected file
         MAL-->>CW: ScanResult{clean: False, threat_name: 'Trojan.PDF.XYZ'}
         CW->>DB: ApplicationDocumentModel.objects.filter(id=doc_id).update(scan_status='INFECTED')
@@ -325,12 +325,12 @@ sequenceDiagram
     Note over AAV: Verify officer is assigned to this application; verify all documents verified
     AAV->>WE: WorkflowEngine.transition(application, trigger='approve', actor_id=officer.id, notes=notes)
     WE->>WE: validate_transition('UNDER_REVIEW', 'approve') → OK
-    WE->>AM: application.status = 'APPROVED'; application.approved_at = now()
+    WE->>AM: application.status = 'APPROVED' and application.approved_at = now()
     WE->>WE: WorkflowStepModel.objects.create(step_name='APPROVAL', actor=officer, action='APPROVED', notes=notes)
     WE->>WE: application_state_changed.send(old='UNDER_REVIEW', new='APPROVED')
     AAV->>CW: generate_and_issue_certificate.delay(application_id, officer_id)
     AAV-->>AC: HTTP 200 {status: "APPROVED", approved_at}
-    AC-->>DP: Application approved; certificate generation queued
+    AC-->>DP: Application approved and certificate generation queued
     DP-->>FO: Show "Approved — Certificate being generated" status
 
     CW->>CW: Task: generate_and_issue_certificate(application_id, officer_id)
@@ -353,7 +353,7 @@ sequenceDiagram
     CW->>CM: CertificateModel.objects.create(application=application, certificate_number=cert_number, s3_key=s3_key, signed_at=now(), dsc_fingerprint=fingerprint)
     CM-->>CW: certificate_instance
     CW->>WE: WorkflowEngine.transition(application, trigger='issue_certificate', actor_id=SYSTEM_ACTOR)
-    WE->>AM: application.status = 'CERTIFICATE_ISSUED'; application.certificate_id = certificate.id
+    WE->>AM: application.status = 'CERTIFICATE_ISSUED' and application.certificate_id = certificate.id
     CW->>DLS: Nepal Document Wallet (NDW)Sync.push(citizen.digilocker_token_enc, signed_bytes, {cert_number, service_name, issued_date})
     Note over CW,DLS: Decrypt token with KMS before API call; handle token refresh if needed
     DLS-->>CW: {digilocker_uri: "in.gov.tn-revenue/income-certificate/cert_number"}
@@ -363,7 +363,7 @@ sequenceDiagram
     NS->>NS: SMS: "Your Income Certificate {cert_number} is ready. Download: {presigned_url}"
     NS->>NS: Email: Attached PDF + Nepal Document Wallet (NDW) link
     NS->>NS: In-App: Push notification via FCM
-    CW->>CW: Task completed; log to audit_logs: CERTIFICATE_ISSUED
+    CW->>CW: Task completed and log to audit_logs: CERTIFICATE_ISSUED
 ```
 
 ---
@@ -412,7 +412,7 @@ sequenceDiagram
     CW->>GM: GrievanceModel.objects.filter(status__not_in=['RESOLVED','CLOSED','ESCALATED'], sla_due_at__lt=now())
     GM-->>CW: [overdue_grievance_instance]
     CW->>GS: GrievanceService.auto_escalate(grievance_id)
-    GS->>GM: grievance.status = 'ESCALATED'; grievance.escalated_at = now()
+    GS->>GM: grievance.status = 'ESCALATED' and grievance.escalated_at = now()
     GS->>NS: NotificationService.send_escalation_alert(grievance)
     NS->>NS: Email to Department Head: "Grievance {grievance_id} has breached SLA and been escalated"
     NS->>NS: Email to Super Admin: Escalation summary
@@ -421,7 +421,7 @@ sequenceDiagram
     GP->>AC: PATCH /api/v1/grievances/{grievance_id}/ {action: "assign", officer_id: X}
     AC->>GCV: PATCH with dept_head JWT
     GCV->>GS: GrievanceService.assign(grievance_id, officer_id=X, assigned_by=dept_head_id)
-    GS->>GM: grievance.assigned_to = officer_id; grievance.status = 'ASSIGNED'
+    GS->>GM: grievance.assigned_to = officer_id and grievance.status = 'ASSIGNED'
     GCV-->>AC: HTTP 200 {status: "ASSIGNED", assigned_to}
 
     Note over CW: --- If escalated grievance also breaches extended SLA ---
@@ -466,3 +466,42 @@ All Celery tasks must be idempotent — safe to run multiple times with the same
 ### 8.4 Sequence Security Policy
 
 The NID OTP flow implements multiple anti-abuse controls visible in SD-001: rate limiting (3 requests per NID per 10 minutes via Redis counter), `txnId` invalidation after use, and a 24-hour used-txnId blacklist. The payment flow uses Redis locking and a database unique index as dual guards against double-charging. Webhook handlers validate HMAC signatures before any processing. All inter-service calls within AWS VPC use private endpoints; no traffic leaves the VPC for internal service communication.
+
+---
+
+## SD-007: Application Withdrawal and Refund Handling
+
+This sequence documents how a citizen withdraws an application before final approval and how refund settlement is coordinated with the payment module.
+
+```mermaid
+sequenceDiagram
+    participant CB as CitizenBrowser
+    participant WD as WithdrawApplicationView<br/>(applications/views.py)
+    participant AM as ApplicationModel
+    participant PM as PaymentModel
+    participant RS as RefundService<br/>(payments/services.py)
+    participant CW as CeleryWorker
+    participant NS as NotificationService
+
+    CB->>WD: POST /api/v1/applications/{id}/withdraw {reason}
+    WD->>AM: select_for_update().get(application_id)
+    AM-->>WD: Application record with current status
+    WD->>WD: Validate withdrawal allowed for current workflow state
+
+    alt Withdrawal allowed
+        WD->>AM: application.status = 'WITHDRAWN' and application.withdrawn_at = now()
+        WD->>PM: fetch successful payment for application
+        PM-->>WD: Payment record with captured amount
+        WD->>RS: RefundService.create_refund_request(payment_id, reason)
+        RS-->>WD: Refund request id and queued state
+        WD->>CW: process_refund.delay(refund_request_id)
+        CW->>RS: Execute refund with ConnectIPS client
+        RS-->>CW: Refund result with gateway reference
+        CW->>NS: send_withdrawal_confirmation.delay(application_id, refund_status)
+        NS-->>CB: SMS and email with withdrawal confirmation
+        WD-->>CB: HTTP 200 {status: "WITHDRAWN", refund_status: "PROCESSING"}
+    else Withdrawal blocked
+        WD-->>CB: HTTP 409 {error: "WITHDRAWAL_NOT_ALLOWED"}
+    end
+```
+

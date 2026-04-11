@@ -165,7 +165,7 @@ sequenceDiagram
 
     Citizen->>UI: Enter mobile number (or NID number)
     UI->>API: POST /api/auth/otp/initiate/<br/>{ mobile: "9876543210", auth_type: "aadhaar_otp" }
-    API->>API: Validate mobile format; check rate limit<br/>(Redis INCR key=otp:mobile:9876543210, TTL 10 min)
+    API->>API: Validate mobile format and check rate limit<br/>(Redis INCR key=otp:mobile:9876543210, TTL 10 min)
     API->>Cache: SET otp_attempt_count (check ≤ 5 attempts)
     Cache-->>API: Current attempt count
 
@@ -234,7 +234,7 @@ sequenceDiagram
     actor Citizen
 
     DeptHead->>API: POST /api/admin/applications/{id}/approve<br/>{ decision: "APPROVED", remarks: "All documents verified" }
-    API->>API: Validate DeptHead JWT; check permission:<br/>can_approve for this department and service
+    API->>API: Validate DeptHead JWT and check permission:<br/>can_approve for this department and service
     API->>WE: trigger_transition(application_id, event="FINAL_APPROVAL",<br/>actor=dept_head_user_id)
 
     WE->>DB: SELECT current_state FROM workflow_instances<br/>WHERE application_id = ?
@@ -256,7 +256,7 @@ sequenceDiagram
     S3-->>DSC: { ETag, VersionId }
 
     DSC->>DSC: Invoke DSC HSM signing module<br/>(pkcs11 interface to USB HSM token or<br/>cloud HSM via AWS CloudHSM)<br/>Sign PDF with Class 3 DSC (CCA compliant)
-    DSC->>S3: PUT certificate_signed_{cert_id}.pdf<br/>(replaces draft; Object Lock WORM enabled)
+    DSC->>S3: PUT certificate_signed_{cert_id}.pdf<br/>(replaces draft and Object Lock WORM enabled)
     S3-->>DSC: { ETag, VersionId, ObjectLockRetainUntilDate }
 
     DSC->>DB: UPDATE certificate_generation_jobs<br/>SET status = "SIGNED",<br/>s3_key = "certificates/{cert_id}.pdf",<br/>signed_at = NOW(), dsc_serial = ?
@@ -353,3 +353,44 @@ sequenceDiagram
 - AWS GuardDuty, CloudTrail, and VPC Flow Logs are continuously monitored. A CloudWatch alarm triggers a P1 PagerDuty alert if: >50 failed authentication attempts/minute from a single IP, >1,000 database error responses/minute, or any `DELETE FROM` SQL statement executed on production RDS outside a migration context.
 - In the event of a confirmed data breach, the Incident Response team must: (1) isolate affected containers within 30 minutes, (2) rotate all secrets (DB passwords, API keys) within 1 hour, (3) notify CERT-In within 6 hours as required by the Information Technology (Amendment) Act, (4) notify affected citizens within 72 hours via SMS and email as required by DPDPA 2023, (5) submit a detailed breach report to the Data Protection Board within 7 days.
 - Post-breach forensic analysis uses the immutable audit log (DS-7) and CloudTrail as the source of truth. The audit log retention of 7 years ensures that forensic evidence is available long after an incident.
+
+---
+
+## 10. Level 1 DFD: Grievance Escalation and SLA Breach Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Citizen
+    participant Portal as Citizen Portal UI
+    participant API as Django API<br/>(Grievance Module)
+    participant GM as Grievance Manager
+    participant DB as PostgreSQL
+    participant RC as Redis
+    participant CW as Celery Worker
+    participant NS as Notification Service
+    actor DeptHead as Department Head
+
+    Citizen->>Portal: Submit grievance with category and message
+    Portal->>API: POST /api/grievances {application_id, message}
+    API->>GM: create_grievance(citizen_id, payload)
+    GM->>DB: INSERT grievance {status: "OPEN", sla_due_at}
+    GM->>RC: ZADD grievance_sla_queue score=sla_due_at grievance_id
+    API-->>Portal: HTTP 201 {grievance_id, sla_due_at}
+
+    loop Every 5 minutes
+        CW->>RC: ZRANGEBYSCORE grievance_sla_queue -inf now
+        RC-->>CW: List of breached grievance ids
+        CW->>GM: escalate_if_breached(grievance_id)
+        GM->>DB: UPDATE grievance status to ESCALATED and set escalated_at
+        GM->>NS: notify_department_head(grievance_id)
+        NS-->>DeptHead: Escalation alert with breach details
+    end
+
+    DeptHead->>Portal: Assign investigator and update remarks
+    Portal->>API: POST /api/grievances/{id}/assign {officer_id}
+    API->>GM: assign_investigator(grievance_id, officer_id)
+    GM->>DB: UPDATE grievance status to ASSIGNED and set assigned_to
+    API-->>Portal: HTTP 200 {status: "ASSIGNED"}
+```
+
