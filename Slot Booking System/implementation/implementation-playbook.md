@@ -138,3 +138,59 @@ System is considered implementation-ready and production-capable when:
 - Reference command handler boundaries and invariants for each state transition.
 - Add deterministic integration tests for race, timeout, and compensation paths.
 - Enforce trace propagation and correlation IDs in all external calls.
+
+## 11. Distributed Booking Control Model
+
+### 11.1 Slot-hold expiration mechanics
+- Every reserve attempt creates a `slot_hold` record with fields: `hold_id`, `booking_id`, `slot_id`, `expires_at_utc`, `fencing_token`, `state`.
+- Hold TTL baseline: **5 minutes**, configurable per resource policy.
+- Expiration is enforced by **dual-path cleanup**:
+  1. Passive expiry check on every read/write path (`now_utc > expires_at_utc`).
+  2. Active sweeper job running every 5-15 seconds that emits `SlotExpired` and releases counters.
+- Expiry transition must be idempotent: `HELD -> EXPIRED` succeeds once; retries are no-op.
+- Client response for reserve includes `hold_expires_at_utc` and `server_now_utc` for countdown rendering.
+
+### 11.2 Deduplication and idempotency handling
+- Public write APIs (`reserve`, `confirm`, `cancel`, `refund`) require `Idempotency-Key`.
+- Request fingerprint (`actor_id + route + normalized_payload_hash`) must match prior key usage.
+- Idempotency store SLA:
+  - TTL >= 24h for booking writes.
+  - Persist terminal response envelope (status + body + correlation ID).
+- Async consumer dedup uses `processed_messages` table keyed by (`consumer_name`, `message_id`).
+- Payment webhooks dedup by provider event ID + signature verification + monotonic received timestamp.
+
+### 11.3 Payment coupling/decoupling model
+- **Coupled mode (strict)**
+  - Confirm booking only inside confirm transaction after payment authorization/capture success.
+  - On payment timeout/failure, hold is released and booking marked `PAYMENT_FAILED`.
+- **Decoupled mode (grace window)**
+  - Booking moves to `CONFIRMED_PAYMENT_PENDING` if policy allows deferred settlement.
+  - Grace window (e.g., 15 minutes) tracked by scheduler; expiry auto-cancels booking if unpaid.
+- Required compensation cases:
+  - `payment_success + booking_not_confirmed` => refund saga.
+  - `booking_confirmed + payment_reversed` => downgrade to `PAYMENT_REVERSED` and trigger manual or automatic cancellation policy.
+
+### 11.4 Race-condition mitigation
+- Use atomic slot-hold acquisition (`SET NX PX`/CAS/Lua) with fencing token validation.
+- Validate version fields on booking and slot rows to reject stale updates.
+- Serialize high-contention operations by shard key (`resource_id + time_bucket`) in worker queue.
+- Enforce bounded retries with jittered backoff; return deterministic conflict codes when retries exhausted.
+- Add Jepsen-style fault tests for concurrent reserve/confirm/cancel with injected delay and reorder.
+
+## 12. Non-functional Acceptance Criteria (Release Gates)
+
+### Throughput
+- Reserve attempts: **>= 2,000 req/s** sustained for 15 minutes in primary region.
+- Confirm/capture completions: **>= 500 req/s** sustained with webhook load.
+- Cancel+refund requests: **>= 300 req/s** sustained including async refund processing.
+
+### Latency (p95)
+- `GET /availability`: **<= 120ms**.
+- `POST /bookings/reserve`: **<= 180ms**.
+- `POST /bookings/{id}/confirm`: **<= 250ms** excluding external PSP latency; include internal state commit.
+- `POST /bookings/{id}/cancel`: **<= 180ms** for booking cancellation acknowledgement.
+
+### Consistency window
+- Availability projection lag to source-of-truth ledger: **<= 2s normal**, **<= 10s degraded**.
+- Hold expiry enforcement lag: **<= 3s p95** from TTL expiration to slot re-open.
+- Payment-to-booking state convergence: **<= 30s p95** after webhook receipt.
