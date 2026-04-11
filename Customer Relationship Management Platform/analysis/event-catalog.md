@@ -74,3 +74,30 @@ flowchart LR
 - Each event defines producer SLA, ordering guarantees, and replay strategy.
 - Observability must publish latency, success rate, and failure-class metrics for this document's scope.
 - Quarterly review confirms definitions and diagrams still match production behavior.
+
+## CRM Lifecycle Event Taxonomy (Lead → Qualified → Opportunity → Closed)
+
+| Lifecycle Stage | Event | Required Business Keys | Notes |
+|---|---|---|---|
+| Lead Created | `crm.lead.lifecycle.created.v1` | `lead_id`, `tenant_id`, `source_channel` | Initial capture event |
+| Lead Qualified | `crm.lead.lifecycle.qualified.v1` | `lead_id`, `qualification_reason`, `qualified_by` | Must include score snapshot |
+| Lead Converted | `crm.lead.lifecycle.converted.v1` | `lead_id`, `contact_id`, `account_id`, `opportunity_id?` | Conversion lineage anchor |
+| Opportunity Opened | `crm.opportunity.lifecycle.opened.v1` | `opportunity_id`, `pipeline_id`, `stage_id` | Start of revenue lifecycle |
+| Opportunity Stage Changed | `crm.opportunity.lifecycle.stage_changed.v1` | `opportunity_id`, `from_stage`, `to_stage`, `probability` | Includes stage gate evidence refs |
+| Opportunity Closed | `crm.opportunity.lifecycle.closed.v1` | `opportunity_id`, `closed_state`, `close_reason`, `amount` | Terminal state event |
+
+## Integration and Reconciliation Events
+
+| Event | Producer | Consumer | Contract Intent |
+|---|---|---|---|
+| `crm.integration.connector.outage_detected.v1` | connector monitor | incident automation | Signals provider outage and starts degraded-mode flow |
+| `crm.integration.webhook.accepted.v1` | webhook gateway | activity sync workers | Records acceptance with dedupe fingerprint |
+| `crm.integration.webhook.replayed.v1` | replay manager | audit/compliance | Evidence of controlled replay execution |
+| `crm.sync.corrected.v1` | reconciliation worker | analytics + audit | Deterministic auto-correction applied |
+| `crm.sync.manual_review_required.v1` | reconciliation worker | operations queue | Human decision required for conflict |
+
+## Event Contract Additions for Auditability
+- `causation_id`: upstream command/event that triggered this event.
+- `lineage_ref`: immutable pointer to source payload snapshot (provider/api input).
+- `policy_evaluations`: list of policy checks and outcomes used before mutation.
+- `consent_context`: channel + lawful basis when event includes communication data.
