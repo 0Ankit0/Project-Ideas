@@ -12,3 +12,11 @@ This pack captures high-risk failure scenarios across checkout, inventory, shipp
 - operations
 
 Each scenario covers failure mode, impact, detection, and recovery/mitigation actions.
+
+## Newly Emphasized Failure Patterns
+- Double-charge prevention during retry storms
+- Lost webhook replay for payment/order convergence
+- Payment timeout after authorization
+- Stale inventory race between cache and reservation source-of-truth
+- Partial shipment/backorder refund integrity
+- Refund reversal and compensating ledger controls
