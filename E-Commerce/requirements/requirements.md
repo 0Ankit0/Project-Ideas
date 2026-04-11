@@ -263,6 +263,46 @@ The system will support:
 
 ---
 
+### 2.11 Critical Commerce Control Requirements
+
+#### FR-CC-001: Pricing and Promotions Rule Engine
+- System shall evaluate pricing in deterministic order: base price -> catalog markdown -> campaign promotion -> coupon -> loyalty credits -> shipping discount.
+- System shall support combinability constraints (`stackable`, `exclusive`, category restrictions, customer segment restrictions).
+- System shall enforce promotion budget caps, per-user usage limits, and campaign validity window with timezone awareness.
+- System shall persist a quote breakdown snapshot at checkout so post-order refunds and disputes use immutable commercial terms.
+
+#### FR-CC-002: Tax and Region Behavior
+- System shall resolve tax jurisdiction by fulfillment origin + delivery destination + product tax code.
+- System shall support region-specific tax inclusivity (tax-inclusive vs tax-exclusive display) configurable per market.
+- System shall support threshold-based rules (e.g., interstate, cross-border, exempt categories) and return a detailed tax breakdown per line item.
+- System shall persist tax decision evidence (versioned rule id, jurisdiction, computed basis) for audit and dispute handling.
+
+#### FR-CC-003: Returns and Refund Policy Enforcement
+- System shall enforce policy windows by category, product condition, and seller policy profile.
+- System shall support partial refund, exchange, replacement, and returnless refund outcomes with explicit reason codes.
+- System shall define refund initiation points (`post-cancel`, `post-pickup`, `post-QC`) per policy template.
+- System shall require evidence capture (images, delivery proof, QC notes) for dispute-eligible returns.
+
+#### FR-CC-004: Order State Machine Invariants
+- System shall enforce valid state transitions only (e.g., `CREATED -> CONFIRMED -> PACKED -> SHIPPED -> DELIVERED`).
+- System shall prohibit transitions when required preconditions are absent (payment capture, inventory reservation, address lock).
+- System shall maintain monotonic event ordering with versioned order aggregate sequence numbers.
+- System shall support compensating transitions for exceptions (`SHIPPED -> RTO_IN_TRANSIT`, `DELIVERED -> RETURN_REQUESTED`) without violating prior state history.
+
+#### FR-CC-005: Fraud Controls
+- System shall score checkout risk using device, account, payment, and behavioral signals.
+- System shall support policy actions: allow, challenge (3DS/OTP), manual review, or block.
+- System shall enforce velocity rules for account creation, coupon use, payment retries, and high-value orders.
+- System shall retain fraud decision reason codes for auditability and model feedback loops.
+
+#### FR-CC-006: Settlement and Reconciliation
+- System shall maintain immutable double-entry ledger entries for order charge, fees, refunds, chargebacks, and vendor payouts.
+- System shall reconcile provider transactions, internal ledger, and bank settlements with deterministic matching keys.
+- System shall support T+N payout schedules with configurable holdbacks for return risk windows.
+- System shall surface reconciliation exceptions with SLA-backed workflows, ownership, and resolution states.
+
+---
+
 ## 3. Non-Functional Requirements
 
 ### 3.1 Performance
@@ -314,6 +354,16 @@ The system will support:
 - Multi-language support (i18n)
 - Offline-capable PWA
 
+### 3.8 Auditability and Financial Integrity
+- **NFR-AFI-001**: Every commercial decision (pricing, tax, fraud, promotion) shall be traceable to versioned rules and persisted with the order snapshot.
+- **NFR-AFI-002**: Financial events shall be reproducible from ledger entries with no destructive updates.
+- **NFR-AFI-003**: Reconciliation jobs shall complete daily with exception rate and aging metrics available to operations.
+
+### 3.9 Consistency and Idempotency
+- **NFR-CI-001**: External side effects (payment capture, refund submit, webhook processing) shall be idempotent via scoped idempotency keys.
+- **NFR-CI-002**: Cross-module state convergence (order, payment, inventory, shipment) shall meet a 5-minute eventual consistency objective for 99% of flows.
+- **NFR-CI-003**: Duplicate event delivery shall not cause duplicate customer charges, duplicate refunds, or invalid state transitions.
+
 ---
 
 ## 4. System Constraints
@@ -335,3 +385,31 @@ The system will support:
 - E-commerce regulations
 - Payment regulations (RBI/PCI-DSS)
 - Data localization requirements
+
+---
+
+## 5. Implementation Acceptance Criteria (Critical Workflows)
+
+### 5.1 Checkout Workflow
+- Given an idempotency key, repeated checkout submissions must return the same order/payment outcome and no extra charge.
+- Quote snapshot (price, promotion, tax, shipping) must match persisted order totals exactly at order creation.
+- Inventory reservation must be acquired or checkout must fail atomically with no payment capture.
+- If provider authorization succeeds but synchronous response fails, webhook replay must complete order or auto-void within SLA.
+
+### 5.2 Fulfillment Workflow
+- Order transitions must follow declared invariants; invalid transition attempts must be rejected and audited.
+- Partial shipment must preserve unfulfilled lines in backorder or cancellation-ready state with customer-visible ETA updates.
+- Shipment event ingestion must be idempotent; duplicate carrier events cannot regress state.
+- Lost webhook or delayed partner callback must be recoverable via scheduled polling and replay.
+
+### 5.3 Refund Workflow
+- Refund initiation must validate policy window, return disposition, and refundable balance before provider submission.
+- Refunds must support partial multi-attempt processing while keeping aggregate refunded amount <= paid amount.
+- Refund completion must update customer timeline, ledger entries, and vendor settlement adjustments consistently.
+- Failed refunds must enter retry/ops queue with reason codes and customer communication.
+
+### 5.4 Cancellation Workflow
+- Pre-shipment cancellation must release reservations and trigger payment void/refund according to payment state.
+- Post-shipment cancellation must route through return/RTO policy and enforce fee rules.
+- Concurrent cancel + ship attempts must resolve deterministically using order version checks.
+- Cancellation SLA and compensation policy breach thresholds must be observable on operations dashboards.
