@@ -7,6 +7,19 @@
 | Client is waiting to provide details | Resolution timer becomes misleading | Support approved SLA pause states with explicit reason codes |
 | Priority is set too low during triage | Critical issue misses response window | Require override approval for downgrading incidents after evidence review |
 | One ticket blocks multiple milestones | Risk hidden in individual queues | Propagate blocker state to all linked milestones and portfolio reporting |
+| Stale assignment (assignee inactive/off-shift but ticket still owned) | Hidden ownership gap and delayed response | Heartbeat + schedule-aware stale-assignment detector requeues after threshold and notifies manager |
+| SLA breach timing drift caused by worker clock skew | False breach/non-breach events and audit inconsistency | Use monotonic time, NTP drift alarms, and periodic deadline recomputation from event history |
+| Conflicting status transitions from concurrent actors (e.g., close vs reopen) | State corruption, duplicate notifications, inconsistent timelines | Optimistic locking on version, transition idempotency keys, and conflict response requiring retry with latest version |
+| Attachment malware scan delays beyond policy window | Potentially unsafe files or blocked workflows | Enforce pending-scan download block, delayed-scan escalation, and controlled override only for security-approved roles |
+
+## Expanded Edge-Case Catalog (Assignment & SLA)
+
+| Edge Case ID | Trigger | Detection Signal | Automated Action | Manual Action | Metrics |
+|---|---|---|---|---|---|
+| `ASG-STALE-001` | Assignee has no activity heartbeat for 30 min during active ownership | `assignment_last_seen_at` lag + on-call calendar mismatch | transition ticket to `reassignment_pending`; notify queue owner | manager confirms reassignment within 15 min | stale assignment count, median reassignment time |
+| `SLA-DRIFT-002` | timer worker clock drift > 5s/10 min | drift monitor event + timer mismatch sample | mark timer `degraded_clock`; rerun recomputation batch | ops validates NTP + node quarantine | drift incidents/week, corrected deadline delta |
+| `WF-CONFLICT-003` | two legal transitions submitted against same ticket version | optimistic lock failure + duplicate idempotency key | reject second transition with `409` and emit `TransitionConflictDetected` | actor retries using refreshed state | transition conflict rate by workflow step |
+| `ATT-SCAN-004` | attachment pending scan > 15 min | queue age + attachment state monitor | send delayed-scan alert; route to backup scanner pool | SecOps triages suspicious backlog | p95 scan latency, pending-scan backlog |
 
 ## Cross-Cutting Workflow and Operational Governance
 
@@ -48,4 +61,3 @@
 | Authorization Correctness | Role scope, tenant scope, and field visibility boundaries | Auth matrix review + API/UI parity checks |
 | Reporting Reproducibility | KPI formulas, dimensions, and source lineage | Recompute KPI from event data sample |
 | Operations Recoverability | Degraded-mode and compensation runbook steps | Tabletop/game-day evidence and postmortem template |
-
