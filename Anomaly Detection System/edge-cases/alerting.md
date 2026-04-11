@@ -69,3 +69,12 @@ Merchant `M-778` emits 25 critical anomalies in 10 minutes; system creates one p
 ## Operational Runbooks and Observability Notes
 - Alert quality metrics include precision of pages and ack latency.
 - Runbook includes temporary suppression policy with expiry guardrail.
+
+
+### 4.7. False-Positive Storms
+* **Scenario**: A model threshold drift causes high-volume false positives across many tenants.
+* **Impact**: Alert fatigue, missed true incidents, and escalation overload.
+* **Solution**:
+	* **Circuit Breaker**: Enable tenant-aware suppression profile when false-positive ratio exceeds 2x baseline for 15 minutes.
+	* **Containment**: Collapse related alerts into a single parent incident with rolling updates.
+	* **Recovery**: Trigger automatic threshold freeze and model rollback evaluation.

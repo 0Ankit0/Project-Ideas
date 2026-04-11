@@ -80,3 +80,20 @@ Nightly `batch_2026_02_14` (2M rows): 0.7% malformed rows sent to quarantine wit
 ## Operational Runbooks and Observability Notes
 - Ingestion lag, quarantine rate, and replay throughput are key signals.
 - Runbook covers replay dry-run, cutover, and reconciliation checks.
+
+
+### 1.8. Delayed Labels
+* **Scenario**: Human-verified labels arrive hours or days after anomaly generation.
+* **Impact**: Training signal skew and delayed quality corrections.
+* **Solution**:
+    * **Event-Time Join**: Join labels to anomaly events by event timestamp, not processing time.
+    * **Backlog Guardrail**: Alert when median label delay exceeds 24h.
+    * **Compensation**: Backfill labeled datasets incrementally for retraining windows.
+
+### 1.9. Feature Pipeline Backfill Overload
+* **Scenario**: Large historical replay floods ingestion and competes with real-time traffic.
+* **Impact**: Real-time SLA breaches and consumer lag growth.
+* **Solution**:
+    * **Isolation**: Run backfill in separate topics/consumer groups and capped quotas.
+    * **Admission Control**: Pause/slow backfill when real-time lag exceeds threshold.
+    * **Reconciliation**: Validate replay completeness with checksum and offset audits.

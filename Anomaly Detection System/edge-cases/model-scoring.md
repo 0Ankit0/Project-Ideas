@@ -69,3 +69,20 @@ Primary `xgb_2026_03` returns 0.83 while shadow `lstm_2026_03` returns 0.62 on s
 ## Operational Runbooks and Observability Notes
 - Monitor precision/recall proxies, drift, calibration error, and latency.
 - Runbook details model rollback, threshold freeze, and communication plan.
+
+
+### 3.7. Model Rollback Safety
+* **Scenario**: Newly promoted model degrades quality or latency and must be reverted quickly.
+* **Impact**: Incorrect anomaly decisions and customer-visible alert quality issues.
+* **Solution**:
+	* **Preparedness**: Keep last-known-good model and manifest digest hot in each region.
+	* **Execution**: One-command rollback with automated traffic shift and post-rollback verification.
+	* **Validation**: Compare pre/post rollback precision proxy, latency, and alert volume before closing incident.
+
+### 3.8. Schema Drift at Scoring Boundary
+* **Scenario**: Feature schema changes (type/order/semantic drift) break model input expectations.
+* **Impact**: Runtime errors, NaN outputs, or silent quality degradation.
+* **Solution**:
+	* **Contract Checks**: Reject incompatible requests using feature schema fingerprint validation.
+	* **Fallback**: Route to compatible previous feature set and flag degraded mode.
+	* **Escalation**: Block promotions and open schema-governance incident automatically.
