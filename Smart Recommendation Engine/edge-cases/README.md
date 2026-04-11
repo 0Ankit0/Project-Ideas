@@ -37,6 +37,7 @@ Every edge case follows a consistent six-field structure:
 | File | Cases Covered | Severity Range |
 |------|--------------|----------------|
 | [cold-start.md](cold-start.md) | New user, new item, system cold start, popularity bias, A/B distortion | High – Medium |
+| [recommendation-resilience.md](recommendation-resilience.md) | Stale embeddings, missing features, degraded mode recommendation behavior, unified fallback order | High – Medium |
 | [feedback-loops.md](feedback-loops.md) | Filter bubble, negative amplification, pipeline failure, delayed feedback, bot contamination | High – Medium |
 | [model-drift.md](model-drift.md) | Concept drift, distribution shift, stale features, serving latency spike, silent accuracy decay | High – Medium |
 | [bias-fairness.md](bias-fairness.md) | Popularity bias, demographic bias, price bias, geo bias, fairness audit failure | Critical – High |
