@@ -934,3 +934,37 @@ An individual entry in a merit list, representing one applicant's rank and compo
 | **Diploma Number** | A unique identifier assigned to a student's diploma upon degree conferral, serving as the official reference for the awarded credential. Format: DIP-YYYY-XXXXXX. |
 | **Curriculum Change Proposal** | A formal request to modify a program's curriculum (add/remove courses, change prerequisites, restructure) that follows a multi-level approval workflow through department, academic board, and senate. |
 | **UUID** | Universally Unique Identifier — a 128-bit random identifier used as the primary key for all EMIS entities, ensuring global uniqueness without coordination. |
+
+---
+
+## Core Entities
+
+(See detailed entity definitions in sections above.)
+
+The primary entities in EMIS are: **User**, **Student**, **Faculty**, **Program**, **Course**, **CourseSection**, **Enrollment**, **Grade**, **Attendance**, **FeeInvoice**, and **AcademicTerm**.
+
+## Canonical Relationship Diagram
+
+```mermaid
+erDiagram
+    Student ||--o{ Enrollment : "enrolls in"
+    CourseSection ||--o{ Enrollment : "has"
+    Course ||--o{ CourseSection : "offered as"
+    Program ||--o{ Course : "includes"
+    Faculty ||--o{ CourseSection : "teaches"
+    Enrollment ||--o{ Grade : "receives"
+    Enrollment ||--o{ Attendance : "tracked by"
+    Student ||--o{ FeeInvoice : "billed via"
+    AcademicTerm ||--o{ CourseSection : "runs during"
+```
+
+## Data Quality Controls
+
+| Control ID | Entity | Field | Rule | Enforcement |
+|---|---|---|---|---|
+| DQC-001 | Student | student_id | Must be globally unique across all academic years | DB UNIQUE + application sequence |
+| DQC-002 | Enrollment | status | Must follow allowed state transitions (PENDING→ACTIVE→COMPLETED/WITHDRAWN) | State machine validation |
+| DQC-003 | Grade | score | Must be within 0–100 range; only authorised faculty may submit | Range check + RBAC |
+| DQC-004 | FeeInvoice | amount_due | Must be positive; computed from fee schedule, not manually entered | System-computed field |
+| DQC-005 | CourseSection | max_seats | Must be ≥ 1; current enrollments cannot exceed max_seats | DB check constraint |
+| DQC-006 | Attendance | marked_at | Must fall within the CourseSection's scheduled time window ± 15 minutes | Application validation |

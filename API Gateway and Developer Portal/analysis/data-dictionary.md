@@ -534,3 +534,37 @@ Represents a triggered monitoring alert for a consumer, API route, or platform-w
 3. **Policy SAP-003 — Read Replica Query Routing:** All read-heavy queries from the Developer Portal (analytics dashboards, API catalogue browsing, audit log searches, plan listings) must be directed to the PostgreSQL read replica, not the primary. The primary instance is reserved exclusively for write operations and time-sensitive reads (e.g., active key validation fallback when Redis is unavailable).
 
 4. **Policy SAP-004 — Database Backup Verification Cadence:** Automated daily RDS snapshots must be verified monthly by restoring to an isolated test environment and executing the full data dictionary schema validation suite. Backup verification failures are escalated as Severity-1 incidents. A verification log entry is produced for each test and reviewed at the quarterly security and compliance review.
+
+---
+
+## Core Entities
+
+(See entity definitions above for full field-level specifications.)
+
+The primary entities in the API Gateway and Developer Portal are: **ApiKey**, **Consumer**, **Application**, **SubscriptionPlan**, **ApiRoute**, **RateLimitPolicy**, **WebhookSubscription**, and **ApiVersion**.
+
+## Canonical Relationship Diagram
+
+```mermaid
+erDiagram
+    Consumer ||--o{ Application : "owns"
+    Consumer ||--o{ ApiKey : "holds"
+    Application ||--o{ ApiKey : "uses"
+    Application }o--|| SubscriptionPlan : "enrolled in"
+    SubscriptionPlan ||--o{ RateLimitPolicy : "defines"
+    ApiKey ||--o{ RateLimitPolicy : "governed by"
+    ApiRoute ||--o{ RateLimitPolicy : "applies"
+    ApiRoute ||--o{ ApiVersion : "versioned as"
+    Application ||--o{ WebhookSubscription : "subscribes via"
+```
+
+## Data Quality Controls
+
+| Control ID | Entity | Field | Rule | Enforcement |
+|---|---|---|---|---|
+| DQC-001 | ApiKey | key_hash | Must be HMAC-SHA256 hash, never plaintext | Application layer + DB constraint NOT NULL |
+| DQC-002 | Consumer | email | Must be unique and RFC 5321 compliant | DB UNIQUE constraint + regex validation |
+| DQC-003 | SubscriptionPlan | rate_limit_rpm | Must be a positive integer; cannot be decreased below active Consumer usage | Application validation |
+| DQC-004 | ApiRoute | upstream_url | Must be a valid HTTPS URL; HTTP only allowed in dev environment | Application validator |
+| DQC-005 | ApiKey | expires_at | Must be in the future on creation; cannot be extended beyond plan max TTL | Application rule |
+| DQC-006 | RateLimitPolicy | window_seconds | Must be one of [1, 60, 3600, 86400]; arbitrary values rejected | Enum constraint |

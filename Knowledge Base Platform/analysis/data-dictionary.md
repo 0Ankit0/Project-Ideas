@@ -461,3 +461,37 @@ collection browsing; the indexing lag affects only search discoverability. The
 providing defence-in-depth for stored OAuth tokens and API keys. The `Attachment.scanStatus`
 field tracks malware scan results; attachments with `scanStatus: infected` are quarantined
 and never served via CDN regardless of `isPublic` flag value.
+
+---
+
+## Core Entities
+
+(See numbered entity sections above for full attribute-level specifications.)
+
+The primary entities in the Knowledge Base Platform are: **Article**, **ArticleVersion**, **Collection**, **Workspace**, **User**, **Permission**, **SearchIndex**, **AIConversation**, and **AIMessage**.
+
+## Canonical Relationship Diagram
+
+```mermaid
+erDiagram
+    Workspace ||--o{ Collection : "organises"
+    Workspace ||--o{ User : "has members"
+    Collection ||--o{ Article : "contains"
+    Article ||--o{ ArticleVersion : "versioned as"
+    Article ||--o{ Permission : "governed by"
+    User ||--o{ Permission : "assigned"
+    Article ||--o{ SearchIndex : "indexed in"
+    User ||--o{ AIConversation : "starts"
+    AIConversation ||--o{ AIMessage : "contains"
+```
+
+## Data Quality Controls
+
+| Control ID | Entity | Field | Rule | Enforcement |
+|---|---|---|---|---|
+| DQC-001 | Article | slug | Must be unique within a Workspace; URL-safe characters only | DB UNIQUE(workspace_id, slug) + regex |
+| DQC-002 | ArticleVersion | content_hash | SHA-256 of content body; must match stored content on retrieval | Application integrity check |
+| DQC-003 | Permission | role | Must be one of [READER, EDITOR, AUTHOR, ADMIN]; no custom roles | Enum constraint |
+| DQC-004 | Article | published_at | Can only be set by EDITOR or AUTHOR role; READER cannot publish | RBAC check |
+| DQC-005 | SearchIndex | last_indexed_at | Must be updated within 60 seconds of article publish/update | Async worker SLA monitoring |
+| DQC-006 | Workspace | custom_domain | Must pass DNS ownership verification before activation | Domain verification workflow |

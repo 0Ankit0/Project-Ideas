@@ -361,3 +361,35 @@ Citizens can request a data lineage report showing every system that has process
 
 ### Section 4 — Index and Performance Notes
 High-traffic queries on `Application` table use partial indexes on `(status, sla_deadline)` for SLA monitoring and `(citizen_id, service_id)` for duplicate detection. Full-text search on service catalog uses PostgreSQL `GIN` index on `tsvector` column.
+
+---
+
+## Core Entities
+
+(See individual entity definitions above for full attribute-level specifications.)
+
+The primary entities in the Government Services Portal are: **Citizen**, **CitizenIdentity**, **ServiceDefinition**, **Application**, **DocumentSubmission**, **FeeInvoice**, **PaymentTransaction**, and **Certificate**.
+
+## Canonical Relationship Diagram
+
+```mermaid
+erDiagram
+    Citizen ||--|| CitizenIdentity : "verified by"
+    Citizen ||--o{ Application : "submits"
+    ServiceDefinition ||--o{ Application : "defines workflow for"
+    Application ||--o{ DocumentSubmission : "requires"
+    Application ||--o{ FeeInvoice : "generates"
+    FeeInvoice ||--o{ PaymentTransaction : "settled by"
+    Application ||--o| Certificate : "produces"
+```
+
+## Data Quality Controls
+
+| Control ID | Entity | Field | Rule | Enforcement |
+|---|---|---|---|---|
+| DQC-001 | Citizen | nid_number | Must be unique and pass NASC NID format checksum | DB UNIQUE + external NASC validation |
+| DQC-002 | Application | status | Must follow allowed FSM transitions; no backward jumps without admin override | State machine + audit log |
+| DQC-003 | FeeInvoice | amount | Computed from ServiceDefinition fee schedule; cannot be manually overridden by portal staff | System-computed, read-only to staff |
+| DQC-004 | DocumentSubmission | file_size_bytes | Must not exceed 10 MB per file; 50 MB per application | Application validation + S3 pre-signed URL size limit |
+| DQC-005 | Certificate | issued_at | Only set when Application.status = APPROVED; cannot be backdated | Application rule |
+| DQC-006 | PaymentTransaction | gateway_reference | Must be globally unique; duplicate references rejected within 24h | DB UNIQUE + idempotency check |

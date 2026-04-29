@@ -493,3 +493,31 @@ Analytics dashboard queries and export jobs are routed exclusively to read repli
 primary write throughput. Connection pooling is provided by PgBouncer in transaction mode (max 200
 server connections per replica). MongoDB (DocumentDB) uses a 3-node replica set with automatic
 primary election on failure.
+
+---
+
+## Canonical Relationship Diagram
+
+```mermaid
+erDiagram
+    Workspace ||--o{ Survey : "owns"
+    Workspace ||--o{ User : "has members"
+    Survey ||--o{ Question : "contains"
+    Question ||--o{ QuestionOption : "has choices"
+    Question ||--o{ ConditionalLogicRule : "has logic"
+    Survey ||--o{ SurveyDistribution : "distributed via"
+    Survey ||--o{ ResponseSession : "receives"
+    ResponseSession ||--o{ Response : "contains"
+    Question ||--o{ Response : "answered by"
+```
+
+## Data Quality Controls
+
+| Control ID | Entity | Field | Rule | Enforcement |
+|---|---|---|---|---|
+| DQC-001 | Survey | status | Must follow FSM transitions (DRAFT→ACTIVE→PAUSED→CLOSED); no backward jumps | State machine validation |
+| DQC-002 | ResponseSession | completed_at | Only set when all required questions are answered | Application rule |
+| DQC-003 | Question | order_index | Must be unique within a Survey; no gaps allowed after reorder | Application reorder service |
+| DQC-004 | SurveyDistribution | expires_at | Must be in the future on creation; cannot be extended beyond 365 days | Application validation |
+| DQC-005 | Response | value | For NPS questions, must be integer 0–10; for rating, within defined scale bounds | Per-question type validator |
+| DQC-006 | Workspace | monthly_response_quota | Cannot be exceeded; enforced at submission time with atomic counter | Redis atomic increment + check |
