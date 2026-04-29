@@ -345,3 +345,58 @@ sequenceDiagram
 - During academic blackout periods (exam week, first week of semester), the outbox relay task frequency is increased from every 30 seconds to every 5 seconds to minimize notification latency.
 - DLQ monitoring alerts are elevated from MEDIUM to HIGH severity during blackout periods.
 - Event schema changes are frozen during blackout periods; deployments introducing new event types or schema changes require the change window to be after the blackout period ends.
+
+---
+
+## Contract Conventions
+
+(See Section 1 above for detailed contract conventions.)
+
+All EMIS domain events follow the naming pattern `{domain}.{entity}.{verb_past_tense}` and carry a standard envelope with `event_id`, `aggregate_id`, `occurred_at`, `schema_version`, and `payload`.
+
+## Domain Events
+
+(See Section 2 above for the complete domain event inventory.)
+
+Summary of key events:
+
+| Event Name | Domain | Trigger | Key Consumers |
+|---|---|---|---|
+| `admissions.application.submitted` | Admissions | Application form submitted | Document checker, notification service |
+| `enrollment.student.enrolled` | Enrollment | Student confirms course enrollment | Timetable service, billing service |
+| `academic.grade.submitted` | Academic | Faculty submits final grade | Transcript service, standing evaluator |
+| `academic.attendance.marked` | Academic | Attendance recorded for a session | Standing evaluator, parent notification |
+| `finance.fee_invoice.generated` | Finance | System generates term fee invoice | Payment gateway, notification service |
+| `finance.payment.received` | Finance | Payment gateway confirms payment | Invoice service, enrollment unblock |
+| `academic.term.closed` | Academic | Academic term end date reached | Standing batch job, transcript generator |
+| `admissions.scholarship.awarded` | Admissions | Scholarship committee decision recorded | Finance service, notification |
+
+## Publish and Consumption Sequence
+
+```mermaid
+sequenceDiagram
+    participant PORTAL as EMIS Portal
+    participant ENROLL as Enrollment Service
+    participant MQ as Message Queue
+    participant BILL as Billing Service
+    participant NOTIF as Notification Service
+    participant AUDIT as Audit Service
+
+    PORTAL->>ENROLL: Student confirms enrollment
+    ENROLL->>MQ: Publish enrollment.student.enrolled
+    MQ-->>BILL: Generate term fee invoice
+    BILL->>MQ: Publish finance.fee_invoice.generated
+    MQ-->>NOTIF: Send invoice email to student
+    MQ-->>AUDIT: Log enrollment event
+    NOTIF-->>PORTAL: In-portal notification delivered
+```
+
+## Operational SLOs
+
+| Event | Max End-to-End Latency | Retry Policy | DLQ Retention |
+|---|---|---|---|
+| `admissions.application.submitted` | 3 s | 3 attempts, exponential backoff | 14 days |
+| `enrollment.student.enrolled` | 2 s | 5 attempts, 1s/2s/4s/8s/16s | 14 days |
+| `academic.grade.submitted` | 5 s | 3 attempts | 30 days |
+| `finance.payment.received` | 1 s | 5 attempts, no backoff for payment events | 30 days |
+| `academic.term.closed` | 30 s (batch) | 3 attempts with 60s between | 30 days |

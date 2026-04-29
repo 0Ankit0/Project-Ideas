@@ -692,3 +692,44 @@ All changes to business rules documented in this catalogue follow the **Platform
 3. **Policy SAP-003 — Failover Rule Consistency:** During a primary Redis cluster failover, rate-limit counters that are lost must cause the gateway to fail open (allow traffic) per BR-RL-010. The failover detection time must be under 30 seconds. After failover, counters are re-initialised from zero for the new window, and a monitoring alert documents the brief period during which rate limits were not enforced.
 
 4. **Policy SAP-004 — Rule Version Control and Rollback:** All business rule configuration changes deployed to production must be tracked in version control with a timestamp, deployer identity, and diff. The platform must support single-step rollback of any rule configuration change within 5 minutes of deployment. Rollback procedures must be tested quarterly in the staging environment as part of the platform's disaster-recovery drills.
+
+---
+
+## Enforceable Rules
+
+The following rules are enforced by the API Gateway and Developer Portal system at runtime:
+
+1. Every inbound request must carry a valid, non-expired API key or a valid OAuth 2.0 Bearer token. Requests without credentials are rejected with HTTP 401.
+2. A Consumer whose plan quota is exhausted receives HTTP 429 with a `Retry-After` header; requests are not queued or deferred.
+3. Route configuration changes take effect within 5 seconds across all gateway instances via Redis pub/sub cache invalidation.
+4. API keys must not appear in URL query parameters; the gateway strips and logs any key detected in a query string and returns HTTP 400.
+5. A SubscriptionPlan's rate limit cannot be decreased below the current peak usage of any active Consumer on that plan without explicit admin acknowledgement.
+6. Webhook delivery is attempted up to 5 times with exponential backoff; after 5 failures the webhook is suspended and the developer notified.
+7. API versioning follows semantic versioning; a deprecated version must remain active for at least 90 days after the `Sunset` header date is published.
+
+## Rule Evaluation Pipeline
+
+```mermaid
+flowchart TD
+    A[Inbound Request] --> B{Auth Check\nAPI Key or OAuth?}
+    B -->|No credential| C[Return 401 Unauthorized]
+    B -->|Invalid credential| D[Return 401 + log violation]
+    B -->|Valid| E{Plan Active?}
+    E -->|Suspended/Expired| F[Return 403 Forbidden]
+    E -->|Active| G{Rate Limit Check\nRedis token bucket}
+    G -->|Limit exceeded| H[Return 429 + Retry-After]
+    G -->|Within limit| I{Route Active?\nHealth check passed?}
+    I -->|No route or all upstreams down| J[Return 503]
+    I -->|Route active| K[Forward to Upstream]
+    K -->|Upstream error| L[Return 502 or 504]
+    K -->|Success| M[Return upstream response]
+```
+
+## Exception and Override Handling
+
+| Exception Scenario | Override Mechanism | Who Can Override | Audit |
+|---|---|---|---|
+| Consumer exceeds plan quota due to metering bug | Admin manually resets quota counter via Admin API with override reason | `GATEWAY_ADMIN` role only | Logged to immutable audit trail |
+| Deprecated API version must remain active beyond Sunset date | Admin extends Sunset date via API catalogue; developer notification is re-sent | `API_PUBLISHER` role | Logged with justification field |
+| Emergency bypass of rate limiting for critical integration | Time-boxed `RATE_LIMIT_EXEMPT` flag on ApiKey, max 1 hour, requires two-admin approval | Two `GATEWAY_ADMIN` accounts | Logged with approver IDs and expiry |
+| Upstream health check false-positive causes unnecessary 503s | Admin forces circuit breaker reset via Admin Console | `GATEWAY_ADMIN` role | Logged with before/after health state |

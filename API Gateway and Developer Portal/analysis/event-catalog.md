@@ -693,3 +693,62 @@ sequenceDiagram
 2. **Webhook Delivery SLA**: First webhook delivery attempt must occur within 10 seconds of the triggering event. Total delivery time (including retries) must not exceed 24 hours before dead-lettering.
 3. **Alert Propagation SLA**: `alert.threshold.breached` events must be delivered to the notification service within 60 seconds of threshold breach detection. PagerDuty escalation must fire within 5 minutes for Critical-severity alerts.
 4. **BullMQ High Availability**: The Redis cluster backing BullMQ must maintain 99.9% availability. A Redis failover exceeding 30 seconds triggers an automatic circuit breaker in the gateway that continues processing requests but buffers analytics events in local memory (up to 10,000 events) until queue connectivity is restored.
+
+---
+
+## Contract Conventions
+
+All events published by the API Gateway and Developer Portal follow these conventions:
+
+- **Naming pattern**: `{aggregate}.{verb_past_tense}` (e.g., `api_key.created`, `gateway.request.completed`)
+- **Transport**: All events are published to the internal BullMQ queue and mirrored to an SNS topic for external subscribers
+- **Schema format**: JSON with mandatory envelope fields: `event_id` (UUID v4), `event_type` (string), `aggregate_id` (string), `occurred_at` (ISO 8601), `schema_version` (integer), `payload` (object)
+- **Versioning**: Schema version is incremented on any breaking change; non-breaking additions do not increment the version
+- **Retention**: Events are retained in the event store for 30 days; dead-letter queue messages are retained for 7 days
+
+## Domain Events
+
+| Event Name | Trigger | Publisher | Consumers | Payload Key Fields |
+|---|---|---|---|---|
+| `api_key.created` | New API key generated | Key Service | Audit service, analytics | key_id, consumer_id, plan_id, created_at |
+| `api_key.rotated` | Key rotation performed | Key Service | Auth cache invalidator, audit | old_key_id, new_key_id, consumer_id |
+| `api_key.revoked` | Key manually revoked | Key Service | Auth cache invalidator, audit, notification | key_id, revoked_by, reason |
+| `gateway.request.completed` | Request proxied successfully | Gateway Core | Analytics aggregator | route_id, key_id, latency_ms, status_code |
+| `rate_limit.quota_exceeded` | Consumer hits hard quota | Rate Limit Service | Notification service, billing | consumer_id, plan_id, limit_type, reset_at |
+| `route.circuit_breaker.opened` | Circuit breaker trips to OPEN | Health Monitor | Alerting, dashboard | route_id, upstream_url, triggered_at |
+| `webhook.delivery.failed` | Webhook delivery fails after all retries | Webhook Service | Notification service, audit | webhook_id, app_id, attempt_count, last_error |
+| `subscription_plan.upgraded` | Consumer upgrades plan | Billing Service | Rate limit service, analytics | consumer_id, old_plan_id, new_plan_id |
+
+## Publish and Consumption Sequence
+
+```mermaid
+sequenceDiagram
+    participant GW as Gateway Core
+    participant KS as Key Service
+    participant BQ as BullMQ Queue
+    participant AA as Analytics Aggregator
+    participant NS as Notification Service
+    participant AI as Audit Service
+
+    GW->>BQ: Publish gateway.request.completed
+    BQ-->>AA: Consume and aggregate metrics
+    AA-->>AA: Update Redis usage counters
+
+    KS->>BQ: Publish api_key.revoked
+    BQ-->>AI: Consume and write audit record
+    BQ-->>NS: Consume and send developer email
+    NS-->>NS: Template render + SMTP delivery
+
+    GW->>BQ: Publish rate_limit.quota_exceeded
+    BQ-->>NS: Consume and send quota warning
+    BQ-->>AA: Consume and log quota event
+```
+
+## Operational SLOs
+
+| Event | Max End-to-End Latency | Max Consumer Processing Time | Retry Policy | DLQ Retention |
+|---|---|---|---|---|
+| `gateway.request.completed` | 500 ms | 200 ms | 3 attempts, 1s/2s/4s backoff | 7 days |
+| `api_key.revoked` | 1 s | 500 ms | 5 attempts, exponential backoff | 7 days |
+| `rate_limit.quota_exceeded` | 2 s | 1 s | 3 attempts, 1s/5s/15s | 7 days |
+| `webhook.delivery.failed` | 5 s | 2 s | 3 attempts | 7 days |

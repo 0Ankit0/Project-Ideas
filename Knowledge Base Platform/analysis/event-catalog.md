@@ -846,3 +846,58 @@ Events in the Search and Widget domains do not store the raw query text or page 
 ### System Availability Policies
 
 BullMQ queues are backed by ElastiCache Redis with a 3-shard cluster configuration. In the event of a Redis primary node failover (30–60 second window), new events are buffered in memory and replayed after recovery. The `article.published` event has a priority level of HIGH in BullMQ to ensure search indexing completes within 60 seconds of publication SLA. Queue depths are monitored via CloudWatch metrics exported from a BullMQ metrics endpoint; alerts fire at depth > 10,000 for the embedding queue and > 1,000 for the notification queue.
+
+---
+
+## Contract Conventions
+
+All Knowledge Base Platform events follow these conventions:
+
+- **Naming pattern**: `{aggregate}.{verb_past_tense}` (e.g., `article.published`, `workspace.member_added`)
+- **Transport**: Internal Redis Streams; SNS topic for cross-service consumers (search indexer, notification)
+- **Schema**: JSON with `event_id` (UUID v4), `event_type`, `aggregate_id`, `workspace_id`, `occurred_at` (ISO 8601), `actor_id`, `schema_version`, `payload`
+- **Idempotency**: All consumers implement idempotent processing keyed on `event_id`
+- **Retention**: 60 days in event store; DLQ retained 14 days
+
+## Domain Events
+
+| Event Name | Trigger | Publisher | Consumers | Key Payload Fields |
+|---|---|---|---|---|
+| `article.published` | Article transitions to PUBLISHED state | Content Service | Search indexer, notification, analytics | article_id, workspace_id, author_id, published_at |
+| `article.updated` | Published article content edited | Content Service | Search indexer, analytics | article_id, version_id, editor_id, changed_fields |
+| `article.archived` | Article moved to ARCHIVED | Content Service | Search indexer, notification | article_id, archived_by, archived_at |
+| `workspace.member_added` | User joins workspace | Workspace Service | Permission service, notification | workspace_id, user_id, role, added_by |
+| `search.query.no_results` | Search returns zero results | Search Service | Gap analytics, recommendation | query_text, workspace_id, occurred_at |
+| `ai_conversation.started` | User opens AI assistant | AI Service | Usage quota check, analytics | conversation_id, user_id, workspace_id |
+| `article.review_requested` | Author submits for review | Content Service | Reviewer notification, workflow | article_id, reviewer_ids, submitted_at |
+
+## Publish and Consumption Sequence
+
+```mermaid
+sequenceDiagram
+    participant AUTHOR as Author
+    participant CS as Content Service
+    participant MQ as Message Queue
+    participant SI as Search Indexer
+    participant NS as Notification Service
+    participant AN as Analytics Service
+
+    AUTHOR->>CS: Publish article
+    CS->>MQ: Emit article.published
+    MQ-->>SI: Index article in Elasticsearch
+    SI-->>SI: Update search index
+    MQ-->>NS: Notify workspace subscribers
+    NS-->>NS: Send email digest
+    MQ-->>AN: Record publish event
+    AN-->>AN: Update article analytics
+```
+
+## Operational SLOs
+
+| Event | Max Indexing Latency | Retry Policy | DLQ Retention |
+|---|---|---|---|
+| `article.published` | 60 s (search indexed) | 5 attempts, exponential | 14 days |
+| `article.updated` | 60 s (search re-indexed) | 5 attempts | 14 days |
+| `workspace.member_added` | 2 s | 3 attempts | 7 days |
+| `search.query.no_results` | 5 s (analytics) | 3 attempts | 7 days |
+| `article.review_requested` | 3 s (notification) | 3 attempts | 14 days |

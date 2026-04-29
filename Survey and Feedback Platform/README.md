@@ -10,7 +10,7 @@
 - [Primary Roles](#primary-roles)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
-- [Directory Structure](#directory-structure)
+- [Documentation Structure](#documentation-structure)
 - [Documentation Status](#documentation-status)
 - [Delivery Blueprint](#delivery-blueprint)
 - [Operational Policy Addendum](#operational-policy-addendum)
@@ -139,150 +139,63 @@
 
 ---
 
-## Directory Structure
+## Documentation Structure
 
-```
-survey-feedback-platform/
-├── README.md
-├── docker/
-│   ├── docker-compose.dev.yml
-│   ├── docker-compose.prod.yml
-│   ├── Dockerfile.backend
-│   └── Dockerfile.frontend
-├── backend/
-│   ├── .env.example
-│   ├── requirements.txt
-│   ├── alembic.ini
-│   ├── alembic/
-│   │   └── versions/
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── config.py
-│   │   ├── celery_app.py
-│   │   ├── database.py
-│   │   ├── models/
-│   │   │   ├── user.py
-│   │   │   ├── workspace.py
-│   │   │   ├── survey.py
-│   │   │   ├── question.py
-│   │   │   ├── response.py
-│   │   │   ├── distribution.py
-│   │   │   ├── contact.py
-│   │   │   ├── template.py
-│   │   │   └── subscription.py
-│   │   ├── schemas/
-│   │   │   ├── survey.py
-│   │   │   ├── response.py
-│   │   │   ├── user.py
-│   │   │   └── analytics.py
-│   │   ├── routers/
-│   │   │   ├── auth.py
-│   │   │   ├── surveys.py
-│   │   │   ├── questions.py
-│   │   │   ├── responses.py
-│   │   │   ├── distributions.py
-│   │   │   ├── analytics.py
-│   │   │   ├── reports.py
-│   │   │   ├── contacts.py
-│   │   │   ├── templates.py
-│   │   │   ├── workspaces.py
-│   │   │   ├── webhooks.py
-│   │   │   └── billing.py
-│   │   ├── services/
-│   │   │   ├── auth_service.py
-│   │   │   ├── survey_service.py
-│   │   │   ├── response_service.py
-│   │   │   ├── distribution_service.py
-│   │   │   ├── analytics_service.py
-│   │   │   ├── report_service.py
-│   │   │   ├── contact_service.py
-│   │   │   ├── template_service.py
-│   │   │   ├── notification_service.py
-│   │   │   ├── integration_service.py
-│   │   │   └── billing_service.py
-│   │   ├── tasks/
-│   │   │   ├── email_tasks.py
-│   │   │   ├── report_tasks.py
-│   │   │   ├── analytics_tasks.py
-│   │   │   └── cleanup_tasks.py
-│   │   ├── core/
-│   │   │   ├── security.py
-│   │   │   ├── permissions.py
-│   │   │   ├── exceptions.py
-│   │   │   └── middleware.py
-│   │   └── utils/
-│   │       ├── s3.py
-│   │       ├── kinesis.py
-│   │       ├── pdf_generator.py
-│   │       └── excel_generator.py
-│   └── tests/
-│       ├── conftest.py
-│       ├── test_surveys.py
-│       ├── test_responses.py
-│       ├── test_analytics.py
-│       └── test_auth.py
-├── frontend/
-│   ├── .env.example
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tsconfig.json
-│   ├── public/
-│   │   └── manifest.json
-│   ├── src/
-│   │   ├── main.tsx
-│   │   ├── App.tsx
-│   │   ├── store/
-│   │   │   ├── authStore.ts
-│   │   │   ├── surveyStore.ts
-│   │   │   └── workspaceStore.ts
-│   │   ├── pages/
-│   │   │   ├── auth/
-│   │   │   ├── builder/
-│   │   │   ├── dashboard/
-│   │   │   ├── analytics/
-│   │   │   ├── reports/
-│   │   │   ├── contacts/
-│   │   │   ├── templates/
-│   │   │   └── settings/
-│   │   ├── components/
-│   │   │   ├── builder/
-│   │   │   │   ├── DragDropCanvas.tsx
-│   │   │   │   ├── QuestionBlock.tsx
-│   │   │   │   ├── LogicEditor.tsx
-│   │   │   │   └── PreviewPane.tsx
-│   │   │   ├── analytics/
-│   │   │   │   ├── NPSChart.tsx
-│   │   │   │   ├── SentimentGauge.tsx
-│   │   │   │   ├── CrossTabTable.tsx
-│   │   │   │   └── WordCloud.tsx
-│   │   │   └── ui/
-│   │   ├── hooks/
-│   │   ├── api/
-│   │   ├── types/
-│   │   └── utils/
-│   └── tests/
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+```text
+Survey and Feedback Platform/
+├── README.md                                  ← This file — project overview and navigation
+├── traceability-matrix.md                     ← Cross-phase requirement-to-implementation linkage
+│
+├── requirements/
+│   ├── requirements-document.md              ← Functional and non-functional requirements
+│   └── user-stories.md                       ← User stories with acceptance criteria
+│
+├── analysis/
+│   ├── use-case-diagram.md                   ← Actor/use-case relationships
+│   ├── use-case-descriptions.md              ← Detailed use case specifications
+│   ├── system-context-diagram.md             ← System boundary and external actors
+│   ├── activity-diagram.md                   ← Key workflow activity flows
+│   ├── bpmn-swimlane-diagram.md              ← BPMN process flows with swimlanes
+│   ├── data-dictionary.md                    ← Canonical data entities and attributes
+│   ├── business-rules.md                     ← Enforceable business rules and exceptions
+│   └── event-catalog.md                      ← Domain events, contracts, and SLOs
+│
+├── high-level-design/
+│   ├── architecture-diagram.md               ← System architecture overview
+│   ├── c4-context-container.md               ← C4 context and container diagrams
+│   ├── data-flow-diagram.md                  ← Data flow across components
+│   ├── domain-model.md                       ← Domain entities and relationships
+│   └── system-sequence-diagram.md            ← System-level sequence flows
+│
+├── detailed-design/
+│   ├── api-design.md                         ← REST API contracts
+│   ├── c4-component.md                       ← C4 component-level design
+│   ├── class-diagram.md                      ← Class and type diagrams
+│   ├── component-diagram.md                  ← Component interaction diagram
+│   ├── erd-database-schema.md                ← Database ERD and schema definitions
+│   ├── sequence-diagram.md                   ← Detailed sequence diagrams
+│   └── state-machine-diagram.md              ← State machine for key entities
+│
 ├── infrastructure/
-│   ├── terraform/
-│   │   ├── main.tf
-│   │   ├── ecs.tf
-│   │   ├── rds.tf
-│   │   ├── elasticache.tf
-│   │   ├── cloudfront.tf
-│   │   ├── waf.tf
-│   │   └── variables.tf
-│   └── k8s/   (optional)
-├── scripts/
-│   ├── seed_data.py
-│   ├── migrate_responses.py
-│   └── backfill_analytics.py
-└── docs/
-    ├── requirements/
-    ├── high-level-design/
-    ├── detailed-design/
-    ├── analysis/
-    ├── edge-cases/
-    ├── implementation/
-    └── infrastructure/
+│   ├── cloud-architecture.md                 ← Cloud provider architecture
+│   ├── deployment-diagram.md                 ← Deployment topology
+│   └── network-infrastructure.md             ← Network layout and security groups
+│
+├── implementation/
+│   ├── c4-code-diagram.md                    ← C4 code-level diagrams
+│   ├── code-guidelines.md                    ← Coding standards and conventions
+│   └── implementation-playbook.md            ← Step-by-step build and deploy playbook
+│
+└── edge-cases/
+    ├── README.md                             ← Edge case registry and classification
+    ├── form-builder.md                      ← Form builder and survey design edge cases
+    ├── response-collection.md               ← Response submission and collection edge cases
+    ├── distribution-and-sharing.md          ← Survey distribution edge cases
+    ├── analytics-and-reporting.md           ← Analytics and report generation edge cases
+    ├── security-and-compliance.md           ← Security threats and compliance violations
+    └── operations.md                        ← Operational runbooks and incident response
 ```
 
 ---

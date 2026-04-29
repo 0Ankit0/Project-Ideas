@@ -4,53 +4,63 @@
 
 ---
 
-## Directory Structure
+## Documentation Structure
 
-```
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+```text
 Knowledge Base Platform/
-├── README.md
+├── README.md                                  ← This file — project overview and navigation
+├── traceability-matrix.md                     ← Cross-phase requirement-to-implementation linkage
+│
 ├── requirements/
-│   ├── requirements-document.md
-│   └── user-stories.md
+│   ├── requirements-document.md              ← Functional and non-functional requirements
+│   └── user-stories.md                       ← User stories with acceptance criteria
+│
 ├── analysis/
-│   ├── competitive-analysis.md
-│   ├── domain-model.md
-│   └── risk-register.md
+│   ├── use-case-diagram.md                   ← Actor/use-case relationships
+│   ├── use-case-descriptions.md              ← Detailed use case specifications
+│   ├── system-context-diagram.md             ← System boundary and external actors
+│   ├── activity-diagram.md                   ← Key workflow activity flows
+│   ├── bpmn-swimlane-diagram.md              ← BPMN process flows with swimlanes
+│   ├── data-dictionary.md                    ← Canonical data entities and attributes
+│   ├── business-rules.md                     ← Enforceable business rules and exceptions
+│   └── event-catalog.md                      ← Domain events, contracts, and SLOs
+│
 ├── high-level-design/
-│   ├── system-overview.md
-│   ├── architecture-diagram.md
-│   ├── data-flow.md
-│   └── api-contracts.md
+│   ├── architecture-diagram.md               ← System architecture overview
+│   ├── c4-context-container.md               ← C4 context and container diagrams
+│   ├── data-flow-diagram.md                  ← Data flow across components
+│   ├── domain-model.md                       ← Domain entities and relationships
+│   └── system-sequence-diagram.md            ← System-level sequence flows
+│
 ├── detailed-design/
-│   ├── content-authoring-service.md
-│   ├── search-service.md
-│   ├── ai-assistant-service.md
-│   ├── access-control-service.md
-│   ├── widget-service.md
-│   ├── analytics-service.md
-│   ├── notification-service.md
-│   ├── media-service.md
-│   ├── feedback-service.md
-│   └── workspace-service.md
+│   ├── api-design.md                         ← REST/GraphQL API contracts
+│   ├── c4-component.md                       ← C4 component-level design
+│   ├── class-diagram.md                      ← Class and type diagrams
+│   ├── component-diagram.md                  ← Component interaction diagram
+│   ├── erd-database-schema.md                ← Database ERD and schema definitions
+│   ├── sequence-diagram.md                   ← Detailed sequence diagrams
+│   └── state-machine-diagram.md              ← State machine for key entities
+│
 ├── infrastructure/
-│   ├── aws-architecture.md
-│   ├── docker-compose.yml
-│   ├── ecs-task-definitions.md
-│   ├── rds-schema.md
-│   ├── elasticsearch-mappings.md
-│   ├── redis-cache-strategy.md
-│   └── ci-cd-pipeline.md
-├── edge-cases/
-│   ├── content-conflicts.md
-│   ├── search-edge-cases.md
-│   ├── ai-failure-modes.md
-│   └── access-control-edge-cases.md
-└── implementation/
-    ├── backend-setup.md
-    ├── frontend-setup.md
-    ├── database-migrations.md
-    ├── search-indexing.md
-    └── deployment-runbook.md
+│   ├── cloud-architecture.md                 ← Cloud provider architecture
+│   ├── deployment-diagram.md                 ← Deployment topology
+│   └── network-infrastructure.md             ← Network layout and security groups
+│
+├── implementation/
+│   ├── c4-code-diagram.md                    ← C4 code-level diagrams
+│   ├── code-guidelines.md                    ← Coding standards and conventions
+│   └── implementation-playbook.md            ← Step-by-step build and deploy playbook
+│
+└── edge-cases/
+    ├── README.md                             ← Edge case registry and classification
+    ├── content-authoring.md                 ← Content authoring and versioning edge cases
+    ├── search-and-retrieval.md              ← Search and retrieval edge cases
+    ├── access-and-permissions.md            ← Access control edge cases
+    ├── ai-assistant.md                      ← AI assistant failure modes
+    ├── security-and-compliance.md           ← Security threats and compliance violations
+    └── operations.md                        ← Operational runbooks and incident response
 ```
 
 ---

@@ -596,3 +596,61 @@ Kinesis PutRecord failures are retried with exponential backoff (50 ms, 200 ms, 
 failure a Celery fallback task replays the event. The HTTP response to the respondent is never
 blocked by event emission failure — responses are committed first. P99 latency SLAs: 
 `response.submitted` → DynamoDB counter ≤ 2 s; `response.submitted` → webhook dispatch ≤ 5 s.
+
+---
+
+## Contract Conventions
+
+All Survey and Feedback Platform events follow these conventions:
+
+- **Naming pattern**: `{domain}.{verb_past_tense}` (e.g., `survey.published`, `response.submitted`)
+- **Transport**: Celery task queue (Redis broker); SNS for cross-service fan-out
+- **Schema**: JSON with `event_id` (UUID v4), `event_type`, `workspace_id`, `aggregate_id`, `occurred_at` (ISO 8601), `actor_id`, `schema_version`, `payload`
+- **Idempotency**: All consumers implement idempotency keyed on `event_id`; duplicate events are silently discarded
+- **Retention**: Events retained 90 days; DLQ messages retained 14 days
+
+## Domain Events
+
+| Event Name | Trigger | Publisher | Consumers | Key Payload Fields |
+|---|---|---|---|---|
+| `survey.published` | Survey transitions to ACTIVE | Survey Service | Distribution service, notification, analytics | survey_id, workspace_id, published_by, published_at |
+| `survey.closed` | Survey reaches quota, expiry, or manual close | Survey Service | Analytics finaliser, notification | survey_id, close_reason, total_responses |
+| `response.submitted` | Respondent completes submission | Response Service | Analytics aggregator, quota counter, notification | response_id, survey_id, respondent_token, submitted_at |
+| `distribution.link_created` | Survey distribution link generated | Distribution Service | Email/SMS sender, analytics | distribution_id, survey_id, channel, created_by |
+| `distribution.link_deactivated` | Distribution link manually deactivated | Distribution Service | Analytics, audit | distribution_id, deactivated_by, reason |
+| `analytics.report_generated` | Scheduled or on-demand report completes | Analytics Service | Notification service, storage | report_id, survey_id, format, download_url |
+| `workspace.quota_exceeded` | Monthly response quota hit | Quota Service | Notification, survey auto-pause | workspace_id, plan_id, quota_limit, current_count |
+
+## Publish and Consumption Sequence
+
+```mermaid
+sequenceDiagram
+    participant OWNER as Survey Owner
+    participant SS as Survey Service
+    participant RS as Response Service
+    participant CELERY as Celery Queue
+    participant AA as Analytics Aggregator
+    participant NS as Notification Service
+    participant QS as Quota Service
+
+    OWNER->>SS: Publish survey
+    SS->>CELERY: Emit survey.published
+    CELERY-->>NS: Notify distribution channels
+
+    Note over RS,CELERY: Respondent submits response
+    RS->>CELERY: Emit response.submitted
+    CELERY-->>AA: Aggregate response data
+    CELERY-->>QS: Increment response counter
+    QS-->>CELERY: Emit workspace.quota_exceeded if limit hit
+    CELERY-->>NS: Notify owner of quota warning
+```
+
+## Operational SLOs
+
+| Event | Max Processing Latency | Retry Policy | DLQ Retention |
+|---|---|---|---|
+| `response.submitted` | 2 s (counter + analytics trigger) | 5 attempts, 1s/2s/4s/8s/16s | 14 days |
+| `survey.published` | 3 s (distribution channels notified) | 3 attempts, exponential | 14 days |
+| `survey.closed` | 5 s (analytics finalised) | 3 attempts | 30 days |
+| `workspace.quota_exceeded` | 1 s (owner notification) | 5 attempts, 1s backoff | 7 days |
+| `analytics.report_generated` | 10 s (download link sent) | 3 attempts | 7 days |

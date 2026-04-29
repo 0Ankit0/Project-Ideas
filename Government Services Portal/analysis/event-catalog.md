@@ -502,3 +502,61 @@ All event consumers are idempotent. Duplicate event delivery (at-least-once deli
 
 ### Section 4 — PII in Event Payloads
 Event payloads must not include raw NID numbers, PAN, or full bank account numbers. All sensitive identifiers are masked (`phone_masked`, `email_masked`) or referenced by UUID. The `AuditLogService` consumer may access the full entity record via UUID for internal logging purposes.
+
+---
+
+## Contract Conventions
+
+All Government Services Portal events follow these conventions:
+
+- **Naming pattern**: `{domain}.{verb_past_tense}` (e.g., `citizen.registered`, `application.approved`)
+- **Transport**: Internal message broker (Redis Streams); mirrored to SNS for cross-service consumption
+- **Schema**: JSON envelope with `event_id` (UUID v4), `event_type`, `aggregate_id`, `occurred_at` (ISO 8601), `schema_version`, `actor_id` (citizen or staff user), `payload`
+- **Ordering**: Events within the same `aggregate_id` are strictly ordered; cross-aggregate ordering is not guaranteed
+- **Retention**: 90 days in event store; DLQ messages retained 14 days
+
+## Domain Events
+
+| Event Name | Trigger | Publisher | Consumers | Key Payload Fields |
+|---|---|---|---|---|
+| `citizen.registered` | Citizen completes NID verification | Identity Service | Profile service, notification | citizen_id, nid_hash, registered_at |
+| `application.submitted` | Citizen submits service application | Application Service | Document validator, fee service | application_id, service_type, citizen_id |
+| `application.status_changed` | Application moves to new state | Workflow Engine | Notification service, audit | application_id, old_status, new_status, changed_by |
+| `fee_invoice.generated` | Fee computed for application | Fee Service | Payment gateway, notification | invoice_id, application_id, amount, currency |
+| `payment.completed` | Payment gateway confirms receipt | Payment Service | Application workflow, audit | payment_id, invoice_id, gateway_reference |
+| `certificate.issued` | Application approved and cert generated | Certificate Service | Citizen document wallet, notification | certificate_id, application_id, issued_at |
+| `document.virus_scan.failed` | Uploaded document fails virus scan | Document Service | Application workflow, alert | document_id, application_id, threat_type |
+
+## Publish and Consumption Sequence
+
+```mermaid
+sequenceDiagram
+    participant CITIZEN as Citizen Portal
+    participant APP as Application Service
+    participant FEE as Fee Service
+    participant PAY as Payment Gateway
+    participant CERT as Certificate Service
+    participant NOTIF as Notification Service
+
+    CITIZEN->>APP: Submit application
+    APP->>APP: Publish application.submitted
+    APP-->>FEE: Compute fee
+    FEE->>FEE: Publish fee_invoice.generated
+    FEE-->>NOTIF: Send payment reminder
+    CITIZEN->>PAY: Make payment
+    PAY->>PAY: Publish payment.completed
+    PAY-->>APP: Advance to UNDER_REVIEW
+    APP->>CERT: On approval, issue certificate
+    CERT->>CERT: Publish certificate.issued
+    CERT-->>NOTIF: Notify citizen
+```
+
+## Operational SLOs
+
+| Event | Max Delivery Latency | Retry Policy | DLQ Retention |
+|---|---|---|---|
+| `citizen.registered` | 2 s | 3 attempts, 1s/2s/4s | 14 days |
+| `application.submitted` | 3 s | 5 attempts, exponential | 90 days |
+| `payment.completed` | 500 ms | 5 attempts, no backoff | 90 days |
+| `certificate.issued` | 5 s | 3 attempts | 90 days |
+| `application.status_changed` | 2 s | 3 attempts | 30 days |

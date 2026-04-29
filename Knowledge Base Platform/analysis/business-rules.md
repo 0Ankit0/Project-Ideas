@@ -431,3 +431,45 @@ serving workspace content.
    and is excluded from uptime SLA calculations.
 4. AI assistant unavailability caused by OpenAI service outages is excluded from the platform
    uptime SLA.
+
+---
+
+## Enforceable Rules
+
+The following rules are enforced by the Knowledge Base Platform at runtime:
+
+1. An article in PUBLISHED state cannot be deleted; it must be ARCHIVED first, with a minimum 30-day archive period before permanent deletion.
+2. Only users with EDITOR or ADMIN role may publish articles; AUTHORS can only submit for review.
+3. A workspace's published article count cannot exceed the plan limit; publish attempts beyond the limit return a 402 Payment Required response.
+4. Search indexing must complete within 60 seconds of article publish; articles not indexed within 120 seconds trigger an alerting event.
+5. AI assistant responses must include a citation list linking to the source articles used; responses without citations are blocked before delivery.
+6. Article version history is immutable; versions cannot be deleted, only superseded by a newer version.
+7. Cross-workspace article sharing requires explicit sharing permission granted by the source workspace admin.
+
+## Rule Evaluation Pipeline
+
+```mermaid
+flowchart TD
+    A[Author Action] --> B{Role Check\nAuthor / Editor / Admin?}
+    B -->|Insufficient role| C[Reject: 403 Forbidden]
+    B -->|Sufficient| D{Action Type?}
+    D -->|Publish| E{Plan Limit Reached?}
+    E -->|Yes| F[Reject: 402 Payment Required]
+    E -->|No| G{Reviewer Workflow Required?}
+    G -->|Regulated workspace| H[Create Review Task]
+    G -->|Standard workspace| I[Publish Immediately]
+    H --> J{Reviewer Approves?}
+    J -->|Approved| I
+    J -->|Changes requested| K[Return to DRAFT]
+    I --> L[Trigger Search Indexing]
+    L --> M[Emit article.published event]
+```
+
+## Exception and Override Handling
+
+| Exception Scenario | Override Mechanism | Who Can Override | Audit |
+|---|---|---|---|
+| Published article must be deleted urgently (legal takedown) | Admin initiates legal-delete workflow with takedown notice reference; bypasses archive period | Workspace ADMIN + Platform SUPER_ADMIN | Takedown notice reference logged |
+| Plan limit reached but article publication is business-critical | Admin grants a one-time publish override with 24-hour TTL | Workspace ADMIN | Override logged with expiry timestamp |
+| AI assistant cites incorrect source (hallucination) | User flags response; support team can retroactively mark AI response as `FLAGGED_INACCURATE` | Support team | Flag reason + reporter logged |
+| Search index out of sync after infrastructure failure | Admin triggers full re-index via admin panel; in-progress re-index shown as banner to readers | Platform SUPER_ADMIN | Re-index job ID logged |

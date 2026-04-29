@@ -6,7 +6,7 @@
 
 ## Table of Contents
 
-1. [Directory Structure](#directory-structure)
+1. [Documentation Structure](#documentation-structure)
 2. [Key Features](#key-features)
 3. [Primary Roles](#primary-roles)
 4. [Getting Started](#getting-started)
@@ -16,52 +16,63 @@
 
 ---
 
-## Directory Structure
+## Documentation Structure
 
-```
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
+
+```text
 Government Services Portal/
-├── README.md
+├── README.md                                  ← This file — project overview and navigation
+├── traceability-matrix.md                     ← Cross-phase requirement-to-implementation linkage
+│
 ├── requirements/
-│   ├── requirements-document.md
-│   └── user-stories.md
+│   ├── requirements-document.md              ← Functional and non-functional requirements
+│   └── user-stories.md                       ← User stories with acceptance criteria
+│
 ├── analysis/
-│   ├── domain-model.md
-│   ├── data-flow-diagrams.md
-│   ├── risk-register.md
-│   └── stakeholder-map.md
+│   ├── use-case-diagram.md                   ← Actor/use-case relationships
+│   ├── use-case-descriptions.md              ← Detailed use case specifications
+│   ├── system-context-diagram.md             ← System boundary and external actors
+│   ├── activity-diagram.md                   ← Key workflow activity flows
+│   ├── bpmn-swimlane-diagram.md              ← BPMN process flows with swimlanes
+│   ├── data-dictionary.md                    ← Canonical data entities and attributes
+│   ├── business-rules.md                     ← Enforceable business rules and exceptions
+│   └── event-catalog.md                      ← Domain events, contracts, and SLOs
+│
 ├── high-level-design/
-│   ├── system-architecture.md
-│   ├── api-design.md
-│   ├── database-schema.md
-│   ├── auth-flows.md
-│   └── integration-map.md
+│   ├── architecture-diagram.md               ← System architecture overview
+│   ├── c4-context-container.md               ← C4 context and container diagrams
+│   ├── data-flow-diagram.md                  ← Data flow across components
+│   ├── domain-model.md                       ← Domain entities and relationships
+│   └── system-sequence-diagram.md            ← System-level sequence flows
+│
 ├── detailed-design/
-│   ├── citizen-identity-module.md
-│   ├── service-catalog-module.md
-│   ├── workflow-engine.md
-│   ├── permit-license-module.md
-│   ├── payment-module.md
-│   ├── document-vault-module.md
-│   ├── status-tracking-module.md
-│   ├── department-admin-module.md
-│   ├── grievance-module.md
-│   └── accessibility-multilingual.md
+│   ├── api-design.md                         ← REST API contracts
+│   ├── c4-component.md                       ← C4 component-level design
+│   ├── class-diagram.md                      ← Class and type diagrams
+│   ├── component-diagram.md                  ← Component interaction diagram
+│   ├── erd-database-schema.md                ← Database ERD and schema definitions
+│   ├── sequence-diagram.md                   ← Detailed sequence diagrams
+│   └── state-machine-diagram.md              ← State machine for key entities
+│
 ├── infrastructure/
-│   ├── aws-architecture.md
-│   ├── deployment-guide.md
-│   ├── monitoring-alerting.md
-│   ├── disaster-recovery.md
-│   └── security-hardening.md
+│   ├── cloud-architecture.md                 ← Cloud provider architecture
+│   ├── deployment-diagram.md                 ← Deployment topology
+│   └── network-infrastructure.md             ← Network layout and security groups
+│
 ├── implementation/
-│   ├── coding-standards.md
-│   ├── testing-strategy.md
-│   ├── ci-cd-pipeline.md
-│   └── performance-testing.md
+│   ├── c4-code-diagram.md                    ← C4 code-level diagrams
+│   ├── code-guidelines.md                    ← Coding standards and conventions
+│   └── implementation-playbook.md            ← Step-by-step build and deploy playbook
+│
 └── edge-cases/
-    ├── auth-edge-cases.md
-    ├── payment-edge-cases.md
-    ├── workflow-edge-cases.md
-    └── document-edge-cases.md
+    ├── README.md                             ← Edge case registry and classification
+    ├── citizen-identity.md                  ← Identity verification and auth edge cases
+    ├── application-workflows.md             ← Application state machine edge cases
+    ├── payments-and-fees.md                 ← Payment processing and fee edge cases
+    ├── notifications.md                     ← Notification delivery edge cases
+    ├── security-and-compliance.md           ← Security threats and compliance violations
+    └── operations.md                        ← Operational runbooks and incident response
 ```
 
 ---

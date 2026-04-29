@@ -111,6 +111,12 @@ QUALITY_ENFORCED_PROJECTS = {
     # New projects — wave 3
     "Application Hosting Platform",
     "Order Management and Delivery System",
+    # New projects — wave 4
+    "API Gateway and Developer Portal",
+    "EMIS",
+    "Government Services Portal",
+    "Knowledge Base Platform",
+    "Survey and Feedback Platform",
 }
 
 SINGULAR_TEMPLATE = {
@@ -835,6 +841,72 @@ PROJECTS: Dict[str, Dict[str, List[str]]] = {
             "delivery-and-proof.md",
             "returns-and-refunds.md",
             "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    # ── New projects — wave 4 ─────────────────────────────────────────────────
+    "API Gateway and Developer Portal": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "routing-and-traffic.md",
+            "authentication-and-keys.md",
+            "rate-limiting-and-quotas.md",
+            "developer-portal.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "EMIS": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "admission-and-application.md",
+            "enrollment-and-registration.md",
+            "academic-operations.md",
+            "finance-and-payments.md",
+            "graduation-discipline-standing.md",
+            "notifications.md",
+            "recruitment-transfer-scholarship-facility.md",
+            "api-and-ui.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Government Services Portal": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "citizen-identity.md",
+            "application-workflows.md",
+            "payments-and-fees.md",
+            "notifications.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Knowledge Base Platform": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "content-authoring.md",
+            "search-and-retrieval.md",
+            "access-and-permissions.md",
+            "ai-assistant.md",
+            "security-and-compliance.md",
+            "operations.md",
+        ],
+    },
+    "Survey and Feedback Platform": {
+        **SINGULAR_TEMPLATE,
+        "edge-cases": [
+            "README.md",
+            "form-builder.md",
+            "response-collection.md",
+            "distribution-and-sharing.md",
+            "analytics-and-reporting.md",
             "security-and-compliance.md",
             "operations.md",
         ],

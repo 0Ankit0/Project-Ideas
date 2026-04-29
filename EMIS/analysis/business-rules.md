@@ -940,3 +940,42 @@ Overrides allow authorized actors to bypass specific rules in documented excepti
 - The Dean's List is generated automatically at semester closure for students meeting all eligibility criteria (GPA ≥ 3.50, ≥ 12 credit hours, no incompletes, no disciplinary sanctions); there is no nomination or manual addition process.
 - Students who exceed the maximum time-to-degree (1.5× standard program duration) must petition the Academic Board for an extension; a maximum of one extension (2 semesters) may be granted.
 - Academic Suspension and Dismissal decisions trigger automatic enrollment blocks and notifications to the student's academic advisor and department head.
+
+---
+
+## Enforceable Rules
+
+The following core rules are enforced across all EMIS domains:
+
+1. A student cannot be enrolled in overlapping CourseSection timeslots within the same academic term.
+2. A grade submission requires the submitting faculty member to be assigned as the instructor of record for that CourseSection.
+3. Fee invoices are system-generated; portal users cannot manually create or edit invoice amounts.
+4. A student's academic standing is automatically updated to PROBATION if their CGPA falls below the program threshold at term close.
+5. An academic term cannot be closed if any enrolled CourseSection still has pending grade submissions.
+6. Document uploads for admission applications must complete virus scanning before the application status advances beyond DOCUMENTS_SUBMITTED.
+7. Scholarship disbursements require Dean-level approval if the amount exceeds the programme's single-disbursement threshold.
+
+## Rule Evaluation Pipeline
+
+```mermaid
+flowchart TD
+    A[User Action\nor System Event] --> B{Authentication\nand Role Check}
+    B -->|Unauthenticated| C[Reject: 401]
+    B -->|Insufficient role| D[Reject: 403]
+    B -->|Authorised| E{Domain Rule\nEvaluation}
+    E -->|Enrollment conflict| F[Reject: timetable clash]
+    E -->|Grade: wrong instructor| G[Reject: not instructor of record]
+    E -->|Fee override attempt| H[Reject: system-computed only]
+    E -->|All rules pass| I[Execute Action]
+    I --> J[Emit Domain Event]
+    J --> K[Update Audit Log]
+```
+
+## Exception and Override Handling
+
+| Exception Scenario | Override Mechanism | Who Can Override | Audit |
+|---|---|---|---|
+| Student needs enrolment in timetable-clashing sections (cross-campus programme) | Dean approval via Override Request workflow | Dean role | Override request ID logged |
+| Grade correction after term close | Registrar-initiated Grade Amendment form with original and corrected values | Registrar + Head of Department | Amendment record with reason |
+| Fee waiver for financial hardship | Scholarship Office submits Waiver Request; system generates adjusted invoice | Scholarship Officer + Finance Head | Waiver voucher number logged |
+| Emergency term extension (natural disaster) | Academic Calendar admin extends term end date; all downstream deadlines shift automatically | Academic Administrator | Logged with authorisation reference |

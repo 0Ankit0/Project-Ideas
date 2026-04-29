@@ -598,3 +598,44 @@ compliance.
 Availability is measured at `POST /api/v1/responses` returning HTTP 2xx within 10 s from three
 synthetic probes (US-East, EU-West, AP-Southeast). Maintenance windows are excluded from SLA
 calculations. Credits are issued per the subscription SLA addendum for verified breaches.
+
+---
+
+## Enforceable Rules
+
+The following rules are enforced by the Survey and Feedback Platform at runtime:
+
+1. A survey must contain at least one question before it can be published; publish attempts on empty surveys return a validation error.
+2. Response collection stops automatically when the survey's `response_quota` is reached or `expires_at` passes; further submissions return 410 Gone.
+3. Branching logic rules are evaluated in order; the first matching condition wins and subsequent conditions for the same question are skipped.
+4. Response data cannot be deleted by the survey owner; anonymisation is available but raw deletion requires a GDPR erasure request processed by support.
+5. A distribution link can only be deactivated, not deleted; deactivation records the deactivating user and timestamp for audit purposes.
+6. NPS scores must be integers in the range 0–10; scores outside this range are rejected at submission time with a 422 validation error.
+7. Analytics aggregation results are cached for 5 minutes; real-time response counts are served from a Redis counter, not from the aggregation cache.
+
+## Rule Evaluation Pipeline
+
+```mermaid
+flowchart TD
+    A[Respondent Submits Response] --> B{Distribution Link Active?}
+    B -->|Deactivated or expired| C[Return 410 Gone]
+    B -->|Active| D{Response Quota Reached?}
+    D -->|Quota full| E[Return 410 Gone\nquota_exceeded]
+    D -->|Within quota| F{Authentication Required?}
+    F -->|Yes and not authenticated| G[Redirect to Login]
+    F -->|No or authenticated| H{Validate All Responses}
+    H -->|Validation failure| I[Return 422 Unprocessable\nwith field errors]
+    H -->|Valid| J[Persist ResponseSession]
+    J --> K[Increment Redis Response Counter]
+    K --> L[Emit response.submitted event]
+    L --> M[Trigger Analytics Aggregation\nasync]
+```
+
+## Exception and Override Handling
+
+| Exception Scenario | Override Mechanism | Who Can Override | Audit |
+|---|---|---|---|
+| Respondent submitted incorrect response (data entry error) | Respondent can edit their own response within 24 hours if re-edit is enabled on the survey | Survey Owner enables re-edit flag | Edit log with before/after values |
+| Survey expired but late responses are still valid (grace period) | Survey owner sets `grace_period_hours` (max 72) before closing; late responses accepted in grace window | Survey Owner | Grace period activation logged |
+| Response quota hit but legitimate respondent group has not yet completed | Admin grants a one-time quota extension with new limit and reason | Workspace ADMIN | Extension logged with approver |
+| GDPR erasure request for individual respondent | Support team anonymises ResponseSession (nullify PII fields, retain aggregates) | Platform Support team | Erasure reference number logged |

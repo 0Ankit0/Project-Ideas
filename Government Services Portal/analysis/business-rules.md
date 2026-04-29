@@ -431,3 +431,45 @@ This document defines the authoritative business rules governing the Government 
 2. Scheduled maintenance windows are on the second Sunday of each month from 2:00 AM to 4:00 AM IST.
 3. During maintenance, a pre-announced downtime banner is displayed from 24 hours before.
 4. Emergency unplanned outages must be resolved within 4 hours; a status update published every 30 minutes.
+
+---
+
+## Enforceable Rules
+
+The following rules are enforced by the Government Services Portal at runtime:
+
+1. A citizen must complete NID verification before submitting any service application; unverified accounts are restricted to browsing only.
+2. A citizen cannot have more than one active (non-terminal) application for the same service type at any time.
+3. Fee payment is mandatory before an application status can advance to UNDER_REVIEW; applications without payment are held in AWAITING_PAYMENT state.
+4. Document uploads must pass automated virus scanning and format validation (allowed types per service definition) before the application can proceed.
+5. Application status transitions must follow the configured state machine; manual overrides by department staff require supervisor approval.
+6. Certificates are generated only when application status is APPROVED; backdating of certificate issue dates is prohibited.
+7. All citizen personal data access by department staff is logged with staff identity, timestamp, and purpose code for GDPR compliance.
+
+## Rule Evaluation Pipeline
+
+```mermaid
+flowchart TD
+    A[Citizen Action\nor Staff Action] --> B{Identity Verified?}
+    B -->|No| C[Redirect to NID Verification]
+    B -->|Yes| D{Active Duplicate\nApplication?}
+    D -->|Duplicate exists| E[Reject: duplicate application]
+    D -->|No duplicate| F{Documents Valid?}
+    F -->|Invalid format or virus| G[Reject: document failure]
+    F -->|Valid| H{Fee Paid?}
+    H -->|Not paid| I[Hold in AWAITING_PAYMENT]
+    H -->|Paid| J[Advance to UNDER_REVIEW]
+    J --> K{Department Review}
+    K -->|Approved| L[Generate Certificate]
+    K -->|Rejected| M[Notify Citizen]
+    K -->|Return for correction| N[Notify Citizen\nallow resubmission]
+```
+
+## Exception and Override Handling
+
+| Exception Scenario | Override Mechanism | Who Can Override | Audit |
+|---|---|---|---|
+| Citizen cannot complete NID verification (system offline) | Department officer creates a temporary manual verification record with supporting physical document reference | Department Officer + Supervisor | Manual verification log with officer ID |
+| Duplicate application needed (genuine re-application after withdrawal) | Supervisor unlocks new application submission via Override Request | Department Supervisor | Override request ID + justification |
+| Fee waiver for below-poverty-line citizen | Welfare officer applies BPL waiver code; system marks invoice as WAIVED | Welfare Officer | Waiver log with BPL certificate reference |
+| Certificate backdating for historical correction | Registrar submits backdating request with court order reference | Registrar + Legal Officer | Legal reference number logged |

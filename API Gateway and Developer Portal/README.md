@@ -10,57 +10,64 @@ Built on Node.js 20 + Fastify for raw throughput, Next.js 14 (App Router) for th
 
 ---
 
-## Directory Structure
+## Documentation Structure
+
+Project root artifact: [`traceability-matrix.md`](./traceability-matrix.md) provides cross-phase requirement-to-implementation linkage.
 
 ```text
 API Gateway and Developer Portal/
-├── README.md
+├── README.md                                  ← This file — project overview and navigation
+├── traceability-matrix.md                     ← Cross-phase requirement-to-implementation linkage
+│
 ├── requirements/
-│   ├── requirements-document.md
-│   └── user-stories.md
-├── design/
-│   ├── system-architecture.md
-│   ├── database-schema.md
-│   ├── api-design.md
-│   └── security-model.md
-├── gateway/
-│   ├── overview.md
-│   ├── plugin-architecture.md
-│   ├── routing.md
-│   └── middleware.md
-├── auth/
-│   ├── api-key-management.md
-│   ├── oauth2-flows.md
-│   └── jwt-validation.md
-├── rate-limiting/
-│   ├── rate-limiting-design.md
-│   ├── quota-management.md
-│   └── throttling-policies.md
-├── transformation/
-│   ├── request-transformation.md
-│   ├── response-transformation.md
-│   └── protocol-translation.md
-├── developer-portal/
-│   ├── portal-overview.md
-│   ├── api-catalog.md
-│   ├── onboarding-flow.md
-│   └── developer-dashboard.md
-├── analytics/
-│   ├── metrics-and-monitoring.md
-│   ├── distributed-tracing.md
-│   └── reporting.md
-├── subscription-plans/
-│   ├── plan-management.md
-│   ├── billing-integration.md
-│   └── entitlements.md
-├── webhooks/
-│   ├── webhook-management.md
-│   └── delivery-guarantees.md
-├── versioning/
-│   ├── api-versioning-strategy.md
-│   └── deprecation-policy.md
-└── admin/
-    └── admin-console.md
+│   ├── requirements-document.md              ← Functional and non-functional requirements
+│   └── user-stories.md                       ← User stories with acceptance criteria
+│
+├── analysis/
+│   ├── use-case-diagram.md                   ← Actor/use-case relationships
+│   ├── use-case-descriptions.md              ← Detailed use case specifications
+│   ├── system-context-diagram.md             ← System boundary and external actors
+│   ├── activity-diagram.md                   ← Key workflow activity flows
+│   ├── bpmn-swimlane-diagram.md              ← BPMN process flows with swimlanes
+│   ├── data-dictionary.md                    ← Canonical data entities and attributes
+│   ├── business-rules.md                     ← Enforceable business rules and exceptions
+│   └── event-catalog.md                      ← Domain events, contracts, and SLOs
+│
+├── high-level-design/
+│   ├── architecture-diagram.md               ← System architecture overview
+│   ├── c4-context-container.md               ← C4 context and container diagrams
+│   ├── data-flow-diagram.md                  ← Data flow across components
+│   ├── domain-model.md                       ← Domain entities and relationships
+│   └── system-sequence-diagram.md            ← System-level sequence flows
+│
+├── detailed-design/
+│   ├── api-design.md                         ← REST/gRPC API contracts
+│   ├── c4-component.md                       ← C4 component-level design
+│   ├── class-diagram.md                      ← Class and type diagrams
+│   ├── component-diagram.md                  ← Component interaction diagram
+│   ├── erd-database-schema.md                ← Database ERD and schema definitions
+│   ├── sequence-diagram.md                   ← Detailed sequence diagrams
+│   └── state-machine-diagram.md              ← State machine for key entities
+│
+├── infrastructure/
+│   ├── cloud-architecture.md                 ← Cloud provider architecture
+│   ├── deployment-diagram.md                 ← Deployment topology
+│   └── network-infrastructure.md             ← Network layout and security groups
+│
+├── implementation/
+│   ├── c4-code-diagram.md                    ← C4 code-level diagrams
+│   ├── code-guidelines.md                    ← Coding standards and conventions
+│   └── implementation-playbook.md            ← Step-by-step build and deploy playbook
+│
+└── edge-cases/
+    ├── README.md                             ← Edge case registry and classification
+    ├── routing-and-traffic.md               ← Routing failures and traffic anomalies
+    ├── authentication-and-keys.md           ← Auth failures and key lifecycle edge cases
+    ├── rate-limiting-and-quotas.md          ← Rate limit and quota enforcement edge cases
+    ├── developer-portal.md                  ← Developer portal failure modes
+    ├── api-and-ui.md                        ← API and UI layer resilience edge cases
+    ├── security-and-compliance.md           ← Security threats and compliance violations
+    └── operations.md                        ← Operational runbooks and incident response
 ```
 
 ---
