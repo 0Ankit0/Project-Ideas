@@ -1,53 +1,63 @@
 # Token Revocation Edge Cases
 
+Token revocation is the critical control path that turns suspension, logout, reuse
+detection, and break-glass expiry into enforced reality. The platform must prefer
+security over convenience when ordering, lag, or cache health becomes uncertain.
+
+## Revocation Propagation Sequence
+
+```mermaid
+sequenceDiagram
+    participant AdminAPI as AdminAPI
+    participant TokenSvc as TokenService
+    participant SessionStore as SessionStore
+    participant FamilyRepo as FamilyRepo
+    participant Outbox as Outbox
+    participant Relay as OutboxRelay
+    participant Bus as EventBus
+    participant Gateway as GatewayFleet
+    participant PDP as PolicyCache
+    participant Audit as AuditConsumer
+
+    AdminAPI->>TokenSvc: POST revoke session
+    TokenSvc->>SessionStore: set session revoked
+    TokenSvc->>FamilyRepo: mark family revoked
+    TokenSvc->>Outbox: insert token.family.revoked.v1
+    Relay->>Outbox: poll committed row
+    Relay->>Bus: publish token.family.revoked.v1
+    Bus-->>Gateway: deliver revocation event
+    Gateway->>Gateway: evict token cache entries
+    Bus-->>PDP: deliver revocation event
+    PDP->>PDP: evict decision cache entries
+    Bus-->>Audit: deliver revocation event
+    Audit->>Audit: persist immutable envelope
+```
+
 ## Failure Modes
-- Token revoked in source store but still accepted by stale edge cache.
-- Refresh token reuse race during mobile reconnect.
-- Out-of-order event delivery for revoke and rotate actions.
+
+| Failure mode | Risk | Required handling |
+|---|---|---|
+| Revoked token still accepted by stale gateway cache | Stale authorization | Gateway compares local watermark with control watermark and fails closed on privileged requests |
+| Refresh reuse race during reconnect | Parallel token minting | Serializable family update plus single winner rule |
+| Out-of-order rotate and revoke delivery | Older rotate event reactivates scope | Consumers ignore events below current family generation or watermark |
+| Duplicate revocation event | Repeated cache purge and noisy alerting | Idempotent consumer keyed by `event_id` and `family_id` |
+| Regional failover before revocation replay completes | Lost revoke state | Block refresh exchange until replay catches up |
+| Gateway in degraded mode with bus disconnect | Accepting revoked tokens for too long | Use short-lived local bloom filter, watermark age alarm, and privileged-path fail closed |
 
 ## Mitigations
-- Cache invalidation events prioritized and retried with bounded exponential backoff.
-- Token family version checks on every refresh operation.
-- Revocation watermark per gateway instance to prevent stale acceptance.
+- Revocation events are tier-1 messages with commit-to-bus target `<= 100 ms` and dedicated consumer groups.
+- Each token family stores a 64-bit `generation` and `family_state`; refresh processing must compare both before issuing a replacement token.
+- Every gateway keeps a per-tenant revocation watermark and reports `lag_ms`; stale gateways are drained from load balancing if lag exceeds the policy threshold.
+- Session termination, identity suspension, and break-glass expiry all call the same family-revocation projector so behavior stays consistent.
+- Introspection and policy caches are invalidated from the same event to prevent a revoked token from being denied in one layer and allowed in another.
 
 ## Validation
-- Chaos test: simulate cache partition and verify deny behavior for privileged APIs.
-- SLO: revocation propagation P95 < 5s, P99 < 15s.
-## Cross-Cutting Implementation Baselines
+- Chaos tests simulate event-bus lag, duplicate delivery, out-of-order replay, Redis partition, and region failover while checking privileged APIs deny revoked tokens.
+- Synthetic probes mint a session, revoke it, and verify denial at gateways, PDP cache, and any relying-party introspection endpoint.
+- Load tests verify revocation flood handling during bulk suspension without starving step-up or audit workloads.
+- Target SLO is `P95 < 5 s` and `P99 < 10 s` from durable revoke commit to universal enforcement, with stricter `P95 < 3 s` for privileged admin surfaces.
 
-### Token and Session Standards
-- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
-- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
-- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
-- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
-
-### Policy Evaluation Standards
-- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
-- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
-- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
-- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
-
-### Identity Lifecycle Standards
-- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
-- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
-- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
-- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
-
-### Federation and SCIM Assumptions
-- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
-- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
-- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
-- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
-
-### Threat Model and Auditability
-- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
-- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
-- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
-- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
-
-## Implementation Deep-Dive Addendum
-
-### Revocation Hardening
-- Revocation tokens include monotonic sequence number per session family.
-- Gateway sidecar maintains short-lived revocation bloom filter for degraded mode.
-- Revocation correctness is continuously validated with synthetic probes.
+## Revocation Hardening
+- Gateways maintain a short-lived revocation bloom filter for degraded mode, but authoritative session or family state always wins when reachable.
+- The platform records revocation watermark gaps, consumer replay counts, and family-generation anomalies as security metrics.
+- If revocation correctness cannot be proven, the platform reduces token lifetime, pauses refresh exchange, and denies privileged traffic until state is trustworthy again.

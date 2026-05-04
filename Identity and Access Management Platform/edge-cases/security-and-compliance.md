@@ -1,52 +1,45 @@
 # Security and Compliance Edge Cases
 
+Security and compliance edge cases focus on situations where the platform must contain a
+threat, preserve evidence, and still prove to auditors that the controls worked as designed.
+
 ## High-Risk Scenarios
-- Suspicious token mint surge from single client credential.
-- Admin attempting privilege escalation outside approved workflow.
-- Audit pipeline backpressure causing delayed compliance evidence.
+
+| Scenario | Detection threshold | Automated containment | Required evidence |
+|---|---|---|---|
+| Suspicious token mint surge from one client or workload | More than `5x` tenant baseline in `15 minutes`; auto-quarantine at `10x` | Freeze client, revoke active families, page incident commander | Client metadata, signing-key IDs, request origins, affected token IDs |
+| Admin attempts privilege escalation outside workflow | Privileged write without fresh step-up or ticket reference | Deny request, suspend operator session if repeated, notify SecOps | Policy trace, operator identity, session posture, denied request payload |
+| Audit pipeline backpressure delays evidence creation | Archive lag above `2 minutes` or local durable buffer above `80 percent` | Scale consumers, freeze privileged writes if durability is at risk | Buffer metrics, archive offsets, signed manifests |
+| After-hours or impossible-travel admin access | Off-hours privileged access from new ASN or impossible-travel signal | Force step-up, restrict scope, create insider-threat case | Risk signals, device posture, approvals, session transcript |
+| Break-glass overuse | More than `3` grants per operator per quarter or repeated same-scope grants | Require leadership review and suspend self-approval rights | Grant history, ticket trail, approver chain, post-use review |
+| Policy bypass attempt | Resource served without matching PDP decision or obligation proof | Fail closed at PEP and emit integrity incident | Gateway logs, PDP trace, policy bundle hash, service response sample |
+
+## Incident Evidence Preservation
+
+```mermaid
+flowchart TD
+    A["Detection or alert fires"] --> B["Freeze subject, client, or operator scope"]
+    B --> C["Capture session, decision, and approval evidence"]
+    C --> D["Generate signed evidence manifest"]
+    D --> E["Write package to immutable archive"]
+    E --> F["Notify SecOps and compliance owners"]
+    F --> G["Track investigation and closure approvals"]
+```
 
 ## Required Controls
-- Real-time anomaly detection and automatic containment hooks.
-- Privileged action policy requiring recent step-up + approval ticket.
-- Audit durability alarms and fallback export channels.
+- Token-mint anomaly detection must baseline per tenant, client, and workload type so noisy tenants do not hide abuse.
+- Privileged admin actions require fresh step-up, approved ticket, signed operator identity, and a PEP obligation proving justification capture.
+- Audit writers emit chain-hashed envelopes; archive exporters verify object counts, offset continuity, and signature integrity before marking a batch complete.
+- Insider-threat analytics consume after-hours access, repeated policy overrides, unusual scope patterns, and approval anomalies.
+- Compliance exports must be reproducible from immutable sources without relying on mutable dashboard data.
 
 ## Evidence Expectations
-- For each incident: timeline, impacted principals, policy versions, containment action, and closure approval.
-## Cross-Cutting Implementation Baselines
+- Every incident package contains timeline, affected principals, policy bundle hashes, session IDs, key IDs, containment action, approval chain, and closure decision.
+- Break-glass investigations include the original request text, dual approvals, step-up proof, commands executed, and automatic expiry evidence.
+- Chain-of-custody requires signed manifest creation time, archive object IDs, reviewer acknowledgements, and any evidence-handling transfers.
+- Recertification campaigns and policy-diff reviews are retained because they demonstrate preventive control operation, not just reactive response.
 
-### Token and Session Standards
-- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
-- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
-- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
-- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
-
-### Policy Evaluation Standards
-- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
-- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
-- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
-- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
-
-### Identity Lifecycle Standards
-- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
-- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
-- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
-- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
-
-### Federation and SCIM Assumptions
-- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
-- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
-- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
-- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
-
-### Threat Model and Auditability
-- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
-- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
-- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
-- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
-
-## Implementation Deep-Dive Addendum
-
-### Evidence and Assurance
-- Every control has automated evidence artifact generation.
-- Compliance checks include periodic access recertification and policy diff reviews.
-- Security incidents must preserve chain-of-custody for audit artifacts.
+## Assurance and Review Cadence
+- Daily automated checks verify audit-chain continuity, key-rotation freshness, and revocation propagation SLOs.
+- Weekly review examines high-risk denials, break-glass usage, failed policy publications, and connector quarantine events.
+- Quarterly control attestation must sample at least one token incident, one break-glass workflow, one entitlement conflict, and one drift-remediation case.

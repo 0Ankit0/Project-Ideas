@@ -1,68 +1,56 @@
 # System Context Diagram
 
+The IAM platform is both an authentication broker and the local authorization authority
+for relying-party applications. It consumes federation and provisioning data, issues
+tokens, evaluates policy, and proves every high-impact action to auditors.
+
 ```mermaid
 flowchart LR
-    User[End User] -->|OIDC/OAuth| Channel[Web/Mobile/App]
-    Admin[Identity Admin] --> Console[Admin Console]
-    SecOps[Security Engineer] --> Console
-
-    Channel --> APIGW[API Gateway/PEP]
-    Console --> APIGW
-
-    APIGW --> IAM[IAM Control Plane]
-    IAM --> IdP[External IdP]
-    IAM --> SCIM[SCIM Providers]
-    IAM --> Notify[Notification Service]
-    IAM --> SIEM[SIEM/SOAR]
-
-    IAM --> RP[Relying Party APIs]
+    User["End user"] --> App["Web, mobile, or CLI client"]
+    Admin["Identity admin or SecOps operator"] --> Console["Admin console and admin API"]
+    Device["Device posture and attestation service"] --> IAM["IAM control plane"]
+    App --> Gateway["API gateway and PEP"]
+    Console --> Gateway
+    Gateway --> IAM
+    IAM --> Token["Session and token services"]
+    IAM --> Policy["PDP and PAP"]
+    IAM --> Lifecycle["Identity lifecycle and entitlement services"]
+    IAM --> Federation["OIDC, SAML, and SCIM adapters"]
+    IAM --> Audit["Audit pipeline and evidence store"]
+    IAM --> Notify["Notification services"]
+    IAM --> HSM["Cloud KMS and HSM"]
+    Federation --> IdP["Enterprise IdPs and social IdPs"]
+    Federation --> Directory["SCIM directories and HR systems"]
+    Token --> RP["Relying party APIs and applications"]
+    Policy --> RP
+    Audit --> SIEM["SIEM and SOAR"]
 ```
 
 ## Trust Boundaries
-- Boundary A: internet client to gateway (DDoS/WAF/rate controls).
-- Boundary B: control plane to external federation systems (signed assertions, pinned metadata).
-- Boundary C: control plane to telemetry/compliance systems (tamper-evident audit export).
+
+| Boundary | Inbound or outbound parties | Controls | Failure stance |
+|---|---|---|---|
+| Internet ingress | End users, partner apps, admin browsers | WAF, DDoS protection, mTLS where applicable, JWT validation, rate limits, CSRF defenses | Fail closed |
+| Federation trust | IAM to OIDC or SAML IdPs | Metadata signature checks, issuer and audience pinning, replay protection, cert overlap windows | Fail closed |
+| Provisioning trust | IAM to SCIM directories and HR sources | Source-of-truth matrix, schema validation, idempotency keys, drift detection | Quarantine on ambiguity |
+| Cryptographic boundary | IAM to KMS or HSM | Key-usage policies, signing-key version registry, split duties, attested access logs | Refuse issuance on failure |
+| Audit boundary | IAM to archive and SIEM | Append-only transport, signed envelopes, WORM retention, chain-hash verification | Buffer briefly, then page |
+
+## External Systems and Contracts
+- **Enterprise IdP**: authoritative for primary authentication when a tenant enables federation, but not for local authorization, emergency grants, or local suspension state.
+- **SCIM directory or HR system**: authoritative for a subset of identity attributes and baseline group memberships according to tenant mapping policy.
+- **Relying-party application**: consumes issued tokens or policy decisions and must honor revocation, token audience, and obligation contracts.
+- **Device posture service**: contributes attestation status, OS risk, device management state, and certificate freshness into adaptive MFA and privileged access decisions.
+- **SIEM or SOAR**: receives near-real-time events for detection and response, but immutable archive remains the compliance system of record.
 
 ## Context Assumptions
-- IAM is authentication broker and local authorization authority.
-- External IdP is trusted for credential verification but not for local risk overrides.
-- All external dependencies are considered partially trusted and monitored.
+- IAM owns session lifecycle, refresh-token family state, policy evaluation, explainability, and entitlement reconciliation.
+- Upstream assertions may bootstrap or update identity records, but they never bypass local suspend, break-glass, or deny-policy controls.
+- All external dependencies are treated as partially trusted. Compromise or degradation in any dependency must not widen access.
+- Admin-facing workflows use the same policy engine and audit pipeline as customer-facing APIs.
 
-## Cross-Cutting Implementation Baselines
-
-### Token and Session Standards
-- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
-- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
-- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
-- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
-
-### Policy Evaluation Standards
-- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
-- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
-- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
-- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
-
-### Identity Lifecycle Standards
-- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
-- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
-- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
-- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
-
-### Federation and SCIM Assumptions
-- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
-- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
-- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
-- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
-
-### Threat Model and Auditability
-- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
-- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
-- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
-- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
-
-## Implementation Deep-Dive Addendum
-
-### Boundary-Specific Threat Notes
-- Internet ingress boundary: DDoS, credential stuffing, CSRF and replay concerns.
-- Federation boundary: signature bypass, metadata poisoning, clock-skew abuse.
-- Telemetry boundary: evidence tampering, dropped alerts, delayed incident visibility.
+## Failure Containment Notes
+- If the IdP is down, existing sessions continue until expiry, but new federated logins fail with a tenant-visible degraded-state message.
+- If the device posture feed is stale, privileged decisions require a new strong factor and may deny high-risk actions entirely.
+- If the KMS or HSM is unavailable, token minting stops, refresh exchange fails closed, and existing tokens remain valid only until normal expiry.
+- If the SIEM is unavailable, audit envelopes remain buffered and archived; operators must not disable evidence generation to restore throughput.

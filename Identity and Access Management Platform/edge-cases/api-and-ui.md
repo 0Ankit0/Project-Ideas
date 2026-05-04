@@ -1,54 +1,50 @@
 # API and UI Edge Cases
 
-## Scenarios
-- API timeout but UI receives stale optimistic success.
-- Partial bulk updates where some identities fail policy checks.
-- Concurrent admin edits causing ETag conflicts.
+This document covers the user-facing race conditions and consistency traps that appear
+in operator APIs, self-service identity flows, and admin dashboards. The goal is to make
+the UI safe even when policy publication, suspension, or revocation propagate asynchronously.
 
-## Required Handling
-- UI must surface operation-level status with retry-safe action buttons.
-- APIs return machine-readable remediation codes and correlation IDs.
-- Conflict responses include latest version metadata for safe retry.
+## Scenario Matrix
 
-## Observability
-- Dashboard slice by endpoint + operation mode (single/bulk).
-- Alert on spike of `409 conflict` and `422 policy_deny` above baseline.
+| Scenario | Typical symptom | Required API contract | Required UI behavior |
+|---|---|---|---|
+| Policy publish race | Admin A edits version `17` while Admin B publishes version `18` | `If-Match` or `ETag` check returns `412 precondition_failed` with latest `bundle_hash` and diff summary | Show banner with latest version, discard stale preview, offer rebase or compare |
+| User suspension during profile edit | Admin saves a profile after another operator suspended the user | Write returns `409 subject_state_conflict` plus current `status` and `reason_code` | Freeze edit form, show suspension details, block resubmission without re-open |
+| Session revoke while self-service UI is open | User sees active sessions that were already revoked by admin | Session list returns `staleness_window_ms` and `source_watermark`; writes require fresh session version | Mark stale rows, auto-refresh, disable local logout on already-revoked sessions |
+| Multi-tab step-up | One browser tab finishes step-up after another tab timed out | Step-up verify returns `409 stale_challenge` with replacement challenge metadata | Close stale modal, prompt user to continue in latest tab only |
+| Partial bulk entitlement update | Some grants fail because of deny guardrails or missing approvals | Bulk API returns per-item `status`, `code`, `field_path`, `remediation`, and `correlation_id` | Render success, failure, and retry counts separately; allow retry only for retryable rows |
+| Drift auto-remediation races UI edits | Admin edits an attribute while the reconciler rewrites a SCIM-owned field | Write returns `423 source_owned_field` with source owner and last sync timestamp | Make source-owned fields read-only with visible ownership badge and sync details |
+| Rate-limited admin bulk job | UI retries too aggressively and amplifies load | APIs emit `429` with `Retry-After`, remaining quota, and `retry_policy` hints | Apply exponential backoff with jitter and pause bulk worker in browser |
 
-## Cross-Cutting Implementation Baselines
+## Policy Publication Race Flow
 
-### Token and Session Standards
-- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
-- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
-- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
-- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
+```mermaid
+flowchart TD
+    A["Admin opens policy editor"] --> B["Fetch version 17 plus ETag"]
+    B --> C["Second admin publishes version 18"]
+    C --> D["Invalidate PAP cache and broadcast new bundle hash"]
+    B --> E["First admin submits stale update"]
+    D --> F{"ETag still current"}
+    F -->|No| G["Return 412 with latest bundle hash, changed statements, and simulation delta"]
+    F -->|Yes| H["Accept update and create review record"]
+```
 
-### Policy Evaluation Standards
-- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
-- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
-- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
-- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
+## API Safety Requirements
+- All write APIs accept `X-Idempotency-Key`; server-side retention of idempotency records is at least `24 hours` for admin writes and `1 hour` for self-service writes.
+- Optimistic concurrency is required on policy bundles, federation mappings, entitlement grants, and profile edits that target mutable local fields.
+- Bulk endpoints return a deterministic `results[]` array that preserves client-supplied item ordering and includes a stable `item_ref`.
+- Retry guidance uses truncated exponential backoff with full jitter: `sleep = random(0, min(base * 2^attempt, 30s))`.
+- When session freshness or step-up status changes, APIs return machine-readable remediation codes such as `step_up_required`, `session_revoked`, or `subject_suspended`.
 
-### Identity Lifecycle Standards
-- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
-- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
-- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
-- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
+## UI Safety Requirements
+- The UI must display last refresh time, source watermark, and ownership badges for SCIM-managed or federation-managed fields.
+- Buttons that can widen access, such as publish policy, unsuspend user, or approve break-glass, must become unavailable when the operator session loses step-up freshness.
+- Bulk-operation screens must offer a downloadable error report with item-level denial reason, unmet approval requirement, and correlation ID.
+- Success toasts are delayed until the server confirms durable write and audit acceptance for privileged actions.
+- Long-running actions show terminal states `queued`, `applying`, `verified`, `partially_failed`, and `rolled_back`.
 
-### Federation and SCIM Assumptions
-- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
-- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
-- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
-- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
-
-### Threat Model and Auditability
-- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
-- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
-- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
-- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
-
-## Implementation Deep-Dive Addendum
-
-### UX Safety Requirements
-- UI must display eventual consistency state and last successful sync timestamp.
-- Bulk-operation UI provides per-item decision reasons and retry affordances.
-- Operator actions are blocked when prerequisite security context is stale.
+## Observability and Alerting
+- Dashboards slice `409`, `412`, `423`, `429`, and `422 policy_deny` by endpoint, tenant, operation mode, and browser client version.
+- Alert when stale-ETag conflicts or `source_owned_field` errors exceed the tenant baseline by `3x` over `15 minutes`.
+- Record UI workflow abandon rate for step-up prompts, policy review rebases, and partial bulk retries.
+- Synthetic browser checks must verify that an admin suspension or session revoke is reflected in the UI within the backend revocation SLA plus `2 seconds` UI refresh delay.

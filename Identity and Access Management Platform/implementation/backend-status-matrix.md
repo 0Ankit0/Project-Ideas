@@ -1,54 +1,50 @@
 # Backend Status Matrix
 
-| Capability | Design | Build | Test | Ops Readiness | Notes |
+This matrix is the implementation tracker for the backend workstreams needed to ship a
+fully functional IAM platform. A row is not considered complete until design artifacts,
+code, automated validation, and operational evidence all exist.
+
+| Capability | Design | Build | Test | Ops readiness | Current implementation gap |
 |---|---|---|---|---|---|
-| Auth login + session | ✅ | ✅ | 🟡 | 🟡 | Pending MFA fallback runbook |
-| Token rotation/reuse detect | ✅ | ✅ | ✅ | 🟡 | Need SIEM dashboard tuning |
-| Policy decision + explain | ✅ | 🟡 | 🟡 | ⚪ | Awaiting rule simulation API |
-| Federation OIDC/SAML | ✅ | 🟡 | ⚪ | ⚪ | Metadata rollover tests pending |
-| SCIM provision/deprovision | ✅ | 🟡 | ⚪ | ⚪ | Drift reconciler hardening needed |
-| Audit export + retention | ✅ | ✅ | 🟡 | 🟡 | Cold archive lifecycle policy pending |
+| Passwordless login and local credential fallback | ✅ | 🟡 | 🟡 | ⚪ | Recovery-code rotation and anti-enumeration scenarios still need automated tests |
+| OIDC and SAML federation | ✅ | 🟡 | ⚪ | ⚪ | Metadata rollover, signed logout, and claim-mapping error paths remain incomplete |
+| Adaptive MFA and device posture | ✅ | 🟡 | 🟡 | 🟡 | Device-attestation feeds wired for read path, but fallback and degradation logic needs chaos coverage |
+| Session management and concurrent-session policies | ✅ | ✅ | 🟡 | 🟡 | Idle timeout, session freeze, and admin revoke race conditions need end-to-end tests |
+| Refresh rotation and reuse detection | ✅ | ✅ | ✅ | 🟡 | Dashboards and paging policy for family-reuse incidents still need production drill evidence |
+| Token revocation propagation | ✅ | 🟡 | 🟡 | ⚪ | Gateway watermark sync and replay after regional failover are not yet exercised |
+| PDP evaluation and explainability | ✅ | 🟡 | 🟡 | ⚪ | Simulation API, obligation compliance tests, and performance evidence are pending |
+| PAP policy publication and rollback | ✅ | 🟡 | ⚪ | ⚪ | Dual control, signed diff manifests, and canary promotion need workflow implementation |
+| Hybrid RBAC and ABAC entitlements | ✅ | 🟡 | ⚪ | ⚪ | Entitlement expiration, deny precedence, and recertification batch jobs need build-out |
+| Identity lifecycle for humans | ✅ | 🟡 | 🟡 | ⚪ | Offboarding proof package and archive export are not yet complete |
+| Workload identity lifecycle | ✅ | ⚪ | ⚪ | ⚪ | Attestation verification, client-certificate rotation, and quarantine automation not started |
+| SCIM provisioning and deprovisioning | ✅ | 🟡 | 🟡 | ⚪ | Bulk idempotency and source-of-truth guards require more connector contract tests |
+| SCIM and federation drift reconciliation | ✅ | 🟡 | ⚪ | ⚪ | Severity scoring, low-risk auto-fix, and approval queue handling remain partial |
+| Break-glass emergency access | ✅ | 🟡 | ⚪ | ⚪ | Dual approval APIs exist on paper only; expiry enforcement and evidence pack need implementation |
+| Immutable audit and compliance export | ✅ | ✅ | 🟡 | 🟡 | Chain-hash verification, archive manifest checks, and legal-hold workflows need drills |
+| Cloud key management and signing-key rotation | ✅ | ✅ | 🟡 | 🟡 | Automatic retire-after enforcement and key-ceremony runbook signoff are still pending |
+| Admin API and UI race safety | ✅ | 🟡 | ⚪ | ⚪ | ETag handling, idempotency coverage, and session-view staleness detection need integration tests |
+| Observability, SLOs, and incident automation | ✅ | 🟡 | 🟡 | 🟡 | Token-revocation, policy publish, and SCIM drift SLO dashboards need final alert tuning |
 
 ## Exit Criteria to Production
-- No critical/high security findings open.
-- SLO dashboards and alert routes verified.
-- At least one successful failover + recovery exercise.
-## Cross-Cutting Implementation Baselines
+- No open critical or high security findings against authn, authz, token, federation, SCIM, audit, or break-glass paths.
+- Every `🟡` or `⚪` row in security-critical capabilities has an approved go-live waiver or is upgraded to production-ready evidence.
+- SLO dashboards exist for login latency, PDP latency, revocation propagation, SCIM drift backlog, and audit pipeline lag.
+- At least one successful region failover, connector outage drill, and revocation replay exercise has been executed and documented.
+- Compliance export proves full audit-chain integrity for a representative tenant and quarter.
 
-### Token and Session Standards
-- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
-- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
-- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
-- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
+## Test Expectations by Capability
 
-### Policy Evaluation Standards
-- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
-- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
-- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
-- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
+| Capability family | Minimum automated evidence |
+|---|---|
+| Authentication and sessions | Unit tests, API contract tests, replay protection tests, multi-device integration tests |
+| Token handling | Concurrency tests for refresh rotation, chaos tests for delayed revocation, signature-key rotation tests |
+| Policy platform | Deterministic simulation tests, deny-precedence regression suite, obligation enforcement integration tests |
+| Federation and SCIM | Connector contract tests, malformed-assertion tests, drift-detection replay tests |
+| Lifecycle and entitlements | Deprovisioning reconciliation tests, expiry tests, conflict-resolution regression suite |
+| Audit and compliance | Archive integrity verification, retention-policy tests, export manifest validation |
 
-### Identity Lifecycle Standards
-- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
-- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
-- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
-- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
-
-### Federation and SCIM Assumptions
-- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
-- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
-- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
-- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
-
-### Threat Model and Auditability
-- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
-- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
-- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
-- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
-
-## Implementation Deep-Dive Addendum
-
-### Maturity Rubric
-- **Design:** threat-reviewed and approved architecture.
-- **Build:** core path implemented with feature flags.
-- **Test:** positive/negative/chaos coverage achieved.
-- **Ops readiness:** dashboards, alerts, runbooks, and on-call drill complete.
+## Maturity Rubric
+- **Design** means architecture, threat model, data contracts, and runbooks are reviewed and accepted.
+- **Build** means the happy path plus critical failure handling are implemented behind a releasable flag.
+- **Test** means positive, negative, concurrency, and security tests run automatically in CI or scheduled validation.
+- **Ops readiness** means dashboards, alerts, runbooks, game-day evidence, and ownership are in place.

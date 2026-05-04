@@ -1,72 +1,144 @@
 # C4 Code Diagram
 
+This code-level view decomposes the backend into implementation modules that can be
+assigned to teams and built independently while preserving clear IAM boundaries.
+
 ```mermaid
-flowchart LR
-    subgraph auth_module
-      login_handler
-      callback_handler
-      session_service
-      token_service
+flowchart TB
+    subgraph Interface["Interface layer"]
+        AuthHTTP["auth_http handlers"]
+        AdminHTTP["admin_http handlers"]
+        ScimHTTP["scim_http handlers"]
+        FederationHTTP["federation_http handlers"]
+        WorkerEntrypoints["worker entrypoints"]
     end
 
-    subgraph policy_module
-      decision_handler
-      context_builder
-      evaluator
-      explain_serializer
+    subgraph Authn["Authentication context"]
+        LoginUC["login_use_case"]
+        SessionSvc["session_service"]
+        MfaSvc["mfa_orchestrator"]
+        TokenSvc["token_service"]
+        RevocationProj["revocation_projector"]
     end
 
-    subgraph lifecycle_module
-      identity_service
-      deprovision_worker
-      scim_sync_service
+    subgraph Authz["Authorization context"]
+        DecisionUC["decision_use_case"]
+        ContextBuilder["decision_context_builder"]
+        PolicyCompiler["policy_bundle_compiler"]
+        ObligationSvc["obligation_dispatcher"]
+        ExplainSvc["decision_explain_serializer"]
     end
 
-    login_handler --> session_service --> token_service
-    decision_handler --> context_builder --> evaluator --> explain_serializer
-    identity_service --> deprovision_worker
-    scim_sync_service --> identity_service
+    subgraph Lifecycle["Lifecycle and entitlement context"]
+        IdentitySvc["identity_service"]
+        EntitlementSvc["entitlement_service"]
+        ConflictSvc["entitlement_conflict_resolver"]
+        DeprovWorker["deprovision_worker"]
+        BreakGlassSvc["break_glass_service"]
+    end
+
+    subgraph Federation["Federation and SCIM context"]
+        OidcSvc["oidc_federation_service"]
+        SamlSvc["saml_federation_service"]
+        ClaimMapper["claim_mapping_engine"]
+        ScimSync["scim_sync_service"]
+        DriftSvc["drift_reconciliation_service"]
+    end
+
+    subgraph Platform["Platform services"]
+        AuditLib["audit_envelope_writer"]
+        Outbox["outbox_publisher"]
+        RiskAdapter["risk_signal_adapter"]
+        KeyMgr["signing_key_manager"]
+        DeviceAdapter["device_posture_adapter"]
+    end
+
+    subgraph Storage["Repositories and adapters"]
+        PgRepo["postgres repositories"]
+        RedisRepo["redis repositories"]
+        EventBus["event_bus adapter"]
+        IdpAdapter["idp client adapters"]
+        Archive["immutable archive adapter"]
+    end
+
+    AuthHTTP --> LoginUC
+    AdminHTTP --> DecisionUC
+    AdminHTTP --> BreakGlassSvc
+    ScimHTTP --> ScimSync
+    FederationHTTP --> OidcSvc
+    FederationHTTP --> SamlSvc
+    WorkerEntrypoints --> DeprovWorker
+    WorkerEntrypoints --> RevocationProj
+    WorkerEntrypoints --> DriftSvc
+
+    LoginUC --> SessionSvc
+    LoginUC --> MfaSvc
+    LoginUC --> TokenSvc
+    LoginUC --> RiskAdapter
+    LoginUC --> DeviceAdapter
+
+    DecisionUC --> ContextBuilder
+    DecisionUC --> ObligationSvc
+    DecisionUC --> ExplainSvc
+    ContextBuilder --> EntitlementSvc
+    ContextBuilder --> RiskAdapter
+    ContextBuilder --> DeviceAdapter
+    DecisionUC --> PolicyCompiler
+
+    IdentitySvc --> EntitlementSvc
+    EntitlementSvc --> ConflictSvc
+    DeprovWorker --> IdentitySvc
+    DeprovWorker --> RevocationProj
+    BreakGlassSvc --> SessionSvc
+    BreakGlassSvc --> DecisionUC
+
+    OidcSvc --> ClaimMapper
+    SamlSvc --> ClaimMapper
+    ClaimMapper --> IdentitySvc
+    ScimSync --> IdentitySvc
+    ScimSync --> EntitlementSvc
+    DriftSvc --> ConflictSvc
+
+    TokenSvc --> KeyMgr
+    TokenSvc --> SessionSvc
+    TokenSvc --> Outbox
+    RevocationProj --> RedisRepo
+    PolicyCompiler --> PgRepo
+    SessionSvc --> RedisRepo
+    IdentitySvc --> PgRepo
+    EntitlementSvc --> PgRepo
+    DriftSvc --> PgRepo
+    OidcSvc --> IdpAdapter
+    SamlSvc --> IdpAdapter
+    ScimSync --> IdpAdapter
+    Outbox --> EventBus
+    AuditLib --> EventBus
+    AuditLib --> Archive
 ```
 
 ## Code Organization Rules
-- Domain logic isolated from transport/infrastructure concerns.
-- Shared primitives (`tenant context`, `correlation id`, `audit envelope`) live in platform package.
-- Async workers must be replay-safe and side-effect idempotent.
-## Cross-Cutting Implementation Baselines
+- Transport adapters must remain thin; business decisions live in use-case and domain-service packages.
+- Shared primitives such as tenant context, correlation ID, audit envelope, idempotency keys, and signed operator identity live in the platform layer.
+- Domain services never call UI code, and they never emit events directly; all event publication goes through the outbox abstraction.
+- Every worker must be replay-safe, side-effect idempotent, and explicit about the entity key it owns for ordering.
 
-### Token and Session Standards
-- Access tokens: JWT signed with asymmetric keys (kid rotation every 30 days), TTL 10 minutes default, audience-restricted.
-- Refresh tokens: opaque, one-time use with rotation; reuse detection revokes the token family and active device session.
-- Session store: strongly consistent source of truth for session status (`active`, `step_up_required`, `revoked`, `expired`, `terminated`).
-- Revocation SLA: propagation to introspection/cache layers within 5 seconds P95.
+## Module Responsibility Guide
 
-### Policy Evaluation Standards
-- Decision result set: `permit`, `deny`, `not_applicable`, `indeterminate`.
-- Precedence: explicit deny > permit > not-applicable; indeterminate fails closed for write/privileged operations.
-- Policy model: hybrid RBAC + ABAC (+ relationship/group expansion where required).
-- Explainability: every decision returns policy IDs, matched rules, and obligation set for audit.
+| Module | Primary responsibility | Must not own |
+|---|---|---|
+| `login_use_case` | Orchestrate primary auth, adaptive MFA, session creation, and token issuance | Policy publication, entitlement writes |
+| `token_service` | Access-token signing, refresh-family rotation, reuse detection, revocation event creation | Direct UI responses, SCIM logic |
+| `decision_use_case` | PDP entry point, deny precedence, obligation collection, explainability payload | Token minting, identity mutation |
+| `policy_bundle_compiler` | Compile approved policy definitions into immutable bundles and cache payloads | Runtime request handling |
+| `identity_service` | Subject lifecycle transitions, suspension, archival metadata | Federation parsing, device challenges |
+| `entitlement_service` | Grant and revoke lifecycle, effective permission expansion | Token validation |
+| `claim_mapping_engine` | Deterministic OIDC and SAML claim transformation and validation | Local entitlement conflict resolution |
+| `drift_reconciliation_service` | SCIM or claim drift analysis, remediation planning, escalation creation | Primary login decisions |
+| `break_glass_service` | Emergency access request, approval, scoped session issuance, expiry closure | Normal entitlement grants |
 
-### Identity Lifecycle Standards
-- Human: `invited -> active -> suspended/locked -> deprovisioned -> archived`.
-- Workload: `registered -> attested -> active -> compromised/quarantined -> retired`.
-- Mandatory transition fields: actor, reason code, source system, request ID, timestamp.
-- Offboarding control: immediate session kill + async entitlement revocation with reconciliation proof.
-
-### Federation and SCIM Assumptions
-- Federation protocols: OIDC/SAML inbound; OIDC/OAuth outbound for relying parties.
-- Trust controls: metadata signature validation, cert rollover overlap, issuer/audience pinning, nonce/state replay defense.
-- SCIM ownership: source-of-truth matrix by attribute domain; drift jobs run every 15 minutes.
-- JIT provisioning: allowed only for approved IdP/tenant mappings and minimal role bootstrap.
-
-### Threat Model and Auditability
-- High-priority threats: token replay, assertion forgery, privilege escalation, stale entitlement abuse, break-glass misuse.
-- Required controls: rate limits, adaptive MFA, device/risk signals, signed admin actions, immutable audit log.
-- Audit minimum fields: tenant, actor, target, action, decision, policy hash, client app, IP/device posture, correlation ID.
-- Retention: 13 months hot search + 7 years archive (compliance profile dependent).
-
-## Implementation Deep-Dive Addendum
-
-### Code Ownership and Boundaries
-- Each module has explicit owner and escalation path.
-- Shared libraries are versioned and backward compatible across services.
-- Domain events are emitted via a single platform abstraction to ensure consistency.
+## Dependency Rules
+- Authentication modules may depend on platform adapters, session repositories, and risk or device adapters, but not on admin UI packages.
+- Authorization modules may read entitlements and resource attributes; they must not mutate grants during policy evaluation.
+- Federation modules may create or update identities only through `identity_service` and `entitlement_service`.
+- Break-glass workflows may call policy evaluation to verify scope, but they use distinct storage and audit types from standard grants.
+- Audit writing is cross-cutting and mandatory for every externally visible mutation and every privileged decision.
