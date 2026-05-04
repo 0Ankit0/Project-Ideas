@@ -1,43 +1,113 @@
 # Component Diagram
 
+The detailed component map below shows how the core services collaborate to implement clinic scheduling and visit operations.
+
 ```mermaid
 flowchart LR
-  API --> SchedulingService
-  API --> AvailabilityService
-  SchedulingService --> ReminderService
-  SchedulingService --> EHRAdapter
-  SchedulingService --> DB[(DB)]
+  subgraph Entry[Channel and API Layer]
+    Portal[Patient Portal]
+    Staff[Staff Console]
+    ProviderUI[Provider Workspace]
+    Gateway[API Gateway]
+  end
+
+  subgraph Services[Domain Services]
+    Scheduling[Scheduling Service]
+    Availability[Availability Service]
+    Eligibility[Eligibility Service]
+    Billing[Billing Service]
+    Notifications[Notification Orchestrator]
+    Waitlist[Waitlist Service]
+    Downtime[Downtime Service]
+    Audit[Audit Service]
+  end
+
+  subgraph Data[State and Messaging]
+    AppDB[(Appointments DB)]
+    PatientDB[(Patients DB)]
+    Ledger[(Payment Ledger)]
+    Cache[(Slot Cache)]
+    Bus[(Event Bus)]
+  end
+
+  subgraph Integrations[Adapters]
+    EHR[EHR Adapter]
+    Clearinghouse[Insurance Adapter]
+    Payments[Payment Adapter]
+    Messaging[Messaging Adapter]
+    Video[Telehealth Adapter]
+  end
+
+  Portal --> Gateway
+  Staff --> Gateway
+  ProviderUI --> Gateway
+  Gateway --> Scheduling
+  Gateway --> Availability
+  Gateway --> Billing
+  Gateway --> Audit
+  Scheduling --> AppDB
+  Scheduling --> Bus
+  Scheduling --> EHR
+  Scheduling --> Video
+  Availability --> AppDB
+  Availability --> Cache
+  Eligibility --> PatientDB
+  Eligibility --> Clearinghouse
+  Billing --> Ledger
+  Billing --> Payments
+  Notifications --> Messaging
+  Notifications --> Bus
+  Waitlist --> Bus
+  Waitlist --> AppDB
+  Downtime --> AppDB
+  Downtime --> Bus
+  Audit --> AppDB
+  Audit --> Ledger
+  Scheduling --> Eligibility
+  Scheduling --> Billing
+  Scheduling --> Notifications
+  Scheduling --> Waitlist
 ```
+
+## Component Interaction Rules
+- The gateway may aggregate reads, but writes always route to the domain service that owns the aggregate.
+- Scheduling orchestrates the booking lifecycle and calls eligibility and billing synchronously only when policy requires a fresh result.
+- Notification, waitlist, and reporting updates are event-driven to keep patient-facing APIs responsive.
+- Downtime service is write-capable only during declared degraded mode and otherwise acts as a read-only incident utility.
+
+## Failure Isolation
+- External integration failures are contained inside adapters and surfaced as retryable or terminal reason codes.
+- Cache invalidation failures can affect search freshness, but booking commit still relies on the authoritative appointment database.
+- Ledger persistence is isolated from general appointment reads to keep finance reconciliation auditable and queryable.
 
 ## Operational Policy Addendum
 
 ### Scheduling Conflict Policies
-- Double-booking is prohibited per provider, location, and time-slot; writes enforce an optimistic concurrency check on slot version plus an idempotency key.
-- When two booking requests race for the same slot, the first committed request wins and all later requests receive `SLOT_ALREADY_BOOKED` with alternative slot suggestions.
-- Provider calendar changes (leave, overrun, emergency block) trigger an automatic revalidation pass that marks impacted bookings as `REBOOK_REQUIRED` and starts remediation workflows.
-- Escalation SLA: unresolved conflicts older than 15 minutes are routed to operations for manual intervention and patient outreach.
+- Double-booking is prevented by the natural key `provider_id + location_id + slot_start + slot_end` plus optimistic locking on `slot_version` during booking and rescheduling.
+- Reservation tokens shield a slot for up to 10 minutes during patient checkout, but the slot does not transition to `RESERVED` until the appointment transaction commits.
+- Provider calendar updates caused by leave, clinic closure, overrun, or emergency blocks trigger immediate impact analysis; future appointments move to `REBOOK_REQUIRED` and create a staffed outreach task.
+- Staff-assisted overrides may exceed normal template capacity only when a justification, approving actor, and override expiry are stored in the audit trail.
 
-### Patient/Provider Workflow States
-- Patient appointment lifecycle: `DRAFT -> PENDING_CONFIRMATION -> CONFIRMED -> CHECKED_IN -> IN_CONSULTATION -> COMPLETED` with terminal branches `CANCELLED`, `NO_SHOW`, and `EXPIRED`.
-- Provider schedule lifecycle: `AVAILABLE -> RESERVED -> LOCKED_FOR_VISIT -> RELEASED`; exceptional states include `BLOCKED` (planned) and `SUSPENDED` (incident/compliance).
-- State transitions are event-driven and auditable; every transition records actor, timestamp, source channel, and reason code.
-- Invalid transitions are rejected with deterministic error codes and do not mutate downstream billing or notification state.
+### Patient and Provider Workflow States
+- Appointment lifecycle: `DRAFT -> PENDING_CONFIRMATION -> CONFIRMED -> CHECKED_IN -> IN_CONSULTATION -> COMPLETED`, with terminal states `CANCELLED`, `NO_SHOW`, `EXPIRED`, and `REBOOK_REQUIRED`.
+- Slot lifecycle: `AVAILABLE -> RESERVED -> LOCKED_FOR_VISIT -> RELEASED`, with exceptional states `BLOCKED` for planned closures and `SUSPENDED` for compliance or credential issues.
+- Invalid state transitions fail fast with deterministic error codes and do not publish downstream billing or notification events.
+- Every transition records actor, channel, reason code, correlation id, timestamp, and source IP where available.
 
 ### Notification Guarantees
-- Notification channels include in-app, email, and SMS (when consented); delivery policy is at-least-once with idempotent message keys to prevent duplicate side effects.
-- Critical events (`CONFIRMED`, `RESCHEDULED`, `CANCELLED`, `REBOOK_REQUIRED`) are retried with exponential backoff for up to 24 hours.
-- If all automated retries fail, a fallback task is created for support-assisted outreach and the record is flagged `NOTIFICATION_ATTENTION_REQUIRED`.
-- Template rendering and localization are versioned so users receive content consistent with the transaction version that triggered the event.
+- Confirmation, reminder, cancellation, reschedule, emergency-closure, and waitlist-offer notifications are delivered through in-app, email, and SMS channels according to patient consent and clinic policy.
+- Delivery is at-least-once with message deduplication keyed by `event_id + template_version + channel`; critical events retry for up to 24 hours before manual outreach is queued.
+- Quiet hours suppress non-critical SMS and voice outreach, but life-safety or same-day operational notices may escalate to approved emergency templates.
+- Notification content follows the minimum-necessary standard and excludes diagnosis, treatment details, or referral notes from SMS and push previews.
 
 ### Privacy Requirements
-- All PHI/PII is encrypted in transit (TLS 1.2+) and at rest (AES-256 or cloud-provider equivalent managed keys).
-- Access control follows least privilege with RBAC/ABAC, MFA for privileged roles, and full audit logging for create/read/update/export actions on medical or billing data.
-- Data minimization applies to notifications and analytics exports; only required fields are shared and retention follows policy/legal hold requirements.
-- Integrations must use signed requests, scoped credentials, and periodic key rotation; sandbox/test data must be de-identified.
+- PHI and billing artifacts are encrypted in transit and at rest, and non-production data must be de-identified before use outside regulated workflows.
+- Role-based and attribute-based access controls restrict patient, scheduling, billing, and audit data to least-privilege views; privileged access requires MFA.
+- Audit logs are immutable, exportable, and searchable by patient, provider, actor, action, and correlation id for compliance investigations.
+- Downtime printouts, callback lists, and manual forms are treated as regulated records and must be secured, reconciled, and shredded per clinic policy after recovery.
 
 ### Downtime Fallback Procedures
-- During partial outages, the system enters degraded mode: read-only schedule views remain available while new bookings are queued for deferred processing.
-- Clinics maintain a printable/offline daily roster and manual check-in sheet; staff can continue visits using downtime SOPs and reconcile once service is restored.
-- Recovery requires replaying queued commands/events in order, conflict revalidation, and sending reconciliation notices for any changed appointments.
-- Incident closure criteria include successful backlog drain, data consistency checks, and post-incident communication to affected patients/providers.
-
+- In degraded mode, staff retain read-only access to schedules while new booking, cancellation, and payment actions are captured in an ordered reconciliation queue.
+- Clinics maintain a printable daily roster, manual check-in sheet, and downtime appointment intake form to continue operations during platform or integration outages.
+- Recovery replays queued commands in timestamp order, revalidates slot conflicts and insurance status, syncs EHR and billing side effects, and notifies patients if outcomes changed.
+- Incident closure requires backlog drain, reconciliation sign-off, communication to affected clinics, and a post-incident review with corrective actions.
