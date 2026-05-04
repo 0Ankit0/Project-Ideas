@@ -1,82 +1,112 @@
 # Data Flow Diagrams
 
-## Clinical Data Flow
+## Purpose
+Describe how PHI, operational data, and interoperability payloads move through the **Hospital Information System** for the workflows most critical to patient safety and hospital operations.
+
+## DFD-1 Registration to Admission
 ```mermaid
 flowchart LR
-    Intake[Registration/Portal] --> PatientAPI[Patient API]
-    PatientAPI --> PatientStore[(Patient Master)]
-
-    ClinicalUI[Clinician UI] --> EncounterAPI[Encounter API]
-    EncounterAPI --> EncounterStore[(Encounter Records)]
-    EncounterAPI --> OrdersAPI[Orders API]
-    OrdersAPI --> OrderStore[(Order Tables)]
-    OrdersAPI --> ExternalLab[Lab/Radiology]
-    ExternalLab --> ResultsIngest[Results Ingestion]
-    ResultsIngest --> EncounterStore
+    Clerk[Registration clerk] --> Search[Patient search and duplicate check]
+    Search --> MPI[Patient identity service]
+    MPI --> PatientDB[(Patient identity store)]
+    MPI --> Audit[Audit service]
+    Clerk --> Coverage[Coverage capture]
+    Coverage --> Insurance[Insurance service]
+    Clerk --> Admit[Admission request]
+    Admit --> ADT[ADT service]
+    ADT --> BedRules[Bed rules engine]
+    BedRules --> BedDB[(ADT and bed store)]
+    ADT --> Kafka[Kafka]
+    Kafka --> Billing[Billing service]
+    Kafka --> FHIR[FHIR adapter]
+    Kafka --> HL7[HL7 integration engine]
 ```
 
-## Revenue Cycle Data Flow
+**Notes**
+- Search-before-create is mandatory. Duplicate review can interrupt the flow before a new MRN is issued.
+- Coverage data is copied into the encounter and admission context so later eligibility changes do not rewrite historical facts.
+- ADT commits admission and bed occupancy in the same transaction and publishes downstream events via an outbox.
+
+## DFD-2 Clinical Order to Result to Medication Administration
+```mermaid
+flowchart TD
+    Physician[Physician] --> ClinicalUI[Clinical UI]
+    ClinicalUI --> Clinical[Clinical service]
+    Clinical --> CDS[Decision support checks]
+    CDS --> OrderDB[(Clinical order store)]
+    Clinical --> Kafka[Kafka]
+    Kafka --> Pharmacy[Pharmacy service]
+    Kafka --> Lab[Lab service]
+    Kafka --> Radiology[Radiology service]
+    Pharmacy --> MAR[(Medication administration store)]
+    Lab --> ResultDB[(Lab result store)]
+    Radiology --> Imaging[(Radiology report store)]
+    ResultDB --> Clinical
+    Imaging --> Clinical
+    Pharmacy --> Billing[Billing service]
+    Clinical --> Timeline[(Clinical timeline projection)]
+    Billing --> Revenue[(Charge projection)]
+```
+
+**Notes**
+- Clinical Service owns the signed order request and departmental services own execution details.
+- Result corrections and order corrections publish new domain events instead of destructive updates.
+- Medication administration events feed both the clinical timeline and charge capture projections.
+
+## DFD-3 Discharge to Claim Submission
 ```mermaid
 flowchart LR
-    EncounterStore[(Encounter Records)] --> ChargeEngine[Charge Generation]
-    ChargeEngine --> Coding[Medical Coding]
-    Coding --> Claims[Claim Builder]
-    Claims --> PayerGateway[Payer Gateway]
-    PayerGateway --> Remit[Remittance/Denials]
-    Remit --> AR[(Accounts Receivable)]
+    Physician[Discharging physician] --> Discharge[Discharge workflow]
+    Nurse[Nurse] --> Discharge
+    CaseMgr[Case manager] --> Discharge
+    Discharge --> Clinical[Clinical service]
+    Clinical --> Summary[(Discharge summary store)]
+    Clinical --> ADT[ADT service]
+    ADT --> BedRelease[(Bed turnover queue)]
+    Clinical --> Kafka[Kafka]
+    Kafka --> Billing[Billing service]
+    Billing --> Coding[Coding and charge rules]
+    Coding --> Claim[(Claim work queue)]
+    Claim --> Insurance[Insurance service]
+    Insurance --> Payer[Payer gateway]
+    Payer --> Remit[(Remittance and denial store)]
 ```
 
----
+**Notes**
+- Discharge summary sign-off and ADT discharge timestamp are separate records but must be correlated.
+- Billing cannot finalize a claim until discharge status, coded diagnoses, and charge completeness all pass validation.
+- Payer or clearinghouse failures create retry work items without changing the discharge source of truth.
 
-
-## Data Flow Control Deep Dive
-### Data Classification
-- PHI and sensitive operational metadata are tagged at ingress and propagated through lineage fields.
-- Export flows require purpose-of-use and retention tags at extraction time.
-- Warehouse pipelines strip direct identifiers unless explicit approved use case.
-
-### Data Lineage Flow
+## DFD-4 External Interoperability and Outage Buffering
 ```mermaid
-flowchart LR
-    Ingress[API Ingress] --> Txn[(OLTP)]
-    Txn --> Outbox[Outbox Events]
-    Outbox --> Stream[Event Stream]
-    Stream --> Proj[Operational Projections]
-    Stream --> WH[Analytics Warehouse]
-    WH --> Reports[Compliance/Operational Reports]
+flowchart TB
+    Domains[Domain services] --> Outbox[Transactional outbox]
+    Outbox --> Kafka[Kafka topics]
+    Kafka --> FHIR[FHIR adapter]
+    Kafka --> HL7[HL7 integration engine]
+    FHIR --> HIE[External EHR and HIE]
+    HL7 --> LIS[LIS and PACS]
+    HL7 --> Payer[Payer feeds]
+    HL7 --> Retry[(Interface retry queue)]
+    Retry --> Reconcile[Replay and reconciliation dashboard]
+    Reconcile --> Domains
 ```
 
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **data lineage, PHI classification, and projection flows**. The boundaries below are specific to `high-level-design/data-flow-diagrams.md` and are intentionally not reused as generic filler text.
+## Data Classification and Persistence Rules
 
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
+| Data Class | Examples | System of Record | Derived Copies |
 |---|---|---|---|
-| Channel Boundary | UI/portal/integration ingress and trust establishment | Internal transaction details | Stable ingress contracts and auth context propagation |
-| Core Domain Boundary | Patient/ADT/clinical/orders/billing service partitioning | External SLA ownership | Clear ownership and bounded failure domains |
-| Platform Boundary | Eventing, observability, identity, and audit services | Domain-specific policy logic | Shared resilience and security foundations |
+| Patient identity | names, aliases, identifiers, demographics, privacy flags | Patient Service | FHIR cache, read models |
+| Clinical record | notes, diagnoses, care plans, order shells, consent references | Clinical Service | chart timeline, analytics |
+| Department execution | specimen status, dispense status, radiology accession, MAR outcome | owning departmental service | dashboards and billing projection |
+| ADT and occupancy | admission segments, transfers, bed status, discharge disposition | ADT Service | bed board, billing projection |
+| Revenue cycle | charges, claims, remittance, denials | Billing and Insurance services | finance reports |
+| Audit evidence | PHI reads, break-glass, merges, corrections, replay actions | Audit Service | SIEM and compliance exports |
 
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `data-flow-diagrams` workflows must be validated before state mutation. | `GET /v1/platform/topology/contracts` with explicit error taxonomy and correlation IDs. | `service_contracts, dependency_graph, data_lineage_edges` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
+## Flow Control Rules
+- All mutating workflows write to the service database and outbox in one local transaction.
+- Kafka consumers must be idempotent using message key plus domain version or natural business key.
+- Read models may lag temporarily but cannot become authoritative for clinical actions.
+- Downtime entry batches are tagged with downtime source, operator, and reconciliation status.
+- Sensitive data exports require purpose-of-use, recipient, and retention metadata.
 
-## Interoperability Assumptions for `data-flow-diagrams.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
-
-### Interoperability and Control Flow
-```mermaid
-flowchart LR
-    A[high-level-design:data-flow-diagrams] --> B[API: GET /v1/platform/topology/contracts]
-    B --> C[Data: service_contracts, dependency_graph, data_lineage_edges]
-    C --> D[Control: Monitoring + Audit + Runbook]
-    D --> E[Recovery/Verification Loop]
-```
-
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `data-flow-diagrams.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.

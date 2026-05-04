@@ -1,58 +1,57 @@
 # Patient Identity Merge
 
-## Scenario
-MPI collisions and safe chart merge workflows.
+## Purpose
+Define the governance and technical workflow for duplicate patient detection, merge, and unmerge in the **Hospital Information System**.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## Merge Risk Categories
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+| Category | Example | Handling |
+|---|---|---|
+| Low risk duplicate | same legal name, DOB, phone, and national ID | MPI analyst review with single approval |
+| Medium risk duplicate | partial demographic mismatch but strong historical linkage | dual review by MPI analyst and registrar |
+| High risk duplicate | neonatal twins, trauma aliases, deceased mismatch, legal hold | mandatory dual approval plus physician validation |
+| Prohibited auto-merge | conflicting sex, incompatible age, active legal hold conflict | no merge until manual adjudication |
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
+## Merge Workflow
+```mermaid
+flowchart TD
+    Candidate[Duplicate candidate detected] --> Review[Review demographics identifiers and chart overlap]
+    Review --> Contra{Contraindication present}
+    Contra -- Yes --> Escalate[Escalate to governed review]
+    Contra -- No --> Approve[Approve merge]
+    Approve --> Snapshot[Write lineage snapshot]
+    Snapshot --> Repoint[Repoint aliases and downstream references]
+    Repoint --> Reconcile[Publish merge event and reconcile services]
+    Reconcile --> Close[Close case]
+```
 
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+## Merge Preconditions
+- Source and target patients must be active or explicitly restorable.
+- Any conflicting deceased status, legal hold, VIP status, or consent directive requires manual review.
+- Merge cannot proceed while an unmerge case is open for either patient.
+- Target patient must be selected according to hospital policy, usually the chart with most complete history or earliest enterprise identity.
 
----
+## Technical Merge Steps
+1. Freeze new merge-sensitive updates on both patient charts for the duration of merge transaction.
+2. Persist merge case, approvals, contraindication review, and pre-merge snapshots.
+3. Repoint aliases, encounters, admissions, orders, results, medications, billing references, and consent directives according to lineage rules.
+4. Publish `patient_merged` event with source and target IDs, merge case ID, and downstream reconciliation requirements.
+5. Mark source chart as inactive merged alias, never hard-delete.
+6. Track downstream service reconciliation until all required services report complete.
 
+## Unmerge Requirements
+- Unmerge is allowed only when a merge case has intact pre-merge snapshot and governance approval.
+- Downstream reconciliation must reverse foreign-key reassignments using stored snapshot mappings.
+- Orders, results, claims, and audit evidence created after merge require manual adjudication if ownership is now ambiguous.
+- Unmerge always creates a new review task for consent, billing, and interface replay verification.
 
-## In-Depth Merge Safety Model
-### Merge Preconditions
-- Confidence score threshold + mandatory human review for risky demographics mismatch.
-- Contraindications: active legal hold conflict, neonatal twin collision, or unresolved deceased status discrepancy.
-- Unmerge capability must remain available with complete lineage restoration.
+## External System Considerations
+- FHIR patient resources must continue to resolve old identifiers through alias mapping after merge.
+- HL7 ADT merge messages must be replayable and idempotent for downstream systems.
+- External payer or HIE references may require manual partner notification when identifiers cannot be updated automatically.
 
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **MPI merge/unmerge safety, lineage, and contraindication handling**. The boundaries below are specific to `edge-cases/patient-identity-merge.md` and are intentionally not reused as generic filler text.
+## Monitoring and Evidence
+- Monitor duplicate rate, merge backlog, unmerge count, and downstream reconciliation lag.
+- Every merge package includes candidate rationale, approvers, impacted services, snapshot ID, and post-merge verification results.
+- High-risk merges require retrospective chart review to ensure allergies, active orders, and billing accounts remain correct.
 
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
-|---|---|---|---|
-| Detection Plane | Signals, anomaly thresholds, and incident trigger criteria | Permanent remediation features | Early detection with low alert noise |
-| Containment Plane | Blast-radius limiting actions and operator approvals | Long-term optimization work | Safe short-term control while preserving evidence |
-| Recovery Plane | Replay/backfill/unwind sequencing and verification | Product roadmap changes | Deterministic restoration and closure evidence |
-
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `patient-identity-merge` workflows must be validated before state mutation. | `POST /v1/operations/incidents/{id}/actions` with explicit error taxonomy and correlation IDs. | `incident_timeline, containment_actions, reconciliation_jobs` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
-
-## Interoperability Assumptions for `patient-identity-merge.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
-
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `patient-identity-merge.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.

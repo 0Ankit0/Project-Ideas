@@ -1,66 +1,48 @@
 # Backend Status Matrix
 
 ## Purpose
-Define the backend status matrix artifacts for the **Hospital Information System** with implementation-ready detail.
+Track delivery readiness of the **Hospital Information System** backend domains so release managers know what is build-ready, what still needs design work, and what evidence is required before go-live.
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
+## Maturity Scale
+- **L0 Planned**: scope identified, no stable contracts.
+- **L1 Designed**: state model, APIs, events, and security expectations documented.
+- **L2 Build Ready**: contracts frozen, migration plan approved, test plan defined.
+- **L3 Feature Complete**: implementation, automated tests, and observability complete in staging.
+- **L4 Go-Live Ready**: operational runbooks, support ownership, drill evidence, and compliance sign-off complete.
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+## Domain Status Matrix
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+| Service Domain | Capability Highlights | Current Target | Blocking Work | Go-Live Evidence |
+|---|---|---|---|---|
+| Patient Identity | EMPI, MRN, aliases, merge or unmerge, consent registry, deceased handling | L2 Build Ready | finalize probabilistic match tuning, FHIR patient mapping, dual-approval merge UX | duplicate test suite, merge replay drill, consent audit report |
+| ADT and Bed Management | admission, transfer, discharge, bed board, room cleaning, census | L2 Build Ready | ward rule catalog, environmental services integration, boarding queue logic | admit and transfer workflow test, capacity alert dashboard |
+| Clinical | encounters, notes, diagnoses, problem list, shared order shell, discharge summary | L2 Build Ready | encounter template config, signature workflow, addendum model | signed note immutability tests, discharge journey test |
+| Pharmacy | formulary, verification queue, dispense, MAR, controlled substance log | L1 Designed | formulary source integration, barcode workflow, witness capture | med admin journey test, controlled substance audit export |
+| Lab | specimen tracking, result versioning, critical alerts, analyzer interfaces | L1 Designed | specimen label workflow, analyzer connector, escalation policy matrix | critical result drill, ORU mapping verification |
+| Radiology | modality worklist, accession, report lifecycle, PACS links | L1 Designed | PACS connector, report correction model, image reference policy | radiology order to report test, PACS outage replay test |
+| Billing | charge rules, claim work queue, invoice and remittance, denial handling | L1 Designed | charge description master mapping, coding handoff, denial reason catalog | clean claim test, remittance replay evidence |
+| Insurance | eligibility, pre-auth, claim submit, claim status, payer exception handling | L1 Designed | payer adapter library, timeout policy, auth response normalization | payer sandbox test, outage retry drill |
+| Staff | provider directory, departments, privileges, roster lookup | L3 Feature Complete | finalize HR sync error handling | privilege sync alerts, stale roster test |
+| OT | booking, surgical checklist, post-op note hooks | L1 Designed | surgical workflow integration with ADT and Clinical | surgery booking test, checklist audit trail |
+| FHIR Adapter | Patient, Encounter, Observation, DiagnosticReport, MedicationRequest, Coverage, Consent | L1 Designed | profile definitions, compartment filtering, SMART scopes | FHIR conformance test pack |
+| HL7 Integration Engine | ADT, ORM, ORU, ACK, replay, dead-letter operations | L2 Build Ready | partner endpoint configs, ACK timeout tuning | interface replay drill, ACK reconciliation report |
+| Audit and Notification | PHI access evidence, break-glass, critical alerts, outage notices | L2 Build Ready | retrospective review queue, notification channel failover | audit fail-secure test, critical alert delivery test |
 
+## Release Gates by Wave
 
-## Delivery Emphasis
-- Milestones mapped to slices that are testable end-to-end.
-- CI quality gates include lint, unit/integration tests, and contract checks.
-- Backend status matrix tracks readiness by capability and release wave.
+| Wave | Services Required at L4 | Notes |
+|---|---|---|
+| Wave 1 | Patient Identity, Staff, Audit and Notification | foundation for identity, consent, and access controls |
+| Wave 2 | ADT and Bed Management | enables inpatient operations and bed board |
+| Wave 3 | Clinical, FHIR Adapter | encounter record becomes usable for care documentation |
+| Wave 4 | Pharmacy, Lab, Radiology, HL7 Integration Engine | closed-loop clinical operations |
+| Wave 5 | Billing, Insurance | revenue cycle and payer workflows |
+| Wave 6 | OT plus all prior domains with DR evidence | full operational hardening |
 
----
+## Readiness Review Questions
+1. Are APIs, event schemas, and migrations compatible with previous release versions.
+2. Can the team replay duplicate or failed events without manual database edits.
+3. Does the service have on-call ownership and alert thresholds tuned for production.
+4. Is PHI access audited for every sensitive operation.
+5. Has the service passed downtime and recovery scenarios relevant to its domain.
 
-
-## Implementation Readiness Matrix Details
-### Capability Maturity Scale
-- **L0**: draft API/data contract only.
-- **L1**: endpoint implemented with unit tests.
-- **L2**: integration-tested with contract verification and observability hooks.
-- **L3**: production-ready with runbook, SLO dashboard, and on-call ownership.
-
-### Exit Criteria per Module
-- Patient/ADT: replay-safe idempotency + merge/unmerge workflows validated.
-- Clinical/orders: CDS gating, result reconciliation, and abnormal alert workflows validated.
-- Billing: claim lifecycle + denial pathways validated against sandbox payer endpoints.
-
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **delivery maturity scoring and go-live exit criteria**. The boundaries below are specific to `implementation/backend-status-matrix.md` and are intentionally not reused as generic filler text.
-
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
-|---|---|---|---|
-| Build & Test Pipeline | Lint, unit/integration/contract tests and policy checks | Runtime scaling strategy | Release quality evidence with traceability |
-| Runtime Service Layer | Endpoint handlers, orchestration, retry/dedupe behavior | CI orchestration internals | Production-safe mutating behavior |
-| Operational Readiness | Runbook links, SLO dashboards, pager ownership | Product feature semantics | Day-2 readiness and controlled rollout posture |
-
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `backend-status-matrix` workflows must be validated before state mutation. | `POST /v1/releases/{service}/promote` with explicit error taxonomy and correlation IDs. | `readiness_matrix, release_evidence, rollout_audits` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
-
-## Interoperability Assumptions for `backend-status-matrix.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
-
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `backend-status-matrix.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.

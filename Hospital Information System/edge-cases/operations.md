@@ -1,47 +1,54 @@
 # Operations
 
-## Day-2 Readiness
-- SLO dashboard for availability, latency, and data freshness.
-- Runbooks for incident triage, rollback, replay, and backfill.
-- Capacity planning based on peak traffic and queue depth trends.
+## Purpose
+Capture day-2 operations guidance for the **Hospital Information System**, with emphasis on clinical safety, incident response, replay, and service ownership.
 
-## Incident Lifecycle
-1. Detect and classify severity with ownership routing.
-2. Contain blast radius and communicate stakeholder impact.
-3. Recover service and data consistency.
-4. Publish postmortem with corrective actions and deadlines.
+## SLO and Alerting Model
 
----
-
-
-## In-Depth Operational Readiness
-### SRE/Operations Control Plane
-- Golden signals tracked per capability: latency, error rate, saturation, and data freshness.
-- Error budgets enforce release throttling when critical-path SLO burn exceeds thresholds.
-- Incident command model includes clinical liaison role for patient-impact interpretation.
-
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **incident lifecycle, SLO governance, and service ownership model**. The boundaries below are specific to `edge-cases/operations.md` and are intentionally not reused as generic filler text.
-
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
+| Capability | SLI | Target | Page Threshold |
 |---|---|---|---|
-| Detection Plane | Signals, anomaly thresholds, and incident trigger criteria | Permanent remediation features | Early detection with low alert noise |
-| Containment Plane | Blast-radius limiting actions and operator approvals | Long-term optimization work | Safe short-term control while preserving evidence |
-| Recovery Plane | Replay/backfill/unwind sequencing and verification | Product roadmap changes | Deterministic restoration and closure evidence |
+| Patient search | successful search latency | P95 under 2 seconds | 15 minutes above threshold |
+| Admission commit | success rate | 99.95 percent | 5 failed admissions in 5 minutes |
+| Medication administration | write success plus queue freshness | 99.95 percent and lag under 30 seconds | lag over 5 minutes |
+| Critical result escalation | time to first alert | under 5 minutes | any breach |
+| HL7 or FHIR delivery | successful delivery rate | 99.9 percent | retry queue over threshold |
+| Audit ingestion | accepted audit events | 100 percent for PHI access | any drop or fail-secure event |
 
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `operations` workflows must be validated before state mutation. | `POST /v1/operations/incidents/{id}/actions` with explicit error taxonomy and correlation IDs. | `incident_timeline, containment_actions, reconciliation_jobs` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
+## Operational Roles
+- **Platform SRE** owns cluster, network, observability, secret rotation, and deployment health.
+- **Clinical Ops Liaison** interprets patient impact, downtime activation, and operational communication.
+- **Integration Engineer** owns HL7, FHIR, payer, LIS, and PACS replay or mapping issues.
+- **Application On-Call** owns service-specific defects, replay approval, and schema rollback support.
+- **Compliance Officer** is notified for break-glass anomalies, PHI access incidents, and audit evidence requests.
 
-## Interoperability Assumptions for `operations.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
+## Incident Command Workflow
+1. Classify incident severity and impacted workflows.
+2. Determine whether downtime mode or feature freeze is required.
+3. Contain blast radius by pausing risky jobs, replay loops, or external connectors.
+4. Restore service availability.
+5. Reconcile data correctness using workflow-specific dashboards.
+6. Publish post-incident corrective actions mapped to services and control gaps.
 
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `operations.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.
+## Replay and Reconciliation Operations
+- Provide tooling to replay events by topic, patient, encounter, message control ID, or outage window.
+- Replays must be dry-runnable to show expected writes before execution.
+- Each replay run stores operator, reason, input filters, records touched, and verification outcome.
+- Reconciliation dashboards must exist for MPI merges, ADT census, active orders, MAR, critical alerts, and claim transmission.
+
+## Common Operational Playbooks
+
+| Playbook | Trigger | First Check |
+|---|---|---|
+| EMPI duplicate spike | duplicate queue growth or MRN collision alert | recent registration source, matching thresholds, feed quality |
+| Bed board inconsistency | census mismatch or occupied dirty bed | ADT events vs occupancy segments |
+| Critical result backlog | unacknowledged critical alert over SLA | notification channel health and provider roster |
+| Medication admin lag | MAR write lag or barcode service failure | pharmacy queue and bedside network |
+| Interface outage | ACK timeout or HTTP 5xx from partner | connector logs, retry queue depth, partner status |
+| Claim submission backlog | claim queue growth or payer outage | insurance adapter health, bill holds, discharge completeness |
+
+## Evidence and Audit Readiness
+- Runbooks must include exact dashboards, saved searches, and replay commands.
+- Production incidents touching PHI or patient safety require evidence package creation within 24 hours.
+- Postmortems must state patient impact, data integrity impact, and whether manual chart review was required.
+- Quarterly game days cover identity merge failure, ADT outage, critical result escalation failure, and regional failover.
+

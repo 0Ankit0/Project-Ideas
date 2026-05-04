@@ -1,58 +1,59 @@
 # Consent Sensitive Data Access
 
-## Scenario
-Sensitive chart segmentation and consent checks.
+## Purpose
+Define how the **Hospital Information System** handles sensitive chart compartments, patient consent directives, break-glass access, and retrospective privacy review.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## Sensitive Data Categories
+- Behavioral health and substance use treatment notes.
+- HIV and sexually transmitted infection related results where local policy requires segmentation.
+- Reproductive health records and restricted imaging or lab results.
+- Research participation data and records covered by study-specific consent.
+- VIP and confidential encounter flags.
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+## Consent Evaluation Inputs
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
+| Input | Example |
+|---|---|
+| Actor role | attending physician, charge nurse, registrar, biller |
+| Purpose of use | treatment, payment, operations, legal, emergency, research |
+| Relationship | assigned care team, consulting service, none |
+| Location | same facility, external affiliate, remote support session |
+| Consent status | active, revoked, expired, emergency override |
+| Data segment | behavioral health, HIV, reproductive care, VIP chart |
 
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+## Break-Glass Flow
+```mermaid
+flowchart TD
+    Access[User requests sensitive record] --> Policy[Evaluate policy and consent]
+    Policy -- Allowed --> Grant[Grant scoped access]
+    Policy -- Denied --> Reason[Show denial reason]
+    Reason --> BreakGlass{Emergency access needed}
+    BreakGlass -- No --> End[Access denied]
+    BreakGlass -- Yes --> Justify[Capture reason and duration]
+    Justify --> GrantBG[Grant time bound break glass]
+    GrantBG --> Review[Create retrospective review task]
+```
 
----
+## Implementation Rules
+1. Sensitive compartments are tagged at record and field level where necessary.
+2. Search results return masked existence or no-hit depending on policy. They never leak sensitive diagnosis text to unauthorized users.
+3. Break-glass grants only the minimum data compartments requested and expires automatically.
+4. Break-glass cannot be used for bulk export or non-care workflow actions unless separately approved.
+5. Consent revocation invalidates cached decisions and future access immediately.
 
+## Audit Evidence Requirements
+- Record actor, role, patient, compartment, purpose-of-use, policy version, decision, workstation, IP, and correlation ID.
+- For break-glass, also record justification text, approving policy path, duration, records viewed, and retrospective reviewer.
+- Provide daily report of break-glass events and repeated denied-access attempts.
+- Allow auditors to reconstruct the exact consent document and policy version used at access time.
 
-## In-Depth Consent Segmentation Controls
-### Consent Evaluation Model
-- Evaluate by purpose-of-use, actor role, relationship-to-patient, and jurisdiction constraints.
-- Segmented records require explicit break-glass token and retrospective review task.
-- Data minimization applies to search results, exports, and audit viewer UX.
+## External Integration Considerations
+- FHIR responses must enforce compartment filters before resource serialization.
+- HL7 interfaces only send sensitive data to approved destinations with data-sharing consent and allowlisted endpoints.
+- Research exports must use de-identification or limited-data-set logic unless an IRB-approved exception exists.
 
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **purpose-of-use gating and segmented chart access policy**. The boundaries below are specific to `edge-cases/consent-sensitive-data-access.md` and are intentionally not reused as generic filler text.
+## Operational Edge Cases
+- If Consent Service is unavailable, the platform fails closed for sensitive compartments and opens downtime guidance for emergency access.
+- If a patient merge occurs, consent directives must be reconciled carefully. Conflicting directives require manual privacy review.
+- VIP flags propagate to read models and notification channels so support staff do not inadvertently expose sensitive patient identity.
 
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
-|---|---|---|---|
-| Detection Plane | Signals, anomaly thresholds, and incident trigger criteria | Permanent remediation features | Early detection with low alert noise |
-| Containment Plane | Blast-radius limiting actions and operator approvals | Long-term optimization work | Safe short-term control while preserving evidence |
-| Recovery Plane | Replay/backfill/unwind sequencing and verification | Product roadmap changes | Deterministic restoration and closure evidence |
-
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `consent-sensitive-data-access` workflows must be validated before state mutation. | `POST /v1/operations/incidents/{id}/actions` with explicit error taxonomy and correlation IDs. | `incident_timeline, containment_actions, reconciliation_jobs` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
-
-## Interoperability Assumptions for `consent-sensitive-data-access.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
-
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `consent-sensitive-data-access.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.

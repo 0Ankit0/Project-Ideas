@@ -1,60 +1,54 @@
 # API And Ui
 
-## API Reliability Risks
-- Duplicate client retries without stable idempotency keys.
-- Pagination drift during concurrent writes.
-- Partial-success composite operations lacking clear error contracts.
+## Purpose
+Document API and user-interface failure modes that matter most in a hospital setting where stale state, duplicate submissions, and poor remediation guidance can create patient-safety issues.
 
-## UI/UX Risks
-- Stale optimistic views conflicting with authoritative backend state.
-- Ambiguous validation and remediation guidance for operators.
+## High-Risk API and UI Scenarios
 
-## Guardrails
-- Standardized error taxonomy and retryability hints.
-- ETag/version preconditions for concurrent edits.
-- Correlated request IDs visible in UI and support tooling.
+| Scenario | API Risk | UI Risk | Required Behavior |
+|---|---|---|---|
+| Duplicate registration submit | repeated create request issues second MRN | clerk thinks first click failed | idempotency key returns original response and UI shows saved patient identity |
+| Concurrent bed assignment | two staff assign same bed | stale bed board display | optimistic locking returns conflict with current bed holder and queue options |
+| Corrected order after user opened chart | old order appears valid in cached view | nurse administers based on stale list | UI forces refresh banner and highlights superseded order |
+| Critical result acknowledgement race | two clinicians acknowledge same alert | one user sees cleared alert late | first acknowledgement wins, second gets informative stale response |
+| Payer timeout during discharge | claim readiness unknown | discharging team thinks discharge failed | discharge completes, billing panel shows deferred payer verification |
+| External outage | partner call blocks user workflow | generic error without next step | UI displays outage-specific fallback instructions and support code |
 
----
+## Error Contract Standard
+- HTTP error body must include `code`, `message`, `retryable`, `user_action`, `correlation_id`, and optional `current_version`.
+- `409` conflicts are used for stale edits, occupied beds, and already-acknowledged alerts.
+- `422` is used for business-rule validation such as missing consent or incompatible bed type.
+- `503` is used only for temporary dependency outages where retry or fallback is appropriate.
+- UI must always show correlation ID to support staff.
 
-
-## API/UI Hardening Details
-### Contract Resilience Patterns
-- UI uses server-issued form schemas to reduce drift between validation layers.
-- API returns machine-actionable remediation hints for operator workflows.
-- Conflict handling uses ETags and conflict payload with stale field diffs.
-
-### Operator UX for Failures
+## Operator Failure Remediation Flow
 ```mermaid
 flowchart TD
-    A[User submits action] --> B{409/422 received?}
-    B -- Yes --> C[Render remediation panel]
-    C --> D[Show authoritative server state diff]
-    D --> E[Retry with updated preconditions]
-    B -- No --> F[Confirm success + audit ref]
+    Submit[User submits action] --> Response{Response type}
+    Response -- Success --> Confirm[Show success and audit reference]
+    Response -- Conflict --> Diff[Show server state diff]
+    Diff --> Retry[Retry with latest version]
+    Response -- Validation --> Guidance[Show rule-specific guidance]
+    Response -- Outage --> Fallback[Show downtime or manual fallback]
 ```
 
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **operator UX behavior under API conflicts, retries, and stale state**. The boundaries below are specific to `edge-cases/api-and-ui.md` and are intentionally not reused as generic filler text.
+## UI Design Rules for Hospital Safety
+- Never hide the authoritative patient banner. Include name, DOB, age, sex, enterprise ID, current location, allergy status, and privacy flag on every clinical screen.
+- Highlight temporary trauma identities and merged identities with explicit status ribbons.
+- When an order or result is corrected, visually distinguish the original, the correction reason, and the active replacement.
+- Use modal confirmation for break-glass, merge, unmerge, discontinue, cancel, and entered-in-error actions.
+- Show countdown timers for critical result acknowledgement and verbal order authentication.
 
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
-|---|---|---|---|
-| Detection Plane | Signals, anomaly thresholds, and incident trigger criteria | Permanent remediation features | Early detection with low alert noise |
-| Containment Plane | Blast-radius limiting actions and operator approvals | Long-term optimization work | Safe short-term control while preserving evidence |
-| Recovery Plane | Replay/backfill/unwind sequencing and verification | Product roadmap changes | Deterministic restoration and closure evidence |
+## API Edge Cases to Implement
+1. Idempotent create endpoints for patient registration, admission, transfer, and claim submission.
+2. Cursor pagination for large chart timelines so new events do not reorder existing pages.
+3. ETag support for editable resources such as notes, care plans, and bed board actions.
+4. Partial success envelope for batch downtime import with per-row disposition and remediation reasons.
+5. Redaction-aware search results for sensitive charts so unauthorized users see existence only when policy allows.
 
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `api-and-ui` workflows must be validated before state mutation. | `POST /v1/operations/incidents/{id}/actions` with explicit error taxonomy and correlation IDs. | `incident_timeline, containment_actions, reconciliation_jobs` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
+## Observability and Support Requirements
+- Every UI error event must include route, feature flag state, browser or device info, user role, facility, and correlation ID.
+- Support dashboards should link UI error telemetry to backend traces and audit records.
+- API metrics require labels for business operation such as `admit_patient`, `merge_patient`, `ack_critical_result`, and `submit_claim`.
+- Synthetic monitoring must cover login, patient search, admission, chart open, medication administration, discharge, and payer connectivity.
 
-## Interoperability Assumptions for `api-and-ui.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
-
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `api-and-ui.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.

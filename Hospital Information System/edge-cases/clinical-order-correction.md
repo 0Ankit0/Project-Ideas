@@ -1,58 +1,66 @@
 # Clinical Order Correction
 
-## Scenario
-Order amendment with signed audit integrity.
+## Purpose
+Define the safety model for correcting, discontinuing, canceling, or marking orders entered in error in the **Hospital Information System**.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## Correction Taxonomy
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
-
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
-
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
-
----
-
-
-## In-Depth Correction Protocol
-### Clinical Safety Controls
-- Corrections require role-qualified signer and reason taxonomy (`entry_error`, `wrong_patient`, `duplicate`).
-- Corrected orders preserve immutable original and chain-of-custody links.
-- Notification fan-out to pharmacy/lab/nursing is mandatory before chart closure.
-
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **signed amendment controls and downstream correction propagation**. The boundaries below are specific to `edge-cases/clinical-order-correction.md` and are intentionally not reused as generic filler text.
-
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
+| Action | When Used | Allowed Order States | Core Requirement |
 |---|---|---|---|
-| Detection Plane | Signals, anomaly thresholds, and incident trigger criteria | Permanent remediation features | Early detection with low alert noise |
-| Containment Plane | Blast-radius limiting actions and operator approvals | Long-term optimization work | Safe short-term control while preserving evidence |
-| Recovery Plane | Replay/backfill/unwind sequencing and verification | Product roadmap changes | Deterministic restoration and closure evidence |
+| Cancel | order should never start | `draft`, `pending_signature`, `active` with no fulfillment | downstream tasks removed before execution |
+| Discontinue | future execution should stop | `active`, `in_progress` | performed work remains in history |
+| Correct | details need replacement | `active`, `in_progress`, `completed` if result or dispense not yet final | replacement order linked to original |
+| Entered in error | wrong patient or invalid order | any state with governance approval | incident evidence and remediation workflow required |
 
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `clinical-order-correction` workflows must be validated before state mutation. | `POST /v1/operations/incidents/{id}/actions` with explicit error taxonomy and correlation IDs. | `incident_timeline, containment_actions, reconciliation_jobs` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
+## Safety Decision Flow
+```mermaid
+flowchart TD
+    Detect[Detect issue] --> State[Check current order state]
+    State --> Downstream[Check pharmacy lab radiology fulfillment]
+    Downstream --> Decide{Correction type}
+    Decide -- Cancel --> CancelTask[Cancel open tasks]
+    Decide -- Discontinue --> StopFuture[Stop future execution]
+    Decide -- Correct --> Replace[Create replacement order]
+    Decide -- Error --> Incident[Create incident and remediation tasks]
+    CancelTask --> Notify[Notify downstream teams]
+    StopFuture --> Notify
+    Replace --> Notify
+    Incident --> Notify
+```
 
-## Interoperability Assumptions for `clinical-order-correction.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
+## Required Workflow
+1. Retrieve current order state, version, fulfillment records, and outstanding tasks.
+2. Require actor role and reason code appropriate to the correction type.
+3. Create correction record before changing order state.
+4. Publish correction event to all subscribed departmental services.
+5. Create remediation tasks when fulfillment already occurred.
+6. Update bedside and clinician-facing projections with clear supersession messaging.
 
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `clinical-order-correction.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.
+## Downstream Remediation Rules
+
+| Order Domain | If Fulfillment Started | Remediation Task |
+|---|---|---|
+| Medication | dispensed but not administered | pharmacy return or waste workflow |
+| Medication | administered | adverse event or physician follow-up review if clinically needed |
+| Lab | specimen collected | specimen disposal or annotate as canceled after collection |
+| Lab | result finalized | result amendment review and clinician notification |
+| Radiology | accession created | cancel slot and update modality worklist |
+| Radiology | report finalized | corrected report workflow and chart notification |
+
+## Audit and Governance Requirements
+- Original order remains immutable and visible.
+- `entered_in_error` requires explicit reason, free-text narrative, and elevated approval when fulfillment started.
+- Wrong-patient corrections open a patient safety incident and require chart access review for all impacted users.
+- The system stores which users already viewed or acted on the order so remediation notifications are targeted.
+
+## Integration Considerations
+- HL7 ORM cancellation messages or FHIR Task status updates must be sent for impacted departmental integrations.
+- Retries are safe because the correction event includes the correction ID and original order version.
+- If a downstream system is offline, the order source-of-truth status still changes while the integration engine queues replay.
+
+## Verification Checklist
+- Replacement order references original order and carries copied clinical context plus corrected fields.
+- MAR, specimen queue, modality worklist, and charge projections reflect the new order status.
+- Notifications sent to ordering provider, active bedside staff, and impacted department.
+- Audit report shows who corrected the order, why, when, and what downstream actions completed.
+

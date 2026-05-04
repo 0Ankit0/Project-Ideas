@@ -1,69 +1,94 @@
 # Cloud Architecture
 
 ## Purpose
-Define the cloud architecture artifacts for the **Hospital Information System** with implementation-ready detail.
+Define the production cloud architecture for the **Hospital Information System** with controls suitable for regulated healthcare workloads, zero-trust networking, and disaster recovery.
 
-## Domain Context
-- Domain: Hospital
-- Core entities: Patient, Encounter, Admission, Clinical Order, Medication Administration, Care Plan, Discharge Summary
-- Primary workflows: patient registration and identity resolution, admission-transfer-discharge, order placement and fulfillment, care documentation and handoff, discharge and follow-up coordination
-
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
-
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
-
-
-## Infrastructure Emphasis
-- Multi-environment topology (dev/stage/prod) with promotion gates.
-- Network segmentation, private service communication, and WAF boundaries.
-- Backup, disaster recovery, and key rotation procedures.
-
----
-
-
-## Cloud Implementation Depth
-### Environment Segmentation
-- Dedicated accounts/projects per environment with SCP/policy guardrails.
-- Private subnets for data plane; egress controlled through inspected gateways.
-- Secrets are managed by centralized vault/KMS with rotation and access policy attestations.
-
-### Disaster Recovery Topology
+## Target Platform Topology
 ```mermaid
 flowchart TB
-    Prim[Primary Region] --> Rep[(Cross-region Replication)]
-    Rep --> Sec[Secondary Region Standby]
-    Sec --> Drill[Quarterly DR Drill]
-    Drill --> Report[Recovery Evidence Report]
+    subgraph Primary[Primary region]
+        Edge[WAF and API edge]
+        K8s[Kubernetes clusters]
+        Data[Managed data services]
+        Obs[Observability and SIEM]
+    end
+
+    subgraph Secondary[Secondary region]
+        Warm[Warm standby clusters]
+        Replica[Replicated databases and object storage]
+    end
+
+    Corp[Hospital campus and VPN]
+    Partners[External partners]
+    Vault[Vault and KMS]
+    Archive[Immutable backup archive]
+
+    Corp --> Edge
+    Partners --> Edge
+    Edge --> K8s
+    K8s --> Data
+    K8s --> Obs
+    K8s --> Vault
+    Data --> Replica
+    Data --> Archive
+    Warm --> Replica
 ```
 
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **region/account topology, DR posture, and platform controls**. The boundaries below are specific to `infrastructure/cloud-architecture.md` and are intentionally not reused as generic filler text.
+## Environment Strategy
 
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
-|---|---|---|---|
-| Network Security Layer | WAF, segmentation, service mesh identity, egress control | Application business logic | Zero-trust communications and least privilege |
-| Compute & Orchestration Layer | Workload placement, autoscaling, rollout topology | Data model design | Availability and fault isolation under load |
-| Data Protection Layer | Backups, encryption, replication, key lifecycle | Clinical workflow definition | Recoverability and confidentiality controls |
+| Environment | Purpose | Isolation Pattern |
+|---|---|---|
+| Developer sandbox | Service development and local integration | Separate cloud account or project, synthetic data only |
+| Integration | Contract tests with shared dependencies | Isolated namespace and non-production keys |
+| Staging | Production-like validation, migration rehearsal, DR drill | Separate account, masked PHI, production topology |
+| Production | Live hospital operations | Dedicated account, private connectivity, break-glass admin only |
+| DR rehearsal | Recovery automation verification | Secondary region with replay-safe test data |
 
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `cloud-architecture` workflows must be validated before state mutation. | `POST /v1/platform/drills/{region}/execute` with explicit error taxonomy and correlation IDs. | `network_policies, dr_snapshots, key_rotation_log` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
+## Workload Placement
+- **Edge tier** hosts WAF, API gateway, ingress controllers, and DDoS protection.
+- **Application tier** hosts domain services, FHIR adapter, integration engine, async workers, and observability agents.
+- **Data tier** hosts PostgreSQL clusters, Redis, Kafka, Elasticsearch or OpenSearch, and object storage with private endpoints.
+- **Security tier** hosts Vault, KMS integration, certificate authority, and audit archive.
 
-## Interoperability Assumptions for `cloud-architecture.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
+## Managed Services and Guardrails
 
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `cloud-architecture.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.
+| Capability | Preferred Service Pattern | Guardrail |
+|---|---|---|
+| Kubernetes | Managed Kubernetes with private API endpoint | Node pools split by workload criticality and trust zone |
+| PostgreSQL | Multi-AZ managed cluster per service group | PITR enabled, TLS required, read replicas for analytics only |
+| Kafka | Managed Kafka or self-managed in isolated nodes | Schema registry, topic ACLs, replication factor 3 |
+| Object storage | S3 compatible buckets with versioning and WORM | Bucket per data class, lifecycle to cold archive |
+| Secrets | Vault with dynamic DB credentials | No long-lived static secrets in CI or workloads |
+| Key management | Cloud KMS backed by HSM | Key rotation every 90 days or on incident |
+| Logging and SIEM | Centralized logging with private ingestion | PHI redaction at source and immutable audit copies |
+
+## Resilience Design
+- Primary region runs active workloads across multiple availability zones.
+- Secondary region maintains warm standby platform services and asynchronous replicas of databases and object storage.
+- Kafka topics are mirrored to secondary region for replay after regional outage.
+- Backups are copied to immutable archive with separate account ownership.
+- DR cutover must support Patient, ADT, Clinical, Pharmacy, Lab, Radiology, Billing, Insurance, FHIR adapter, and audit services within the stated RTO.
+
+## PHI Protection Controls
+- Private connectivity from hospital sites uses VPN or dedicated link termination in the edge tier.
+- No public IPs on application or data nodes.
+- Object stores holding DICOM, scanned documents, or consent forms use bucket policies that deny download outside approved service roles.
+- Database snapshots and backups are encrypted with customer-managed keys.
+- Access to production consoles requires privileged access management, MFA, and session recording.
+
+## Disaster Recovery Workflow
+```mermaid
+flowchart LR
+    Detect[Regional incident declared] --> Freeze[Freeze promotions and risky jobs]
+    Freeze --> Failover[Promote secondary services]
+    Failover --> Replay[Replay queued events and interface backlog]
+    Replay --> Verify[Run census, MAR, result, and billing reconciliation]
+    Verify --> Resume[Resume normal traffic]
+```
+
+## Infrastructure Evidence Requirements
+- Quarterly DR drill with signed evidence for failover timing and reconciliation results.
+- Monthly restore test for each critical database and object archive class.
+- Automated inventory of public endpoints, certificate expiry, KMS key rotation, and unencrypted resource drift.
+- Security and compliance dashboards must show backup health, replication lag, failed login anomalies, and Vault lease expiry.
+

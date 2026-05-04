@@ -1,68 +1,63 @@
 # Security And Compliance
 
-## Sensitive Data Controls
-- Classify data by sensitivity and apply masking/tokenization where needed.
-- Enforce least privilege for users, services, and break-glass access.
+## Purpose
+Describe the operational security and compliance controls for the **Hospital Information System**, especially those tied to PHI protection, auditability, zero-trust access, and regulated healthcare workloads.
 
-## Compliance Requirements
-- Immutable audit logs for admin and policy-changing operations.
-- Evidence collection for periodic internal/external audits.
-- Regional retention/deletion workflows with legal-hold exceptions.
+## Control Domains
 
-## Verification
-- Quarterly access reviews and key rotation checks.
-- Automated policy tests in CI for critical authorization paths.
+| Domain | Key Controls |
+|---|---|
+| Identity and access | SSO, MFA, least privilege, department-scoped roles, break-glass |
+| Data protection | encryption, tokenization where needed, PHI redaction, WORM archives |
+| Auditability | immutable logs, policy decision capture, evidence export, access review |
+| Platform security | mTLS, network policy, image signing, secret rotation, vulnerability management |
+| Privacy governance | consent enforcement, minimum necessary, segmentation, legal hold |
 
----
-
-
-## In-Depth Security Operations
-### Control Evidence Lifecycle
-- Control attestations are generated continuously from runtime telemetry and policy logs.
-- Evidence catalog maps controls to HIPAA safeguards and internal policy IDs.
-- High-risk control failures auto-open incidents with compliance owner escalation.
-
-### Security Monitoring Pipeline
+## Security Monitoring Flow
 ```mermaid
 flowchart LR
-    App[HIS Services] --> Logs[Security/Event Logs]
-    Logs --> SIEM[SIEM Correlation]
-    SIEM --> SOAR[SOAR Playbooks]
-    SOAR --> IR[Incident Response]
-    IR --> Evidence[Audit Evidence Repository]
+    Services[Domain services] --> Audit[Audit and security logs]
+    Audit --> SIEM[SIEM correlation]
+    SIEM --> Alert[Security alert and case]
+    Alert --> IR[Incident response]
+    IR --> Evidence[Evidence repository]
+    Evidence --> Review[Compliance review]
 ```
 
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **security monitoring, control evidence, and audit-ready reporting**. The boundaries below are specific to `edge-cases/security-and-compliance.md` and are intentionally not reused as generic filler text.
+## PHI Control Requirements
+- Every PHI read and write must produce immutable audit evidence.
+- Sensitive identifiers in logs are masked or tokenized before leaving the source service.
+- Service accounts have purpose-bound scopes and cannot browse patient charts.
+- Bulk export requires explicit approval, reason, recipient, time window, and retention plan.
+- Support staff access to production uses privileged sessions with recording and automatic expiration.
 
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
-|---|---|---|---|
-| Detection Plane | Signals, anomaly thresholds, and incident trigger criteria | Permanent remediation features | Early detection with low alert noise |
-| Containment Plane | Blast-radius limiting actions and operator approvals | Long-term optimization work | Safe short-term control while preserving evidence |
-| Recovery Plane | Replay/backfill/unwind sequencing and verification | Product roadmap changes | Deterministic restoration and closure evidence |
+## Access Governance
+- Role catalog must separate registrar, clinician, nurse, pharmacist, lab tech, radiology tech, billing staff, coder, auditor, admin, and support engineer privileges.
+- Department and facility attributes constrain access beyond broad role membership.
+- Break-glass access is time bound and triggers retrospective privacy review.
+- Quarterly access certification is required for privileged roles and service accounts.
 
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `security-and-compliance` workflows must be validated before state mutation. | `POST /v1/operations/incidents/{id}/actions` with explicit error taxonomy and correlation IDs. | `incident_timeline, containment_actions, reconciliation_jobs` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
+## Compliance Evidence Pack
 
-## Interoperability Assumptions for `security-and-compliance.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
+| Evidence Type | Frequency | Source |
+|---|---|---|
+| PHI access audit export | on demand and monthly sample | Audit Service |
+| Break-glass review report | daily | Audit Service and policy engine |
+| Encryption and key rotation status | monthly | KMS, Vault, platform inventory |
+| Vulnerability remediation status | weekly | container and host scanning |
+| Backup and restore proof | monthly | backup platform and DR drills |
+| Interface replay log | per incident | integration engine and audit service |
 
-### Interoperability and Control Flow
-```mermaid
-flowchart LR
-    A[edge-cases:security-and-compliance] --> B[API: POST /v1/operations/incidents/{id}/actions]
-    B --> C[Data: incident_timeline, containment_actions, reconciliation_jobs]
-    C --> D[Control: Monitoring + Audit + Runbook]
-    D --> E[Recovery/Verification Loop]
-```
+## Incident Handling Expectations
+- Security incidents affecting PHI are triaged with compliance and legal involvement from the start.
+- Audit subsystem degradation is treated as Sev 1 because fail-secure behavior can impact care operations.
+- Breach investigation needs exact list of records accessed, actor sessions, affected patients, and policy decisions.
+- Post-incident actions must include control gap remediation, not only service recovery.
 
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `security-and-compliance.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.
+## Technical Guardrails
+1. Signed container images and admission policy for every workload.
+2. Secrets injected at runtime from Vault with lease rotation.
+3. No production PHI in developer environments.
+4. Object storage for records and images uses immutable retention where policy requires.
+5. All admin and data export endpoints are behind explicit allowlists and step-up authentication.
+

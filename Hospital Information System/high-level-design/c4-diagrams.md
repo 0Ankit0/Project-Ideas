@@ -1,76 +1,174 @@
 # C4 Diagrams
 
-## C1: Context
-```mermaid
-flowchart LR
-    Clinician[Clinician] --> HIS[Hospital Information System]
-    FrontDesk[Front Desk] --> HIS
-    BillingTeam[Billing Team] --> HIS
-    HIS <--> Lab[Lab System]
-    HIS <--> Radiology[Radiology System]
-    HIS --> Payer[Payer Gateway]
-    IdP[SSO/IdP] --> HIS
-```
+## Purpose
+Describe the C4 context, container, and service-boundary views for the **Hospital Information System** in a way that aligns with the approved microservices architecture and interoperability model.
 
-## C2: Containers
+## C1 Context Diagram
 ```mermaid
 flowchart TB
-    UI[Web/Portal]
-    API[API/BFF]
-    Core[Core Clinical Services]
-    Worker[Async Worker]
-    DB[(OLTP DB)]
-    MQ[(Event Bus)]
-    WH[(Warehouse)]
+    PatientApp[Patient app]
+    Clinicians[Clinician web and mobile clients]
+    FrontDesk[Registration and billing staff clients]
+    ExternalEHR[External EHR and HIE]
+    LIS[Laboratory information system]
+    PACS[PACS and radiology systems]
+    Payer[Payer and clearinghouse]
+    IdP[Identity provider]
+    HIS[Hospital Information System]
 
-    UI --> API --> Core
-    Core --> DB
-    Core --> MQ
-    Worker --> DB
-    Worker --> MQ
-    Worker --> WH
+    PatientApp --> HIS
+    Clinicians --> HIS
+    FrontDesk --> HIS
+    ExternalEHR <--> HIS
+    LIS <--> HIS
+    PACS <--> HIS
+    Payer <--> HIS
+    IdP --> HIS
 ```
 
----
+### Context Responsibilities
+- The HIS is the system of record for patient identity, ADT, encounters, orders, medication administration, discharge, and charge capture.
+- External EHR and HIE systems consume or supply normalized FHIR resources through the FHIR adapter.
+- LIS and PACS exchange order, result, accession, and imaging metadata through HL7 or vendor connectors.
+- Payer networks handle eligibility, pre-auth, claims, and remittance. They are never the source of truth for hospital clinical state.
 
-
-## C4 Narrative and Constraints
-### Container Contracts
-- UI/BFF is stateless, no PHI persistence, and relies on token-bound session context.
-- Core services own transactional boundaries; integration service owns protocol translation.
-- Analytics/warehouse are downstream projections, never synchronous dependencies for care workflows.
-
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **context/container boundaries and constrained dependencies**. The boundaries below are specific to `high-level-design/c4-diagrams.md` and are intentionally not reused as generic filler text.
-
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
-|---|---|---|---|
-| Channel Boundary | UI/portal/integration ingress and trust establishment | Internal transaction details | Stable ingress contracts and auth context propagation |
-| Core Domain Boundary | Patient/ADT/clinical/orders/billing service partitioning | External SLA ownership | Clear ownership and bounded failure domains |
-| Platform Boundary | Eventing, observability, identity, and audit services | Domain-specific policy logic | Shared resilience and security foundations |
-
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `c4-diagrams` workflows must be validated before state mutation. | `GET /v1/platform/topology/contracts` with explicit error taxonomy and correlation IDs. | `service_contracts, dependency_graph, data_lineage_edges` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
-
-## Interoperability Assumptions for `c4-diagrams.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
-
-### Interoperability and Control Flow
+## C2 Container Diagram
 ```mermaid
 flowchart LR
-    A[high-level-design:c4-diagrams] --> B[API: GET /v1/platform/topology/contracts]
-    B --> C[Data: service_contracts, dependency_graph, data_lineage_edges]
-    C --> D[Control: Monitoring + Audit + Runbook]
-    D --> E[Recovery/Verification Loop]
+    subgraph ClientLayer[Client layer]
+        Portal[React clinical portal]
+        Mobile[Mobile nursing app]
+        Workstation[Shared registration workstations]
+    end
+
+    subgraph EdgeLayer[Edge and integration layer]
+        Gateway[API gateway]
+        Auth[Keycloak and policy engine]
+        FHIR[FHIR adapter]
+        HL7[HL7 integration engine]
+    end
+
+    subgraph CoreDomain[Core microservices]
+        Patient[Patient identity service]
+        ADT[ADT and bed management service]
+        Clinical[Clinical service]
+        Pharmacy[Pharmacy service]
+        Lab[Lab service]
+        Radiology[Radiology service]
+        Billing[Billing service]
+        Insurance[Insurance service]
+        Staff[Staff service]
+        OT[OT service]
+        Notification[Notification service]
+    end
+
+    subgraph Platform[Platform services]
+        Kafka[Kafka event bus]
+        Audit[Audit service]
+        Search[Search and read models]
+        Observability[Observability stack]
+        Vault[Vault and KMS]
+    end
+
+    Portal --> Gateway
+    Mobile --> Gateway
+    Workstation --> Gateway
+    Gateway --> Auth
+    Gateway --> Patient
+    Gateway --> ADT
+    Gateway --> Clinical
+    Gateway --> Billing
+    Gateway --> Insurance
+    Gateway --> Staff
+    Gateway --> OT
+    Gateway --> FHIR
+    FHIR --> Patient
+    FHIR --> Clinical
+    HL7 --> ADT
+    HL7 --> Lab
+    HL7 --> Radiology
+    Clinical --> Pharmacy
+    Clinical --> Lab
+    Clinical --> Radiology
+    Patient --> Kafka
+    ADT --> Kafka
+    Clinical --> Kafka
+    Pharmacy --> Kafka
+    Lab --> Kafka
+    Billing --> Kafka
+    Insurance --> Kafka
+    Kafka --> Notification
+    Kafka --> Search
+    CoreDomain --> Audit
+    CoreDomain --> Observability
+    CoreDomain --> Vault
 ```
 
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `c4-diagrams.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.
+### Container Responsibilities
+
+| Container | Responsibility | Data Ownership |
+|---|---|---|
+| API gateway | Authenticated ingress, rate limiting, routing, correlation ID propagation | No PHI persistence |
+| Auth and policy | OIDC tokens, RBAC, ABAC, break-glass policy, service identity | Identity metadata and policy bundles |
+| FHIR adapter | Resource translation between internal models and FHIR R4 | Adapter cache only |
+| HL7 integration engine | HL7 v2 MLLP routing, ACK handling, replay, mapping | Message journal |
+| Core microservices | Domain workflows and authoritative state | Each service owns its schema |
+| Kafka | Domain event transport and durable replay log | Event topics and archive |
+| Audit service | Immutable access and mutation evidence | Audit store |
+| Search and read models | Bed board, chart timeline, MPI search, operational dashboards | Derived projections only |
+| Observability | Metrics, logs, traces, alerting | Telemetry only |
+
+## C3 Service Collaboration Diagram
+```mermaid
+flowchart TD
+    Patient[Patient identity]
+    ADT[ADT and bed management]
+    Clinical[Clinical]
+    Pharmacy[Pharmacy]
+    Lab[Lab]
+    Radiology[Radiology]
+    Billing[Billing]
+    Insurance[Insurance]
+    FHIR[FHIR adapter]
+    Audit[Audit]
+
+    Patient --> ADT
+    Patient --> Clinical
+    Patient --> FHIR
+    ADT --> Billing
+    ADT --> Clinical
+    Clinical --> Pharmacy
+    Clinical --> Lab
+    Clinical --> Radiology
+    Pharmacy --> Billing
+    Lab --> Clinical
+    Radiology --> Clinical
+    Billing --> Insurance
+    Insurance --> Billing
+    Clinical --> Audit
+    Patient --> Audit
+    ADT --> Audit
+```
+
+## Architectural Constraints
+- Each domain service owns its database and publishes events instead of allowing direct cross-service table access.
+- Patient identity is the source for enterprise patient ID, alias lineage, consent flags, and merge decisions.
+- ADT owns admission segments, bed occupancy, transfer history, and discharge disposition.
+- Clinical owns encounter timeline, notes, diagnoses, and non-departmental order orchestration.
+- Pharmacy, lab, and radiology each own fulfillment state for their orderable domains while Clinical retains the clinician-facing order shell.
+- Billing and insurance are downstream consumers of clinical and ADT events. They must tolerate late or corrected clinical data.
+- All inter-service traffic uses mTLS and zero-trust policy enforcement.
+
+## Cross-Cutting Control Services
+- **Audit service** records PHI reads, merge actions, break-glass events, order corrections, and release promotions.
+- **Notification service** handles critical results, order verification prompts, patient communications, and outage notices.
+- **Observability stack** exposes SLO dashboards for registration, ADT, medication administration, and interface delivery.
+- **Search and read models** build denormalized dashboards such as MPI work queue, bed board, and discharge task list.
+
+## Design Decisions for Implementation
+1. The FHIR adapter is read-through and command-gateway only. It does not own patient state.
+2. HL7 adapters translate message formats but leave business rules to the target domain service.
+3. MPI merge workflow remains isolated in Patient Service with event-driven reconciliation tasks to downstream services.
+4. Critical result escalation is handled by Lab or Radiology services plus Notification service, not by the general API gateway.
+5. Bed management is part of ADT because census, transfer rules, and billing class changes must remain transactionally aligned.
+

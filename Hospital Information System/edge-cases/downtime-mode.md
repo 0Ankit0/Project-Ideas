@@ -1,77 +1,57 @@
 # Downtime Mode
 
-## Scenario
-Clinical continuity during system downtime.
+## Purpose
+Define planned and unplanned downtime procedures for the **Hospital Information System** so clinical care can continue safely and records can later be reconciled to the electronic source of truth.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## Downtime Activation Criteria
+- Tier 1 clinical workflows unavailable beyond five minutes.
+- Campus network isolation from cloud platform.
+- Identity provider outage that blocks most clinical logins.
+- Major external integration outage combined with unsafe manual workaround risk.
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
-
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
-
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
-
----
-
-
-## In-Depth Downtime Operations
-### Planned vs Unplanned Downtime
-- Planned downtime publishes cutover windows, printable downtime packets, and failback checklist.
-- Unplanned downtime triggers emergency charting forms and deferred entry queues.
-- Recovery includes strict ordering for back-entry to avoid temporal inconsistencies.
-
-### Downtime/Fallback Flow
+## Downtime Workflow
 ```mermaid
 flowchart LR
-    D1[Primary system unavailable] --> D2[Activate downtime packet]
-    D2 --> D3[Capture care on paper/local forms]
-    D3 --> D4[Restore HIS]
-    D4 --> D5[Back-enter with dual verification]
-    D5 --> D6[Reconcile and sign-off]
+    Outage[Outage detected] --> Command[Incident command activates downtime]
+    Command --> Packet[Print or open downtime packets]
+    Packet --> Capture[Record care on approved downtime forms]
+    Capture --> Restore[Core services restored]
+    Restore --> BackEntry[Enter downtime records]
+    BackEntry --> Verify[Dual verification and reconciliation]
+    Verify --> Close[Downtime closed]
 ```
 
-## File-Specific Implementation Boundaries
-This artifact is implementation-focused on **planned/unplanned continuity operations and reconciliation sequencing**. The boundaries below are specific to `edge-cases/downtime-mode.md` and are intentionally not reused as generic filler text.
+## Planned Downtime Requirements
+- Publish maintenance window, impacted workflows, and fallback instructions at least 72 hours ahead unless emergency change is approved.
+- Print or stage downtime packets for registration, admission, medication administration, orders, and results review.
+- Freeze non-essential integrations and queue outbound traffic to avoid split-brain data.
+- Capture pre-downtime snapshots for active census, active orders, MAR due list, pending critical results, and unsent claims.
 
-| Boundary Slice | In Scope for this File | Out of Scope for this File | Implementation Consequence |
-|---|---|---|---|
-| Detection Plane | Signals, anomaly thresholds, and incident trigger criteria | Permanent remediation features | Early detection with low alert noise |
-| Containment Plane | Blast-radius limiting actions and operator approvals | Long-term optimization work | Safe short-term control while preserving evidence |
-| Recovery Plane | Replay/backfill/unwind sequencing and verification | Product roadmap changes | Deterministic restoration and closure evidence |
+## Unplanned Downtime Requirements
+- Activate downtime banner and on-unit communication tree.
+- Use local downtime identifiers for new patients or encounters when online search is not possible.
+- Record administration times, order times, and result receipt times on downtime forms with author initials.
+- Manual verbal result escalation remains in effect for critical values.
 
-## Business Rules to API/Data/Operational Controls (File-Specific)
-| Rule Focus | API Enforcement Touchpoint | Data Model/Contract Tie-In | Operational Control |
-|---|---|---|---|
-| Preconditions for `downtime-mode` workflows must be validated before state mutation. | `POST /v1/operations/incidents/{id}/actions` with explicit error taxonomy and correlation IDs. | `incident_timeline, containment_actions, reconciliation_jobs` with strict timestamp, actor, and tenant context fields. | Alert on rule-violation rate and route to owner with SLA-backed response. |
-| Mutations must be replay-safe and duplicate-proof. | Idempotency checks on mutation endpoints and async consumers. | Uniqueness keys + immutable evidence rows for side-effect tracking. | Replay runbook with pre/post reconciliation and sign-off checklist. |
-| Access to sensitive operations must include least-privilege and evidence. | AuthN/AuthZ middleware + policy decision point reason codes. | Audit/event envelopes include policy version and decision outcome. | Quarterly control review and continuous SIEM correlation for anomalies. |
+## Back-Entry and Reconciliation Rules
 
-## Interoperability Assumptions for `downtime-mode.md`
-- Contract versions are explicitly pinned; backward compatibility is managed per versioned API/event schema.
-- External dependencies are treated as failure-prone; timeout/retry budgets and fallback states are documented in this file's scenarios.
-- Observability correlation (`tenant_id`, `actor_id`, `correlation_id`) is required for all critical-path operations in this document scope.
+| Record Type | Reconciliation Requirement |
+|---|---|
+| New patient registration | MPI search rerun before final create, temporary downtime ID retained as alias |
+| Admission or transfer | compare downtime census with ADT occupancy before commit |
+| Medication administration | dual verification against MAR, downtime form, and witness when required |
+| Lab and radiology orders | preserve original occurrence time and ordering provider |
+| Results received during downtime | mark as downtime-imported and re-run critical result alert logic if acknowledgement absent |
+| Discharge | ensure summary, disposition, and charge capture are all represented before closing encounter |
 
-### Interoperability and Control Flow
-```mermaid
-flowchart LR
-    A[edge-cases:downtime-mode] --> B[API: POST /v1/operations/incidents/{id}/actions]
-    B --> C[Data: incident_timeline, containment_actions, reconciliation_jobs]
-    C --> D[Control: Monitoring + Audit + Runbook]
-    D --> E[Recovery/Verification Loop]
-```
+## Source-of-Truth and Provenance Rules
+- Online services remain the authoritative record once restored.
+- Downtime entries must carry original occurrence timestamp, entry timestamp, source document reference, and reconciler identity.
+- Rejected downtime entries remain in the reconciliation queue with reason and supervisor assignment.
+- No downtime record is deleted after import. Errors are corrected through standard amendment workflows.
 
-## Compliance and Security Posture for this Artifact
-- Evidence produced by this workflow/design artifact is audit-consumable (who/what/when/why) and linked to incident/postmortem records.
-- Sensitive data exposure is minimized using role-scoped access and redaction guidance relevant to `downtime-mode.md`.
-- Operational controls for this file include detection, containment, recovery, and verification steps with named ownership.
+## Drill and Verification Expectations
+- Run downtime drill at least twice per year covering admissions, medication administration, and critical result escalation.
+- Measure time to activate downtime, time to back-enter, percent of records reconciled without exception, and unresolved variance count.
+- Keep printable and offline-access instructions versioned and linked to current forms.
+
