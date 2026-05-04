@@ -1,79 +1,54 @@
-# Security And Compliance
+# Security and Compliance Edge Cases — Customer Relationship Management Platform
 
-## Sensitive Data Controls
-- Classify data by sensitivity and apply masking/tokenization where needed.
-- Enforce least privilege for users, services, and break-glass access.
+## Purpose
 
-## Compliance Requirements
-- Immutable audit logs for admin and policy-changing operations.
-- Evidence collection for periodic internal/external audits.
-- Regional retention/deletion workflows with legal-hold exceptions.
+This document focuses on the security and compliance scenarios most likely to fail in a multi-tenant CRM: tenant isolation leaks, RBAC drift, export and erasure mistakes, audit tampering, and service-account overreach.
 
-## Verification
-- Quarterly access reviews and key rotation checks.
-- Automated policy tests in CI for critical authorization paths.
-
-## Domain Glossary
-- **Control Exception**: File-specific term used to anchor decisions in **Security And Compliance**.
-- **Lead**: Prospect record entering qualification and ownership workflows.
-- **Opportunity**: Revenue record tracked through pipeline stages and forecast rollups.
-- **Correlation ID**: Trace identifier propagated across APIs, queues, and audits for this workflow.
-
-## Entity Lifecycles
-- Lifecycle for this document: `Detect -> Contain -> Investigate -> Remediate -> Attest`.
-- Each transition must capture actor, timestamp, source state, target state, and justification note.
+## Control Flow
 
 ```mermaid
-flowchart LR
-    A[Detect] --> B[Contain]
-    B[Contain] --> C[Investigate]
-    C[Investigate] --> D[Remediate]
-    D[Remediate] --> E[Attest]
-    E[Attest]
+flowchart TD
+    Request[User or Service Request] --> Auth[Authenticate and resolve tenant]
+    Auth --> Policy[RBAC and field policy check]
+    Policy --> Domain[Domain action]
+    Domain --> Audit[Immutable audit write]
+    Domain --> Privacy[Privacy and retention policy]
+    Privacy --> Response[Success or policy error]
 ```
 
-## Integration Boundaries
-- Boundaries include IAM, KMS, SIEM, and compliance evidence repositories.
-- Data ownership and write authority must be explicit at each handoff boundary.
-- Interface changes require schema/version review and downstream impact acknowledgement.
+## Scenario Catalog
 
-## Error and Retry Behavior
-- Failed control checks are non-retryable until remediation evidence is attached.
-- Retries must preserve idempotency token and correlation ID context.
-- Exhausted retries route to an operational queue with triage metadata.
+| Scenario | Risk | Required Handling | Acceptance Criteria |
+|---|---|---|---|
+| Cross-tenant identifier guess | user guesses UUID from another tenant | data leak across tenants | every query enforces tenant filter before object lookup success; respond with generic not-found or forbidden per policy | Foreign tenant data never appears in API, search, exports, or logs |
+| Field-level permission bypass | hidden amount or salary-like custom field requested through API | sensitive field exposure | field policy trims response shape and rejects filter/sort on hidden fields | UI and API return the same protected field set |
+| Export includes restricted data | admin builds export after permission changes | oversharing in downloadable files | export manifest is generated from current permission snapshot and revalidated at materialization time | Hidden fields never appear in exports |
+| GDPR erasure on merged subject | subject merged into another contact | surviving record still contains personal data | privacy workflow traverses merge lineage and redacts all linked source identifiers | Search, timeline, and campaigns no longer expose erased subject |
+| Legal hold conflicts with erasure | court hold exists on related records | unlawful deletion or blocked compliance workflow | erasure transitions to `ON_HOLD` with explicit legal hold reason and approver | No deletion occurs while hold is active |
+| Audit log tamper attempt | privileged user or compromised service tries to update audit rows | loss of evidence | app role lacks `UPDATE` and `DELETE`; tamper attempts create security alert | Audit entries are append-only in practice and by policy |
+| Break-glass admin session | emergency access used in incident | untracked privileged actions | break-glass login requires elevated MFA, short TTL, mandatory reason, and flagged audit entries | Every emergency action is easy to query and review |
+| Webhook secret or token leak | logs or UI expose secrets | third parties can spoof callbacks or access provider data | only secret references are stored; UI never re-renders raw secret; rotation invalidates old secret immediately | Compromised secret can be rotated without downtime to unrelated tenants |
+| Service account overreach | background worker reads fields it should not | excessive access blast radius | service accounts get scoped roles by bounded context and separate tenant routing | Worker can act only on its owned aggregates |
+| Retention vs purge mismatch | user deletes file but policy requires retention | evidence missing during audit | operational delete tombstones item while retention archive remains immutable until policy expiry | User-facing delete does not violate retention obligations |
 
-## Measurable Acceptance Criteria
-- 100% privileged actions are auditable with actor, reason, and ticket link.
-- Observability must publish latency, success rate, and failure-class metrics for this document's scope.
-- Quarterly review confirms definitions and diagrams still match production behavior.
+## Compliance-Specific Requirements
 
-## PII Retention and Data Lifecycle Controls
+| Requirement Area | Required System Behavior |
+|---|---|
+| GDPR Article 17 | erase or anonymize personal data, record approver, and propagate downstream deletion tasks |
+| GDPR Article 20 | export only accessible subject data, in a portable file format, with expiry-limited delivery |
+| CAN-SPAM | unsubscribe honored immediately, footer present on all campaign sends, suppression ledger authoritative |
+| SOC 2 evidence | audit logs, access reviews, change approvals, and key rotation evidence are queryable and retained |
 
-| Data Class | Examples | Default Retention | Deletion/Anonymization Rule | Legal Hold Behavior |
-|---|---|---|---|---|
-| Contact Identifiers | name, email, phone | 7 years after last business activity | Hard-delete or irreversible hash on approved erasure request | Hold supersedes deletion until release |
-| Communication Content | email body, call transcripts, meeting notes | 3 years | Content redaction with metadata preservation for audit linkage | Preserve encrypted original under hold token |
-| Consent Records | opt-in/out, lawful basis, source | Duration of relationship + 5 years | Never mutate prior state; append revocation events | Always retained for evidentiary compliance |
-| Audit Logs | auth changes, role updates, exports, merges | 7 years minimum | WORM archive; no direct delete path | Immutable regardless of hold |
+## Operational Guardrails
 
-## Consent and Preference Enforcement
-- Consent is evaluated at send-time and at workflow-enqueue-time.
-- Channel-specific preferences (email, SMS/telephony, call window) override campaign defaults.
-- Every outbound communication must include consent snapshot reference and purpose-of-processing code.
-- Revocation events must propagate to all connectors within 5 minutes and block further sends.
+- Authorization decisions must log policy version and actor type so incidents can be replayed.
+- Sensitive export, erasure, and configuration actions require correlation IDs and immutable audit evidence.
+- Service-to-service credentials rotate independently from tenant provider credentials.
+- Security and privacy alerts route to different queues but share the same correlation model.
 
-## Auditability and Evidence Model
-- All privileged/user-impacting actions capture: actor, tenant, target object, reason code, ticket/link, before/after diff hash.
-- Evidence bundles for audits include policy config version, enforcement logs, and reconciliation outcomes.
-- Audit events are written to append-only storage with cryptographic integrity checks.
+## Test Acceptance Criteria
 
-## Tenant Isolation Controls
-- Logical data isolation: mandatory `tenant_id` row filtering with policy-enforced query guards.
-- Compute isolation: per-tenant rate limits and job partitioning for sync/replay workloads.
-- Secret isolation: provider credentials scoped to tenant-specific KMS keys and vault paths.
-- Backup/restore isolation: restore operations are tenant-scoped and require explicit target-tenant validation.
-
-## Compliance Validation Cadence
-- Monthly automated control tests for retention, consent enforcement, and tenant boundary checks.
-- Quarterly access reviews and sampled evidence walkthroughs for SOC 2 and GDPR controls.
-- Annual disaster-recovery rehearsal validating secure tenant-scoped restore and audit continuity.
+- Cross-tenant, field-level, and export/erasure cases are covered in integration tests and policy tests.
+- Secret rotation and break-glass actions are tested without manual production-only steps.
+- Audit evidence remains queryable even after GDPR erasure redacts subject PII.
