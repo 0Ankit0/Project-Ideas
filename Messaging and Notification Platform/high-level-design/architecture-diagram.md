@@ -1,76 +1,74 @@
 # Architecture Diagram
 
-## Objective
-Provide implementation-ready guidance for **Architecture Diagram** in the Messaging and Notification Platform.
+## Traceability
+- Analysis context: [`../analysis/system-context-diagram.md`](../analysis/system-context-diagram.md)
+- Domain semantics: [`./domain-model.md`](./domain-model.md)
+- Detailed internals: [`../detailed-design/delivery-orchestration-and-template-system.md`](../detailed-design/delivery-orchestration-and-template-system.md)
+- Infrastructure realization: [`../infrastructure/cloud-architecture.md`](../infrastructure/cloud-architecture.md)
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-## Mermaid Diagram
+## Platform Topology
+
 ```mermaid
 flowchart TB
-  Internet --> Edge[API Gateway/WAF]
-  Edge --> API[Notification API Cluster]
-  API --> DB[(PostgreSQL)]
-  API --> Cache[(Redis)]
-  API --> Bus[(Kafka/SQS)]
-  Bus --> Workers[Dispatch Workers]
-  Workers --> Router[Provider Router]
-  Router --> Providers[Channel Providers]
-  Workers --> Audit[(Audit/Event Store)]
-  Workers --> Obs[Metrics/Tracing/Logging]
+  Internet --> Edge[API Gateway + WAF]
+  Edge --> API[Notification API]
+  Edge --> Portal[Operator Portal]
+  API --> Auth[Auth / Tenant Policy]
+  API --> Template[Template Service]
+  API --> Orchestrator[Delivery Orchestrator]
+  API --> Pref[Preference + Consent Service]
+  Portal --> Template
+  Portal --> ProviderAdmin[Provider Management]
+
+  Orchestrator --> Bus[(Kafka / streaming bus)]
+  Orchestrator --> MsgDB[(PostgreSQL metadata)]
+  Orchestrator --> Cache[(Redis)]
+  Bus --> Dispatch[Dispatch Workers]
+  Dispatch --> Router[Provider Routing Engine]
+  Router --> Providers[Email / SMS / Push / Webhook providers]
+  Providers --> Callback[Callback Ingestion]
+  Callback --> Orchestrator
+
+  Orchestrator --> Audit[(Audit + compliance store)]
+  Orchestrator --> Analytics[(Warehouse + dashboards)]
+  Dispatch --> Obs[Metrics / traces / logs]
+  Callback --> Obs
 ```
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
 
-## Coverage
-This document is part of the implementation-ready set and should stay synchronized with requirements, design, and runbooks.
+## Service Responsibilities
 
-## Delivery, Reliability, and Compliance Baseline
+| Service/Domain | Responsibility |
+|---|---|
+| Notification API | authenticated send, status, schedule, cancel, and configuration APIs |
+| Operator Portal | template management, campaign setup, provider routing, DLQ/replay UI |
+| Template Service | versioned templates, rendering schemas, approvals, locale fallback rules |
+| Preference + Consent Service | suppression, quiet hours, legal consent, import/sync workflows |
+| Delivery Orchestrator | policy evaluation, queueing, retry scheduling, failover decisions |
+| Dispatch Workers | channel-specific rendering, provider request execution, callback correlation |
+| Provider Routing Engine | weighted route selection, circuit-breaker state, geo/provider policy |
+| Audit + Analytics | immutable evidence, delivery funnel metrics, compliance exports |
 
-### 1) Delivery semantics
-- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
-- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
-- **Latency tiers:**
-  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
-  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
-  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
-- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
+## Technology Shaping Decisions
 
-### 2) Queue and topic behavior
-- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
-- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
-- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
-- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+- Kafka or equivalent durable bus separates request admission from dispatch so queue pressure does not directly break API availability.
+- Redis is reserved for hot-path caches and counters; canonical state stays in PostgreSQL to preserve auditability and reconciliation.
+- Provider adapters are isolated behind normalized contracts so channel/provider growth does not leak SDK-specific logic into orchestration.
 
-### 3) Retry and dead-letter handling
-- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
-- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
-- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
-- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
-- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+## Critical Paths
 
-### 4) Provider routing and failover
-- **Routing mode:** weighted primary/secondary by channel and geography.
-- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
-- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
-- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
+1. **Request admission path**: API gateway -> API -> consent/policy -> metadata store -> outbox/event bus.
+2. **Dispatch path**: bus -> dispatch worker -> route selection -> provider adapter -> callback ingestion/reconciliation.
+3. **Governance path**: portal -> template service -> approval workflow -> published version cache.
+4. **Evidence path**: state changes -> audit store -> analytics warehouse -> compliance export tooling.
 
-### 5) Template management
-- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
-- **Versioning:** immutable published versions; sends always pin explicit version.
-- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
-- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
+## Architecture Invariants
 
-### 6) Compliance and audit logging
-- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
-- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
-- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
-- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
+- Message metadata is stored before asynchronous dispatch begins.
+- A provider route failure only affects traffic matching that route policy; unrelated channels and healthy providers continue.
+- Compliance decisions are made on authoritative preference data and rechecked immediately before handoff for long-lived queued messages.
 
-## Verification Checklist
-- [ ] All interfaces include idempotency + correlation identifiers.
-- [ ] Retryable vs non-retryable errors are explicitly classified.
-- [ ] DLQ replay process is documented with approvals and guardrails.
-- [ ] Provider failover policy defines trigger, action, and recovery criteria.
-- [ ] Template versioning and approval workflow are enforceable in tooling.
-- [ ] Compliance evidence can be queried by message_id and correlation_id.
+## Operational acceptance criteria
+
+- P0 transactional traffic continues meeting latency targets during partial provider brownouts via failover or queue prioritization.
+- Every service boundary emits correlation IDs, tenant IDs, and actor IDs for audit and trace stitching.
+- Architecture review artifacts explicitly identify which services are latency-critical, compliance-critical, or recovery-critical.

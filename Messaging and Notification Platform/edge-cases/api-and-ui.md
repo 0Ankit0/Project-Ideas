@@ -1,72 +1,65 @@
 # Api And Ui
 
-## Objective
-Provide implementation-ready guidance for **Api And Ui** in the Messaging and Notification Platform.
+## Traceability
+- API contracts: [`../detailed-design/api-design.md`](../detailed-design/api-design.md)
+- Template rules: [`../analysis/business-rules.md`](../analysis/business-rules.md)
+- Delivery flow: [`../detailed-design/delivery-orchestration-and-template-system.md`](../detailed-design/delivery-orchestration-and-template-system.md)
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
+## Scenario Set A: Concurrent Template Publish and Send
 
-## Edge-Case Handling Matrix
-| Scenario | Detection Signal | Automated Action | Manual Action |
-|---|---|---|---|
-| Duplicate event ingestion | idempotency collision | return prior `message_id` | review abuse patterns |
-| Provider timeout storm | timeout/error threshold exceeded | open circuit + failover | incident communication |
-| Template variable mismatch | render exception | mark non-retryable + DLQ | patch template + replay |
-| Consent race condition | stale consent version | re-evaluate at dispatch | legal/compliance review |
+### Trigger
+An operator publishes a new template version while another client submits sends pinned to the prior version.
 
-## Runbook Requirements
-1. Every edge case has alert, owner, severity, and escalation time.
-2. Recovery playbook includes rollback and replay safety checks.
-3. Post-incident review must attach trace IDs and provider evidence.
+```mermaid
+sequenceDiagram
+  participant UI as Portal
+  participant API as Notification API
+  participant TMP as Template Service
+  participant OR as Orchestrator
 
-## Delivery, Reliability, and Compliance Baseline
+  UI->>TMP: Publish version v9
+  API->>OR: Send using pinned version v8
+  TMP-->>UI: v9 published
+  OR->>TMP: Fetch template version v8
+  TMP-->>OR: Return template version v8
+  OR-->>API: Accept send
+```
 
-### 1) Delivery semantics
-- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
-- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
-- **Latency tiers:**
-  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
-  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
-  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
-- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
+### Invariants
+- Sends always resolve the explicitly pinned template version.
+- Publication of a new version must not mutate already accepted sends.
 
-### 2) Queue and topic behavior
-- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
-- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
-- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
-- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+### Operational acceptance criteria
+- Support can explain which template version rendered a message using only `message_id`.
+- UI blocks destructive edits to published versions; new content always creates a new version.
 
-### 3) Retry and dead-letter handling
-- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
-- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
-- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
-- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
-- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+## Scenario Set B: Stale Status in Dashboard or SSE Disconnect
 
-### 4) Provider routing and failover
-- **Routing mode:** weighted primary/secondary by channel and geography.
-- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
-- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
-- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
+### Trigger
+Operator dashboard polls lagging read models while the SSE stream drops during provider callback bursts.
 
-### 5) Template management
-- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
-- **Versioning:** immutable published versions; sends always pin explicit version.
-- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
-- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
+### Invariants
+- Streaming updates are authoritative over eventually consistent summary views.
+- Retry/cancel/replay actions are disabled when status sources disagree.
 
-### 6) Compliance and audit logging
-- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
-- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
-- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
-- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
+### Operational acceptance criteria
+- UI surfaces stale-state warnings with correlation ID and last refresh timestamp.
+- Reconnect flow resumes from last acknowledged event and backfills missed status changes.
 
-## Verification Checklist
-- [ ] All interfaces include idempotency + correlation identifiers.
-- [ ] Retryable vs non-retryable errors are explicitly classified.
-- [ ] DLQ replay process is documented with approvals and guardrails.
-- [ ] Provider failover policy defines trigger, action, and recovery criteria.
-- [ ] Template versioning and approval workflow are enforceable in tooling.
-- [ ] Compliance evidence can be queried by message_id and correlation_id.
+## Scenario Set C: Oversized Preview or Send Payload
+
+### Trigger
+A client submits a very large personalization object or malformed preview payload that could overwhelm renderer memory.
+
+### Invariants
+- Payload-size limits are enforced before rendering.
+- Failed previews do not create message records or queue entries.
+
+### Operational acceptance criteria
+- Error response identifies the violated payload limit and offending field path.
+- Abuse patterns on preview endpoints feed rate-limit and anomaly-detection controls.
+
+---
+
+**Status**: Complete  
+**Document Version**: 2.0

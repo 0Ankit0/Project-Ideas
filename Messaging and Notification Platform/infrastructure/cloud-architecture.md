@@ -1,65 +1,81 @@
 # Cloud Architecture
 
-## Objective
-Provide implementation-ready guidance for **Cloud Architecture** in the Messaging and Notification Platform.
+## Traceability
+- Architecture topology: [`../high-level-design/architecture-diagram.md`](../high-level-design/architecture-diagram.md)
+- Network controls: [`./network-infrastructure.md`](./network-infrastructure.md)
+- Detailed delivery design: [`../detailed-design/delivery-orchestration-and-template-system.md`](../detailed-design/delivery-orchestration-and-template-system.md)
+- Operational delivery plan: [`../implementation/implementation-guidelines.md`](../implementation/implementation-guidelines.md)
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
+## Environment Layout
 
-## Operational Controls
-- Separate prod/non-prod accounts/projects.
-- Per-tenant rate limiting at gateway and worker layers.
-- Regional failover with RPO <= 5 minutes, RTO <= 30 minutes.
-- Secrets rotation every 90 days for provider credentials.
+```mermaid
+flowchart TB
+  subgraph Prod[Production]
+    Edge[CDN/WAF + API Gateway]
+    Core[Kubernetes core services]
+    Workers[Kubernetes dispatch workers]
+    Data[(PostgreSQL / Redis / Kafka)]
+    Audit[(Object storage + warehouse)]
+  end
 
-## Delivery, Reliability, and Compliance Baseline
+  subgraph Standby[Secondary Region]
+    Core2[Warm core services]
+    Workers2[Warm worker pool]
+    Data2[(Replica data services)]
+  end
 
-### 1) Delivery semantics
-- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
-- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
-- **Latency tiers:**
-  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
-  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
-  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
-- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
+  Edge --> Core
+  Core --> Workers
+  Core --> Data
+  Workers --> Data
+  Core --> Audit
+  Core --> Core2
+  Data --> Data2
+```
 
-### 2) Queue and topic behavior
-- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
-- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
-- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
-- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+## Cloud Service Mapping
 
-### 3) Retry and dead-letter handling
-- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
-- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
-- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
-- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
-- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+| Capability | Preferred managed service pattern |
+|---|---|
+| Edge ingress | CDN + WAF + managed API gateway |
+| Stateless services | Kubernetes or container services with HPA/KEDA |
+| Message bus | Kafka / Kinesis / PubSub equivalent with tiered retention |
+| Metadata DB | PostgreSQL HA / Aurora / Cloud SQL HA |
+| Hot cache | Redis cluster with replication and snapshots |
+| Audit archive | object storage with immutable retention and lifecycle policies |
+| Analytics | warehouse + streaming ETL |
+| Secret management | cloud secret manager or Vault with rotation workflows |
 
-### 4) Provider routing and failover
-- **Routing mode:** weighted primary/secondary by channel and geography.
-- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
-- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
-- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
+## Isolation and Capacity Strategy
 
-### 5) Template management
-- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
-- **Versioning:** immutable published versions; sends always pin explicit version.
-- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
-- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
+- Separate production and non-production accounts/projects.
+- Core APIs, template services, and dispatch workers run in separate node pools to isolate latency-sensitive traffic from bursty workload spikes.
+- Per-tenant rate limiting is enforced at both gateway and worker layers.
+- Dispatch worker autoscaling uses queue depth, provider latency, and priority-lane pressure rather than CPU alone.
 
-### 6) Compliance and audit logging
-- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
-- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
-- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
-- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
+## Operational Control Plane
 
-## Verification Checklist
-- [ ] All interfaces include idempotency + correlation identifiers.
-- [ ] Retryable vs non-retryable errors are explicitly classified.
-- [ ] DLQ replay process is documented with approvals and guardrails.
-- [ ] Provider failover policy defines trigger, action, and recovery criteria.
-- [ ] Template versioning and approval workflow are enforceable in tooling.
-- [ ] Compliance evidence can be queried by message_id and correlation_id.
+- Queue administration, provider-route changes, and replay approval tooling run in a locked-down operator namespace.
+- Secret-rotation jobs and provider-health monitors are isolated from tenant-facing workloads.
+- Regional failover automation is policy-driven but requires incident-commander approval for final cutover.
+
+## DR and Resilience Targets
+
+| Target | Value |
+|---|---|
+| Regional failover RTO | <= 30 minutes |
+| Regional failover RPO | <= 5 minutes for metadata, near-zero for queued events with replicated bus |
+| P0 lane recovery under provider outage | <= 5 minutes with route failover |
+| Secret rotation cadence | every 90 days or immediately on compromise signal |
+
+## Infrastructure Invariants
+
+- A regional outage must not lose accepted messages that were acknowledged to callers.
+- Provider secrets are never stored in application config files or CI variables outside approved secret stores.
+- Audit exports and compliance evidence use immutable storage policies independent of hot operational databases.
+
+## Operational acceptance criteria
+
+- Infrastructure dashboards expose queue lag, provider health, database replication lag, and worker saturation by region.
+- Quarterly DR rehearsal proves traffic cutover, event replay integrity, and audit-store availability.
+- Cost dashboards break down spend by provider, channel, and tenant tier so routing policy can consider cost as well as reliability.

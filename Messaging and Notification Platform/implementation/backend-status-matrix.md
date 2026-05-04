@@ -1,69 +1,40 @@
 # Backend Status Matrix
 
-## Objective
-Provide implementation-ready guidance for **Backend Status Matrix** in the Messaging and Notification Platform.
+## Traceability
+- Delivery roadmap: [`./implementation-guidelines.md`](./implementation-guidelines.md)
+- Architecture topology: [`../high-level-design/architecture-diagram.md`](../high-level-design/architecture-diagram.md)
+- Detailed orchestration: [`../detailed-design/delivery-orchestration-and-template-system.md`](../detailed-design/delivery-orchestration-and-template-system.md)
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
+## Service Readiness Matrix
 
-## Execution Plan
-- Sprint 1: API + persistence + idempotency + outbox.
-- Sprint 2: worker dispatch + retries + DLQ + callbacks.
-- Sprint 3: provider failover + template governance + compliance export.
+| Service | Scope | Core readiness | Test readiness | Operational readiness | Notes |
+|---|---|---|---|---|---|
+| notification-api | send/status/schedule/cancel APIs | designed | contract tests required | gateway limits + RBAC runbooks required | depends on auth + policy |
+| template-service | template CRUD, approval, publish | designed | renderer/schema tests required | approval audit dashboards required | locale fallback critical |
+| preference-service | consent, suppression, quiet hours | designed | policy regression tests required | legal evidence export required | blocks dispatch eligibility |
+| delivery-orchestrator | queueing, state transitions, retry, failover | designed | integration + chaos tests required | P0 lane SLO dashboards required | canonical message state owner |
+| dispatch-workers | channel execution workers | designed | provider adapter tests required | queue lag + saturation alerts required | scale by priority lane |
+| provider-adapter-fleet | email, SMS, push, webhook connectors | partially implemented | per-provider contract tests required | route health dashboards required | roll out by channel |
+| callback-ingestion | webhook/poll reconciliation | designed | signature/replay tests required | delayed-callback alerting required | security-sensitive surface |
+| analytics-pipeline | delivery funnels and provider metrics | planned | reconciliation tests required | warehouse lag monitoring required | can lag behind hot path |
+| audit-export-service | compliance evidence and exports | planned | export integrity tests required | immutable retention verification required | required before regulated GA |
 
-## Definition of Done
-- Contract tests for provider adapters pass.
-- Chaos test validates failover behavior under provider outage.
-- Security review confirms PII redaction and RBAC boundaries.
+## Definition of Ready for Production
 
-## Delivery, Reliability, and Compliance Baseline
+- Critical-path services (`notification-api`, `preference-service`, `delivery-orchestrator`, `dispatch-workers`) have SLOs, dashboards, and on-call ownership.
+- Provider adapter coverage includes at least one production-grade adapter per core channel.
+- Replay tooling exists with approval workflow before enabling self-service DLQ recovery.
 
-### 1) Delivery semantics
-- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
-- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
-- **Latency tiers:**
-  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
-  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
-  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
-- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
+## Readiness Gate Definitions
 
-### 2) Queue and topic behavior
-- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
-- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
-- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
-- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+| Gate | Meaning |
+|---|---|
+| Core readiness | design and ownership are stable enough to implement without major boundary churn |
+| Test readiness | automated contract/integration/chaos coverage expectations are defined |
+| Operational readiness | alerts, runbooks, SLOs, and escalation paths exist for production support |
 
-### 3) Retry and dead-letter handling
-- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
-- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
-- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
-- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
-- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+## Operational acceptance criteria
 
-### 4) Provider routing and failover
-- **Routing mode:** weighted primary/secondary by channel and geography.
-- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
-- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
-- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
-
-### 5) Template management
-- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
-- **Versioning:** immutable published versions; sends always pin explicit version.
-- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
-- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
-
-### 6) Compliance and audit logging
-- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
-- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
-- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
-- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
-
-## Verification Checklist
-- [ ] All interfaces include idempotency + correlation identifiers.
-- [ ] Retryable vs non-retryable errors are explicitly classified.
-- [ ] DLQ replay process is documented with approvals and guardrails.
-- [ ] Provider failover policy defines trigger, action, and recovery criteria.
-- [ ] Template versioning and approval workflow are enforceable in tooling.
-- [ ] Compliance evidence can be queried by message_id and correlation_id.
+- Status in this matrix is updated from real implementation evidence, not only design intent.
+- Any service marked `planned` or `partially implemented` must be called out in project-level rollout and scope decisions.
+- A service cannot be called GA-ready unless all three readiness columns are satisfied.

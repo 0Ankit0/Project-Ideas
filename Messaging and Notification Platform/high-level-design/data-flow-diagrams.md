@@ -1,76 +1,68 @@
 # Data Flow Diagrams
 
-## Objective
-Provide implementation-ready guidance for **Data Flow Diagrams** in the Messaging and Notification Platform.
+## Traceability
+- Analysis semantics: [`../analysis/data-dictionary.md`](../analysis/data-dictionary.md)
+- Architecture topology: [`./architecture-diagram.md`](./architecture-diagram.md)
+- Detailed orchestration: [`../detailed-design/delivery-orchestration-and-template-system.md`](../detailed-design/delivery-orchestration-and-template-system.md)
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-## Mermaid Diagram
+## Level 0 Data Flow
+
 ```mermaid
 flowchart LR
-  Evt[Business Event] --> Ingest[Ingress API]
-  Ingest --> Validate[Schema + Policy Validation]
-  Validate --> Store[(Request Store)]
-  Store --> Outbox[(Outbox)]
-  Outbox --> Topic[(Priority Topics)]
-  Topic --> Worker[Dispatch Worker]
-  Worker --> Prov[Provider APIs]
-  Prov --> Status[Delivery Callback]
-  Status --> Store
-  Status --> Warehouse[(Analytics Warehouse)]
+  Producer[Product service / operator] --> API[Notification API]
+  API --> Policy[Policy + preference checks]
+  Policy --> Meta[(Metadata store)]
+  Meta --> Bus[(Queue / event bus)]
+  Bus --> Dispatch[Dispatch workers]
+  Dispatch --> Providers[External providers]
+  Providers --> Callback[Callback ingestion]
+  Callback --> Meta
+  Meta --> Audit[(Audit store)]
+  Meta --> Warehouse[(Analytics warehouse)]
 ```
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
 
-## Coverage
-This document is part of the implementation-ready set and should stay synchronized with requirements, design, and runbooks.
+## Level 1: Send and Callback Flow
 
-## Delivery, Reliability, and Compliance Baseline
+```mermaid
+flowchart TB
+  Req[Send request] --> Validate[Auth + schema + idempotency]
+  Validate --> Consent[Consent/suppression evaluation]
+  Consent --> Template[Template version + variable validation]
+  Template --> Persist[Persist request/message/outbox]
+  Persist --> Topic[Priority topic]
+  Topic --> Worker[Dispatch worker]
+  Worker --> Route[Route selection + provider adapter]
+  Route --> Provider[Provider API]
+  Provider --> Callback[Webhook/poll callback]
+  Callback --> Reconcile[Reconcile attempt outcome]
+  Reconcile --> Status[Update message status]
+  Status --> Audit[Audit + analytics emit]
+```
 
-### 1) Delivery semantics
-- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
-- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
-- **Latency tiers:**
-  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
-  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
-  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
-- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
+## Data Stores and Access Patterns
 
-### 2) Queue and topic behavior
-- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
-- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
-- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
-- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+| Store | Primary contents | Read/write pattern |
+|---|---|---|
+| PostgreSQL metadata | requests, messages, attempts, templates, consents, routes | transactional writes, status queries |
+| Redis | idempotency keys, hot consent cache, rate counters, route state | low-latency lookups and expirations |
+| Queue/event bus | accepted messages, retries, callbacks, audit events | append/read by partition |
+| Audit store | immutable actor + message evidence | append-only with query/export |
+| Analytics warehouse | delivery metrics, campaign aggregates, provider comparisons | batch/stream ingest, analytical reads |
 
-### 3) Retry and dead-letter handling
-- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
-- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
-- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
-- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
-- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+## Data-Flow Guardrails
 
-### 4) Provider routing and failover
-- **Routing mode:** weighted primary/secondary by channel and geography.
-- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
-- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
-- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
+- Data needed for dispatch eligibility is read synchronously before queue admission.
+- Long-running or eventually consistent analytics writes never block the dispatch path.
+- Callback reconciliation uses provider identifiers plus attempt IDs to avoid cross-message contamination.
 
-### 5) Template management
-- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
-- **Versioning:** immutable published versions; sends always pin explicit version.
-- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
-- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
+## Failure-Aware Data Flow Notes
 
-### 6) Compliance and audit logging
-- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
-- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
-- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
-- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
+- Outbox publication protects against partially committed request records that never reach dispatch workers.
+- Callback failures are replayable because the provider payload, normalized mapping, and attempt reference are retained independently.
+- Warehouse ingestion consumes derived events, not hot-path writes, so reporting outages do not threaten message durability.
 
-## Verification Checklist
-- [ ] All interfaces include idempotency + correlation identifiers.
-- [ ] Retryable vs non-retryable errors are explicitly classified.
-- [ ] DLQ replay process is documented with approvals and guardrails.
-- [ ] Provider failover policy defines trigger, action, and recovery criteria.
-- [ ] Template versioning and approval workflow are enforceable in tooling.
-- [ ] Compliance evidence can be queried by message_id and correlation_id.
+## Operational acceptance criteria
+
+- Queue lag, callback lag, and warehouse-lag metrics are visible per priority tier and tenant segment.
+- Replay flows preserve original business identifiers while clearly separating replay execution metadata.
+- Teams can trace a single message from request to final provider outcome using only persisted stores and emitted events.

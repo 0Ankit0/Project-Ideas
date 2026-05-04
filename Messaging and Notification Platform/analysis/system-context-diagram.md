@@ -1,31 +1,74 @@
 # System Context Diagram
 
-## Objective
-Provide implementation-ready guidance for **System Context Diagram** in the Messaging and Notification Platform.
+## Traceability
+- Requirements baseline: [`../requirements/requirements.md`](../requirements/requirements.md)
+- High-level topology: [`../high-level-design/architecture-diagram.md`](../high-level-design/architecture-diagram.md)
+- External contracts: [`../detailed-design/api-design.md`](../detailed-design/api-design.md)
+- Edge handling: [`../edge-cases/provider-failover.md`](../edge-cases/provider-failover.md)
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-## Mermaid Diagram
+## System Boundary
+
+The Messaging and Notification Platform sits between internal producer systems, tenant operators, external delivery providers, and compliance/reporting stakeholders. Its boundary includes request admission, template governance, orchestration, dispatch, callback reconciliation, and evidence retention. It does **not** own the business events that trigger notifications or the downstream provider infrastructure.
+
+## Context Diagram
+
 ```mermaid
 flowchart TB
-  Users[Operators/Campaign Managers/API Clients] --> API[Notification API]
-  API --> Orchestrator[Delivery Orchestrator]
-  Orchestrator --> Queue[(Kafka/SQS Topics)]
-  Queue --> Workers[Channel Workers]
-  Workers --> Providers[Email/SMS/Push/Webhook Providers]
-  Providers --> Callbacks[Status Callbacks]
-  Callbacks --> Orchestrator
-  Orchestrator --> DB[(Operational DB)]
-  Orchestrator --> Audit[(Compliance Log Store)]
-  Orchestrator --> Analytics[(Metrics + BI)]
-```
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
+  subgraph Actors
+    Apps[Product services / event producers]
+    Ops[Tenant operators / campaign managers]
+    Support[Support + compliance analysts]
+  end
 
-## Analysis Notes
-- Domain boundaries: ingestion, orchestration, dispatch, feedback, compliance.
-- Primary risks: duplicate sends, delayed callbacks, consent drift, provider brownouts.
-- Mitigations: idempotency, callback reconciliation, consent version checks, circuit breakers.
+  subgraph Platform[Messaging and Notification Platform]
+    API[Notification API + Portal]
+    Template[Template + Preference Services]
+    Orchestrator[Delivery Orchestrator]
+    Audit[Audit + Analytics]
+  end
+
+  subgraph External
+    Providers[Email / SMS / Push / Webhook / Chat providers]
+    IdP[SSO / IAM]
+    Data[BI warehouse / SIEM]
+    Pref[External consent and CRM systems]
+  end
+
+  Apps --> API
+  Ops --> API
+  Support --> Audit
+  IdP --> API
+  API --> Template
+  API --> Orchestrator
+  Template --> Pref
+  Orchestrator --> Providers
+  Providers --> Orchestrator
+  Orchestrator --> Audit
+  Audit --> Data
+```
+
+## External Actors and Systems
+
+| Actor/System | Relationship to platform | Key responsibilities outside platform |
+|---|---|---|
+| Product services | submit send requests or publish triggering business events | decide when a user should be notified |
+| Tenant operators | manage templates, routing, policies, and campaign schedules | business messaging strategy and approvals |
+| Compliance/support analysts | inspect audit trails, DLQ items, and evidence exports | legal review, customer support, replay approval |
+| Delivery providers | accept channel-specific dispatch requests and send callbacks | actual last-mile delivery to recipient devices or inboxes |
+| Identity provider | authenticate operators and service principals | SSO, MFA, role assertions |
+| External CRM/consent systems | source of recipient preferences and contact updates | customer profile management outside messaging core |
+| BI/SIEM platforms | consume delivery metrics and security evidence | reporting, alerting, forensics |
+
+## Context Invariants
+
+- The platform is the authoritative source for notification message state, but not for the business domain event that caused the send.
+- Tenant operators cannot bypass compliance or suppression policy through the UI or API.
+- Provider callbacks are advisory until correlated to a known dispatch attempt and validated against replay/signature controls.
+
+## Operational acceptance criteria
+
+- Every external boundary has an authenticated identity model and traceable correlation ID propagation.
+- Loss of one delivery provider must not block message acceptance for unrelated channels or healthy fallback routes.
 
 ## Delivery, Reliability, and Compliance Baseline
 

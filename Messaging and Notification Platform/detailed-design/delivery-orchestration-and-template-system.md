@@ -1,65 +1,89 @@
 # Delivery Orchestration And Template System
 
-## Objective
-Provide implementation-ready guidance for **Delivery Orchestration And Template System** in the Messaging and Notification Platform.
+## Traceability
+- Analysis rules: [`../analysis/business-rules.md`](../analysis/business-rules.md)
+- Event contracts: [`../analysis/event-catalog.md`](../analysis/event-catalog.md)
+- High-level architecture: [`../high-level-design/architecture-diagram.md`](../high-level-design/architecture-diagram.md)
+- Implementation controls: [`../implementation/implementation-guidelines.md`](../implementation/implementation-guidelines.md)
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
+## Orchestration Flow
 
-## Design Deep Dive
-- Outbox pattern is mandatory for publish consistency with DB transactions.
-- Worker lease model prevents concurrent duplicate dispatch.
-- Callback signature verification and replay protection are required.
-- Template renderer must support strict and permissive modes by message tier.
+```mermaid
+sequenceDiagram
+  participant API as Notification API
+  participant OR as Orchestrator
+  participant DB as Metadata DB
+  participant BUS as Queue Bus
+  participant WK as Dispatch Worker
+  participant RT as Routing Engine
+  participant PV as Provider Adapter
 
-## Delivery, Reliability, and Compliance Baseline
+  API->>DB: persist request + message + outbox
+  API-->>OR: notify accepted message
+  OR->>BUS: publish dispatch intent
+  BUS-->>WK: lease message
+  WK->>RT: choose provider route
+  RT-->>WK: route + policy
+  WK->>PV: send normalized payload
+  PV-->>WK: provider response
+  WK->>DB: persist dispatch attempt outcome
+  WK->>BUS: publish delivered/failed/retry event
+```
 
-### 1) Delivery semantics
-- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
-- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
-- **Latency tiers:**
-  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
-  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
-  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
-- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
+## Orchestrator Responsibilities
 
-### 2) Queue and topic behavior
-- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
-- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
-- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
-- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+| Capability | Description |
+|---|---|
+| Admission handoff | move accepted messages into the correct priority lane |
+| Policy reevaluation | re-check consent, suppression, quiet-hour, and quota conditions before dispatch |
+| Retry scheduler | determine next attempt time, backoff, and max-attempt behavior |
+| Failover controller | switch provider route on retryable provider failure without creating a new message |
+| State reconciliation | merge callback, polling, and timeout signals into one canonical message lifecycle |
+| Replay controls | requeue DLQ or callback-reconciliation jobs with operator approval and audit evidence |
 
-### 3) Retry and dead-letter handling
-- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
-- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
-- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
-- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
-- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+## Template Rendering Pipeline
 
-### 4) Provider routing and failover
-- **Routing mode:** weighted primary/secondary by channel and geography.
-- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
-- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
-- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
+```mermaid
+flowchart LR
+  TemplateReq[Message + template version] --> Fetch[Fetch template version]
+  Fetch --> Schema[Validate variables against schema]
+  Schema --> Locale[Resolve locale fallback]
+  Locale --> Render[Render subject/body]
+  Render --> Sanitize[HTML/text sanitization]
+  Sanitize --> Hash[Generate content hash + audit fingerprint]
+  Hash --> Channel[Channel-specific formatter]
+```
 
-### 5) Template management
-- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
-- **Versioning:** immutable published versions; sends always pin explicit version.
-- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
-- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
+### Rendering rules
+- Transactional messages use **strict mode**: missing required variables fail fast and block dispatch.
+- Promotional messages may use **permissive mode** only for explicitly optional variables with approved defaults.
+- Rendered payload hash is stored to correlate support issues without keeping full message content in hot logs.
 
-### 6) Compliance and audit logging
-- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
-- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
-- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
-- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
+## Provider Adapter Model
 
-## Verification Checklist
-- [ ] All interfaces include idempotency + correlation identifiers.
-- [ ] Retryable vs non-retryable errors are explicitly classified.
-- [ ] DLQ replay process is documented with approvals and guardrails.
-- [ ] Provider failover policy defines trigger, action, and recovery criteria.
-- [ ] Template versioning and approval workflow are enforceable in tooling.
-- [ ] Compliance evidence can be queried by message_id and correlation_id.
+| Adapter concern | Standardized contract |
+|---|---|
+| authentication | secret reference + provider account context |
+| send request | normalized recipient, payload, metadata, idempotency token |
+| delivery response | normalized response class (`accepted`, `retryable_failure`, `permanent_failure`) |
+| callback verification | provider signature, replay window, payload mapping |
+| health scoring | latency, timeout, 4xx/5xx rate, carrier/provider incident markers |
+
+## Retry, Failover, and DLQ Logic
+
+1. Retryable provider or transport failures create a new `DispatchAttempt` and preserve the original `message_id`.
+2. Failover is attempted only if another eligible route exists and policy allows cross-provider retry for that channel.
+3. Permanent recipient/content failures bypass failover and go directly to DLQ with reason classification.
+4. DLQ replay creates a new attempt chain but links back to the original error evidence and approval record.
+
+## Invariants
+
+- The outbox pattern is mandatory to keep request persistence and event publication consistent.
+- Worker leasing prevents concurrent dispatch of the same message on the same attempt number.
+- Callback verification uses provider signatures or polling correlation to prevent spoofed delivery updates.
+- Route selection must be deterministic for a given health snapshot and policy state to support replay/debugging.
+
+## Operational acceptance criteria
+
+- A single message’s full attempt history is queryable by `message_id` without joining ad hoc logs.
+- Renderer, adapter, and callback components expose contract tests for every supported channel/provider pair.

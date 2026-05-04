@@ -1,76 +1,74 @@
 # C4 Diagrams
 
-## Objective
-Provide implementation-ready guidance for **C4 Diagrams** in the Messaging and Notification Platform.
+## Traceability
+- System context: [`../analysis/system-context-diagram.md`](../analysis/system-context-diagram.md)
+- Architecture topology: [`./architecture-diagram.md`](./architecture-diagram.md)
+- Component view: [`../detailed-design/c4-component-diagram.md`](../detailed-design/c4-component-diagram.md)
 
-## Scope
-- Multi-tenant, multi-channel notifications (email, SMS, push, webhook).
-- Transactional, operational, and campaign traffic profiles.
-## Mermaid Diagram
+## C4 Level 1: System Context
+
 ```mermaid
 flowchart TB
   subgraph L1[System Context]
-    U[Users and Services] --> S[Messaging Platform]
-    S --> P[External Providers]
-  end
-  subgraph L2[Container]
-    S --> API[API Container]
-    S --> WK[Worker Container]
-    S --> DB[(Postgres)]
-    S --> MQ[(Kafka/SQS)]
+    U[Product Services / Operators / Compliance Users] --> S[Messaging and Notification Platform]
+    S --> P[Channel Providers]
+    S --> I[Identity Provider]
+    S --> C[CRM / Preference Systems]
+    S --> A[Analytics / SIEM]
   end
 ```
-- End-to-end controls from API ingestion to provider callbacks and compliance evidence.
 
-## Coverage
-This document is part of the implementation-ready set and should stay synchronized with requirements, design, and runbooks.
+## C4 Level 2: Container View
 
-## Delivery, Reliability, and Compliance Baseline
+```mermaid
+flowchart TB
+  Client[API Clients / Portal Users] --> Gateway[API Gateway]
+  Gateway --> API[Notification API Container]
+  Gateway --> Portal[Portal UI Container]
+  API --> Policy[Policy + Preference Container]
+  API --> Template[Template Container]
+  API --> Orchestrator[Delivery Orchestrator Container]
+  Orchestrator --> MQ[(Kafka / Queue Bus)]
+  MQ --> Worker[Dispatch Worker Container]
+  Worker --> Provider[Provider Adapter Container]
+  Provider --> Ext[External Providers]
+  API --> PG[(PostgreSQL)]
+  Orchestrator --> PG
+  Policy --> PG
+  Worker --> Cache[(Redis)]
+  Orchestrator --> Audit[(Audit / Analytics Stores)]
+```
 
-### 1) Delivery semantics
-- **Default guarantee:** At-least-once delivery for all async sends. Exactly-once is not assumed; business safety is achieved via idempotency.
-- **Idempotency contract:** `idempotency_key = tenant_id + message_type + recipient + template_version + request_nonce`.
-- **Latency tiers:**
-  - `P0 Transactional` (OTP, password reset): enqueue < 1s, provider handoff p95 < 5s.
-  - `P1 Operational` (alerts, statements): enqueue < 5s, handoff p95 < 30s.
-  - `P2 Promotional` (campaign): enqueue < 30s, handoff p95 < 5m.
-- **Status model:** `ACCEPTED -> QUEUED -> DISPATCHING -> PROVIDER_ACCEPTED -> DELIVERED|FAILED|EXPIRED`.
+## Container Responsibilities
 
-### 2) Queue and topic behavior
-- **Topic split:** `notifications.transactional`, `notifications.operational`, `notifications.promotional`, plus channel suffixes.
-- **Partition key:** `tenant_id:recipient_id:channel` to preserve recipient-level ordering without global lock contention.
-- **Backpressure policy:** API returns `202 Accepted` once persisted; throttling starts at queue depth thresholds and adaptive worker concurrency.
-- **Poison message isolation:** messages with schema/validation failures bypass retries and go directly to DLQ.
+| Container | Primary role |
+|---|---|
+| API Gateway | edge auth, rate limiting, WAF, request correlation |
+| Notification API | request admission, message status APIs, scheduling, cancellation |
+| Portal UI | operator workflows for templates, campaigns, provider settings, DLQ |
+| Policy + Preference | consent, suppression, quiet hours, regional policy checks |
+| Template | versioned templates, schema validation, approval workflow |
+| Delivery Orchestrator | queueing, retry/failover, state transitions, dispatch control |
+| Dispatch Worker | render and send channel payloads, manage provider responses |
+| Provider Adapter | unify external provider APIs behind normalized contracts |
+| PostgreSQL | source of truth for metadata, templates, preferences, audit references |
+| Redis | idempotency window, hot policy cache, short-lived route state |
+| Audit / Analytics stores | immutable evidence, delivery funnel metrics, reporting |
 
-### 3) Retry and dead-letter handling
-- **Retry policy:** capped exponential backoff with jitter (e.g., 30s, 2m, 10m, 30m, 2h max).
-- **Retryable causes:** transport timeout, 429, 5xx, transient DNS/network faults.
-- **Non-retryable causes:** invalid recipient, permanent provider policy reject, malformed template payload.
-- **DLQ payload:** original envelope, error class/code, attempt history, provider response excerpt, trace IDs.
-- **Redrive controls:** replay by batch, by tenant, by error class; replay requires approval in production.
+## Boundary Notes
 
-### 4) Provider routing and failover
-- **Routing mode:** weighted primary/secondary by channel and geography.
-- **Health model:** active probes + rolling error-rate window + circuit breaker half-open testing.
-- **Failover rule:** open circuit on sustained 5xx or timeout rates; route to standby while preserving idempotency keys.
-- **Recovery:** gradual traffic ramp-back (10% -> 25% -> 50% -> 100%) with rollback guards.
+- API Gateway and Portal UI are separate deployables so tenant self-service failures do not block product-driven API sends.
+- Policy + Preference is separated from Template to isolate compliance-critical logic from content-authoring workflows.
+- Dispatch Worker and Provider Adapter may be co-deployed for low-volume channels or separated for high-throughput lanes.
 
-### 5) Template management
-- **Lifecycle:** `DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> DEPRECATED -> RETIRED`.
-- **Versioning:** immutable published versions; sends always pin explicit version.
-- **Schema checks:** required variables, type validation, locale fallback chain, safe HTML sanitization.
-- **Change control:** dual approval for regulated templates; rollback < 5 minutes.
+## C4 Invariants
 
-### 6) Compliance and audit logging
-- **Audit events:** consent evaluation, suppression decisions, template render inputs/outputs hash, provider requests/responses, operator actions.
-- **PII policy:** log tokenized recipient identifiers; redact message body unless explicit legal-hold context.
-- **Retention:** operational logs 90 days hot, 1 year warm; compliance evidence 7 years (policy configurable).
-- **Forensics query keys:** `tenant_id`, `message_id`, `correlation_id`, `provider_message_id`, `recipient_token`, time range.
+- Only the Delivery Orchestrator may transition canonical message state.
+- Provider adapters never persist business state directly; they report normalized outcomes back to orchestration.
+- Portal UI uses the same governed APIs and permissions model as external operator clients.
 
-## Verification Checklist
-- [ ] All interfaces include idempotency + correlation identifiers.
-- [ ] Retryable vs non-retryable errors are explicitly classified.
-- [ ] DLQ replay process is documented with approvals and guardrails.
-- [ ] Provider failover policy defines trigger, action, and recovery criteria.
-- [ ] Template versioning and approval workflow are enforceable in tooling.
-- [ ] Compliance evidence can be queried by message_id and correlation_id.
+## Operational acceptance criteria
+
+- Container boundaries align with deployable ownership so a single team can own APIs, data, SLOs, and runbooks per container.
+- C4 diagrams remain synchronized with service ownership, queue topology, and infrastructure namespaces.
+- Each container has explicit persistence ownership and does not rely on undocumented shared-table writes.
