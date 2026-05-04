@@ -1,74 +1,58 @@
-# Refunds Chargebacks
+# Refunds and Chargebacks Edge Cases — Payment Orchestration and Wallet Platform
 
-## Scenario
-Dispute timelines and balance impact controls.
+Refunds and chargebacks are financially coupled but operationally different. Refunds are merchant-initiated customer remediations, while chargebacks are network-driven disputes that can override merchant intent. Both require strict amount controls, reserve handling, and auditability.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## 1. Refund Edge Cases
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+| Scenario | Risk | Required Handling |
+|---|---|---|
+| Partial capture followed by full refund request | Refund exceeds captured amount | Compute refundable amount from captured totals only |
+| Refund requested while capture still pending settlement | Merchant funds not yet available | Post refund against pending settlement liability |
+| Provider accepts refund asynchronously | Duplicate callbacks or stale status | Keep refund in `PROCESSING` until provider webhook or poll confirms final state |
+| Merchant retries refund after timeout | Duplicate refund | Replay by refund idempotency key and original refund ID |
+| Refund after chargeback opened | Double compensation to cardholder | Block or require manual override based on dispute stage |
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
+## 2. Chargeback Edge Cases
 
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+| Scenario | Risk | Required Handling |
+|---|---|---|
+| Duplicate dispute webhook | Double reserve debit | Deduplicate by provider case ID and event ID |
+| Dispute arrives after full refund | Merchant could be debited twice | Link chargeback to prior refund and create provider inquiry workflow |
+| Merchant balance insufficient on chargeback lost | Platform carries exposure | Move shortfall to recovery receivable and freeze payouts |
+| Evidence uploaded after deadline | False expectation of representment | Store evidence but mark it late and do not auto-submit |
+| Chargeback later reversed or won after provisional loss | Merchant reserve stuck | Post compensating journal and release reserve |
 
-## Artifact-Specific Deep Dive: Lifecycle, Reconciliation, Disputes, Fraud, and Ledger Safety
+## 3. Reserve and Hold Rules
 
-### Why this artifact matters
-This document now defines **refund-dispute** behavior and explicitly maps architecture intent to API contracts, diagrammed flows, and day-2 operations owned by **Support Ops, Risk Ops**.
+- On chargeback open, attempt to move funds from `wallet_available` to `wallet_reserved`.
+- If no funds are available, create a reserve deficit record and stop future payouts.
+- Refunds should use pending settlement or available balance before touching reserved chargeback funds.
+- Platform-configured rolling reserves remain separate from dispute-specific reserves for reporting clarity.
 
-### Transaction state transitions required in this artifact
-- `INITIATED -> AUTHORIZING -> AUTHORIZED -> CAPTURE_PENDING -> CAPTURED` for card and wallet charges.
-- `CAPTURED -> SETTLEMENT_PENDING -> SETTLED` after provider clearing confirmation.
-- `CAPTURED|SETTLED -> REFUND_PENDING -> PARTIALLY_REFUNDED|REFUNDED` for merchant-initiated refunds.
-- `SETTLED -> CHARGEBACK_OPEN -> CHARGEBACK_WON|CHARGEBACK_LOST` for issuer disputes.
-- Each transition MUST include: actor, triggering API/event, timeout, retry policy, and compensating action.
+## 4. Lifecycle View
 
-### API contracts this artifact must keep consistent
-- `POST /payments/{id}/refunds`: documented here with required request ids, idempotency keys, and failure reason codes for **refund-dispute**.
-- `POST /disputes/webhooks`: documented here with required request ids, idempotency keys, and failure reason codes for **refund-dispute**.
-- `POST /disputes/{id}/evidence`: documented here with required request ids, idempotency keys, and failure reason codes for **refund-dispute**.
-- `GET /payments/{id}`: documented here with required request ids, idempotency keys, and failure reason codes for **refund-dispute**.
-- All mutating calls MUST return `correlation_id`, `idempotency_key`, `previous_state`, `new_state`, and `transition_reason`.
-
-### In-depth flow diagram for refunds-chargebacks
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant Client
-    participant API as Payment API
-    participant Risk as Risk Service
-    participant Ledger
-    participant Recon as Reconciliation
-    participant Ops as Operations
-
-    Client->>API: create/capture request (refund-dispute)
-    API->>Risk: score transaction
-    Risk-->>API: ALLOW/REVIEW/DECLINE
-    API->>Ledger: post provisional journal
-    Ledger-->>API: journal_id + invariant check
-    API-->>Client: state update + correlation_id
-    API->>Recon: publish settlement candidate
-    Recon-->>Ops: discrepancy or success signal
+flowchart LR
+    Captured[CAPTURED or SETTLED] --> RefundPending[REFUND_PENDING]
+    RefundPending --> Refunded[REFUNDED or PARTIALLY_REFUNDED]
+    Captured --> ChargebackOpen[CHARGEBACK_OPEN]
+    ChargebackOpen --> Evidence[MERCHANT_RESPONSE]
+    Evidence --> ChargebackWon[CHARGEBACK_WON]
+    Evidence --> ChargebackLost[CHARGEBACK_LOST]
+    ChargebackLost --> ReserveRelease[POST LOSS JOURNAL]
+    ChargebackWon --> ReserveReturn[RELEASE RESERVE]
 ```
 
-### Reconciliation, dispute/refund, and fraud controls
-- Reconciliation: three-way match (ledger vs PSP file vs bank statement) with tolerance thresholds and auto-classification into `timing`, `amount`, `missing`, `duplicate` breaks.
-- Disputes/Refunds: evidence chain-of-custody, SLA timers, and automatic ledger reversals when disputes are lost.
-- Fraud: pre-auth risk decisioning, post-auth anomaly detection, and payout velocity controls tied to case management.
+## 5. Detection Signals
 
-### Ledger invariants and operational hooks
-- Invariants enforced here: double-entry balance, append-only journal, exactly-once posting per business event, and currency-safe postings.
-- Operational process: if any invariant fails, move transaction to `OPERATIONS_HOLD`, page on-call + finance, and block payout release until compensating journals are approved.
-- Runbooks must include: replay commands, manual override approvals (dual control), and incident-close reconciliation attestation.
+- refund total approaching captured total with multiple concurrent requests
+- dispute webhook count greater than chargeback case count
+- aged reserved balances with no dispute status change
+- provider fee spikes tied to chargeback loss events
 
+## 6. Recovery Procedures
+
+1. Rebuild refund or dispute timeline from provider events and internal audit history.
+2. Verify merchant liability using journal chain rather than dashboard balances.
+3. Post compensating journals for wrongly applied reserves or fees.
+4. Notify merchant with clear distinction between refund status and chargeback status.

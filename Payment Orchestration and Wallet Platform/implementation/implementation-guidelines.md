@@ -1,76 +1,111 @@
-# Implementation Guidelines
+# Implementation Guidelines — Payment Orchestration and Wallet Platform
 
-## Purpose
-Define the implementation guidelines artifacts for the **Payment Orchestration and Wallet Platform** with implementation-ready detail.
+These guidelines define how engineering teams should implement the documented architecture so the resulting system remains stateless, replayable, auditable, and safe for financial operations.
 
-## Domain Context
-- Domain: Payments
-- Core entities: Payment Intent, Authorization, Capture, Wallet Account, Ledger Entry, Settlement Batch, Payout
-- Primary workflows: provider routing decisioning, authorization and capture lifecycle, wallet posting and balance controls, settlement and reconciliation, refunds, disputes, and payout releases
+## 1. Service Boundary Rules
 
-## Key Design Decisions
-- Enforce idempotency and correlation IDs for all mutating operations.
-- Persist immutable audit events for critical lifecycle transitions.
-- Separate online transaction paths from async reconciliation/repair paths.
+- Payment orchestration owns payment intent state and PSP attempt history.
+- Ledger owns journal validity, account balances, and accounting exports.
+- Wallet owns customer-facing balance buckets and freeze or reserve semantics.
+- Settlement owns batch construction and provider settlement submissions.
+- Reconciliation owns break classification and attestation, not source transaction mutation.
+- Payout owns reserve, compliance gating, rail dispatch, and payout status.
+- No service may read another service's database directly.
 
-## Reliability and Compliance
-- Define SLOs and error budgets for user-facing operations.
-- Include RBAC, least-privilege service identities, and full audit trails.
-- Provide runbooks for degraded mode, replay, and backfill operations.
+## 2. Command Handling Pattern
 
+All financial mutations should follow the same pattern:
 
-## Delivery Emphasis
-- Milestones mapped to slices that are testable end-to-end.
-- CI quality gates include lint, unit/integration tests, and contract checks.
-- Backend status matrix tracks readiness by capability and release wave.
+1. Authenticate and authorize.
+2. Validate schema and business preconditions.
+3. Acquire idempotency record.
+4. Load aggregate in a serializable transaction or with optimistic concurrency check.
+5. Apply state transition.
+6. Persist outbox event in the same transaction.
+7. Call external systems only from a well-defined saga step with durable attempt state.
+8. Finalize response from authoritative write outcome, not from read model projections.
 
-## Artifact-Specific Deep Dive: Lifecycle, Reconciliation, Disputes, Fraud, and Ledger Safety
+## 3. Idempotency and Exactly-Once Patterns
 
-### Why this artifact matters
-This document now defines **implementation-plan** behavior and explicitly maps architecture intent to API contracts, diagrammed flows, and day-2 operations owned by **Backend Eng, QA**.
+- Every mutating public endpoint requires an `Idempotency-Key` header.
+- Idempotency scope is `tenant + route template + method + key`.
+- Store request hash, current execution state, response envelope, and related resource IDs.
+- If a duplicate request arrives while the original is still executing, return the existing operation status instead of starting a second execution.
+- Event consumers must maintain consumer-side dedupe keys on provider event ID or business event ID.
 
-### Transaction state transitions required in this artifact
-- `INITIATED -> AUTHORIZING -> AUTHORIZED -> CAPTURE_PENDING -> CAPTURED` for card and wallet charges.
-- `CAPTURED -> SETTLEMENT_PENDING -> SETTLED` after provider clearing confirmation.
-- `CAPTURED|SETTLED -> REFUND_PENDING -> PARTIALLY_REFUNDED|REFUNDED` for merchant-initiated refunds.
-- `SETTLED -> CHARGEBACK_OPEN -> CHARGEBACK_WON|CHARGEBACK_LOST` for issuer disputes.
-- Each transition MUST include: actor, triggering API/event, timeout, retry policy, and compensating action.
+## 4. Saga and External Call Guidelines
 
-### API contracts this artifact must keep consistent
-- `POST /payments`: documented here with required request ids, idempotency keys, and failure reason codes for **implementation-plan**.
-- `POST /risk/screen`: documented here with required request ids, idempotency keys, and failure reason codes for **implementation-plan**.
-- `POST /ledger/journals`: documented here with required request ids, idempotency keys, and failure reason codes for **implementation-plan**.
-- `POST /disputes/webhooks`: documented here with required request ids, idempotency keys, and failure reason codes for **implementation-plan**.
-- All mutating calls MUST return `correlation_id`, `idempotency_key`, `previous_state`, `new_state`, and `transition_reason`.
+- Model each external effect as a saga step with explicit retry and compensation semantics.
+- Never call two PSPs in parallel for the same payment intent.
+- On timeout or ambiguous provider outcome, persist the ambiguity and switch to status-query workflow.
+- Provider adapters must normalize provider-specific statuses into platform-specific enums without losing original raw codes.
+- Webhook handling must be append-only: store raw payload, verify signature, deduplicate, then fan out internal events.
 
-### In-depth flow diagram for implementation-guidelines
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client
-    participant API as Payment API
-    participant Risk as Risk Service
-    participant Ledger
-    participant Recon as Reconciliation
-    participant Ops as Operations
+## 5. Ledger and Wallet Implementation Rules
 
-    Client->>API: create/capture request (implementation-plan)
-    API->>Risk: score transaction
-    Risk-->>API: ALLOW/REVIEW/DECLINE
-    API->>Ledger: post provisional journal
-    Ledger-->>API: journal_id + invariant check
-    API-->>Client: state update + correlation_id
-    API->>Recon: publish settlement candidate
-    Recon-->>Ops: discrepancy or success signal
-```
+- Ledger writes use serializable transactions or equivalent invariant-safe locking.
+- Wallet balances are projections built from committed journal events. Do not treat wallet table columns as independent source-of-truth numbers.
+- Represent available, pending, reserved, and frozen semantics explicitly. Avoid overloading a single numeric balance field.
+- Reversal journals must preserve the original reference chain. Do not edit or delete old journal lines.
+- Manual adjustments must pass through the same journal engine as automated postings.
 
-### Reconciliation, dispute/refund, and fraud controls
-- Reconciliation: three-way match (ledger vs PSP file vs bank statement) with tolerance thresholds and auto-classification into `timing`, `amount`, `missing`, `duplicate` breaks.
-- Disputes/Refunds: evidence chain-of-custody, SLA timers, and automatic ledger reversals when disputes are lost.
-- Fraud: pre-auth risk decisioning, post-auth anomaly detection, and payout velocity controls tied to case management.
+## 6. Database and Schema Conventions
 
-### Ledger invariants and operational hooks
-- Invariants enforced here: double-entry balance, append-only journal, exactly-once posting per business event, and currency-safe postings.
-- Operational process: if any invariant fails, move transaction to `OPERATIONS_HOLD`, page on-call + finance, and block payout release until compensating journals are approved.
-- Runbooks must include: replay commands, manual override approvals (dual control), and incident-close reconciliation attestation.
+| Area | Guideline |
+|---|---|
+| Primary keys | Use stable, opaque IDs generated by the owning service |
+| Unique constraints | Enforce idempotency keys, provider event IDs, journal business event keys, and settlement batch keys |
+| Monetary fields | Store integer minor units and explicit currency code |
+| Audit fields | Every mutable aggregate stores `created_at`, `updated_at`, `actor_type`, and `actor_id` where applicable |
+| Soft delete | Financial records are never hard deleted; PII is pseudonymized when retention policy requires it |
 
+## 7. Eventing and CQRS
+
+- Use the transactional outbox pattern for all domain events.
+- Topic key must preserve per-aggregate ordering for payment intents, wallets, payouts, and disputes.
+- Read models can lag, but dashboards must display the last processed event timestamp.
+- Use dead-letter topics for poison messages and provide replay tooling that preserves original event IDs.
+
+## 8. Testing Requirements by Domain
+
+| Test Layer | Mandatory Scenarios |
+|---|---|
+| Unit tests | State machine transitions, routing rules, balance bucket arithmetic, posting recipes |
+| Contract tests | PSP adapter requests and responses, KYC and AML provider mappings, webhook signature checks |
+| Integration tests | Idempotency replay, outbox publish, duplicate webhook handling, ledger invariant failures |
+| End-to-end tests | Create, auth, capture, refund, payout, chargeback, settlement rerun, reconciliation break resolution |
+| Chaos tests | PSP timeout, Redis eviction, Kafka lag, database failover, stale FX rates |
+
+## 9. Observability Guidelines
+
+- Every request and event must carry `correlation_id` and `causation_id`.
+- Emit business metrics such as authorization rate, fallback count, duplicate webhook count, aged breaks, stale reserves, and payout return rate.
+- Logs must never contain PAN, CVV, or unredacted bank account numbers.
+- Dashboard templates should exist per domain before production traffic is enabled.
+
+## 10. Rollout Sequence
+
+1. Build sandbox-first adapters and deterministic simulators.
+2. Launch payment orchestration with one PSP and no automated fallback until ambiguous outcome handling is tested.
+3. Introduce ledger-backed capture and refund posting.
+4. Introduce wallet balances and payout reserve flows.
+5. Enable settlement and reconciliation in shadow mode before driving payout release gates from them.
+6. Enable chargeback auto-debit, KYC gating, and AML blocking only after ops tooling is live.
+
+## 11. Code Review Checklist
+
+- Does the change preserve single-writer ownership of the aggregate?
+- Are retries idempotent across API, queue consumer, and provider callback paths?
+- Is every financial side effect represented by a journal or reserve movement?
+- Is ambiguous provider state handled explicitly rather than guessed?
+- Are audit, metrics, and operator remediation paths included?
+
+## 12. Production Readiness Requirements
+
+Before any domain is promoted to production:
+
+- runbooks must exist for rollback, replay, manual hold, and supervised repair
+- on-call ownership must be assigned
+- alert thresholds must be tested with synthetic events
+- disaster recovery recovery steps must be exercised in staging
+- finance and compliance sign-off must exist for balance-affecting changes

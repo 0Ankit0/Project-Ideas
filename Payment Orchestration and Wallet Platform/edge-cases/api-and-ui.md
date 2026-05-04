@@ -1,66 +1,61 @@
-# API And Ui
+# API and UI Edge Cases — Payment Orchestration and Wallet Platform
 
-## API Reliability Risks
-- Duplicate client retries without stable idempotency keys.
-- Pagination drift during concurrent writes.
-- Partial-success composite operations lacking clear error contracts.
+This document covers race conditions and experience gaps between merchant APIs, operator consoles, and eventually consistent backend processing. The goal is to prevent operators or merchants from taking the same financial action twice or acting on stale state.
 
-## UI/UX Risks
-- Stale optimistic views conflicting with authoritative backend state.
-- Ambiguous validation and remediation guidance for operators.
+## 1. High-Risk Scenarios
 
-## Guardrails
-- Standardized error taxonomy and retryability hints.
-- ETag/version preconditions for concurrent edits.
-- Correlated request IDs visible in UI and support tooling.
+| Scenario | Risk | Required Backend Behavior | Required UI Behavior |
+|---|---|---|---|
+| Client times out after authorization succeeds | Merchant retries and may fear double charge | Expose operation status by idempotency key and payment intent ID | Show `processing` state and poll authoritative status endpoint |
+| Operator double-clicks capture | Duplicate capture against same auth | Reject second capture if no capturable amount remains | Disable action after first submit and display capture journal ref |
+| API refund and console refund happen concurrently | Over-refund | Serialize refund creation on payment intent and remaining refundable amount | Show latest refundable amount from server before confirmation |
+| Payout list is based on stale balance projection | Merchant payout exceeds available cleared funds | Use authoritative wallet reserve transaction at submit time | Display freshness timestamp and refresh on submit |
+| Webhook delivery is delayed but UI already shows success | Merchant distrusts state | Provide eventual status timeline with event processing timestamps | Display webhook delivery status separately from payment status |
+| Paginated dispute queue changes under analyst | Lost work or skipped case | Use cursor pagination over immutable sort keys | Keep filters and cursor stable; warn when newer items exist |
 
-## Artifact-Specific Deep Dive: Lifecycle, Reconciliation, Disputes, Fraud, and Ledger Safety
+## 2. API Contract Rules
 
-### Why this artifact matters
-This document now defines **api-contracts** behavior and explicitly maps architecture intent to API contracts, diagrammed flows, and day-2 operations owned by **API Guild, Payments Eng**.
+- Mutating responses must include `correlation_id`, resource ID, current status, and next recommended poll URL.
+- Long-running or ambiguous operations return a stable operation resource instead of forcing clients to guess final state.
+- List endpoints expose `as_of` timestamps so UIs can disclose read-model staleness.
+- Console mutations should use optimistic concurrency with version or `If-Match` headers on mutable operational objects such as dispute evidence drafts or merchant routing rules.
 
-### Transaction state transitions required in this artifact
-- `INITIATED -> AUTHORIZING -> AUTHORIZED -> CAPTURE_PENDING -> CAPTURED` for card and wallet charges.
-- `CAPTURED -> SETTLEMENT_PENDING -> SETTLED` after provider clearing confirmation.
-- `CAPTURED|SETTLED -> REFUND_PENDING -> PARTIALLY_REFUNDED|REFUNDED` for merchant-initiated refunds.
-- `SETTLED -> CHARGEBACK_OPEN -> CHARGEBACK_WON|CHARGEBACK_LOST` for issuer disputes.
-- Each transition MUST include: actor, triggering API/event, timeout, retry policy, and compensating action.
+## 3. UI Rules for Financial Safety
 
-### API contracts this artifact must keep consistent
-- `POST /payments`: documented here with required request ids, idempotency keys, and failure reason codes for **api-contracts**.
-- `POST /payments/{id}/capture`: documented here with required request ids, idempotency keys, and failure reason codes for **api-contracts**.
-- `POST /payments/{id}/refunds`: documented here with required request ids, idempotency keys, and failure reason codes for **api-contracts**.
-- `POST /ledger/journals`: documented here with required request ids, idempotency keys, and failure reason codes for **api-contracts**.
-- All mutating calls MUST return `correlation_id`, `idempotency_key`, `previous_state`, `new_state`, and `transition_reason`.
+- Never render a destructive financial action button as immediately repeatable.
+- When status is `PROCESSING`, `PSP_RESULT_UNKNOWN`, or `OPERATIONS_HOLD`, the UI must present investigation guidance instead of retry buttons.
+- Money totals shown in the UI must label whether they are `available`, `pending`, or `reserved`.
+- Refund and payout forms must preload server-calculated maximum values rather than trusting client-side arithmetic.
 
-### In-depth flow diagram for api-and-ui
+## 4. Timeout Recovery Sequence
+
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client
-    participant API as Payment API
-    participant Risk as Risk Service
-    participant Ledger
-    participant Recon as Reconciliation
-    participant Ops as Operations
+    actor Merchant
+    participant API
+    participant Orchestrator
+    participant PSP
+    participant Status
 
-    Client->>API: create/capture request (api-contracts)
-    API->>Risk: score transaction
-    Risk-->>API: ALLOW/REVIEW/DECLINE
-    API->>Ledger: post provisional journal
-    Ledger-->>API: journal_id + invariant check
-    API-->>Client: state update + correlation_id
-    API->>Recon: publish settlement candidate
-    Recon-->>Ops: discrepancy or success signal
+    Merchant->>API: POST payment intent
+    API->>Orchestrator: Create request
+    Orchestrator->>PSP: Submit authorization
+    PSP-->>Orchestrator: Return auth success
+    API-->>Merchant: Return timeout
+    Merchant->>Status: GET by idempotency key
+    Status-->>Merchant: Return AUTHORIZED
 ```
 
-### Reconciliation, dispute/refund, and fraud controls
-- Reconciliation: three-way match (ledger vs PSP file vs bank statement) with tolerance thresholds and auto-classification into `timing`, `amount`, `missing`, `duplicate` breaks.
-- Disputes/Refunds: evidence chain-of-custody, SLA timers, and automatic ledger reversals when disputes are lost.
-- Fraud: pre-auth risk decisioning, post-auth anomaly detection, and payout velocity controls tied to case management.
+## 5. Detection Signals
 
-### Ledger invariants and operational hooks
-- Invariants enforced here: double-entry balance, append-only journal, exactly-once posting per business event, and currency-safe postings.
-- Operational process: if any invariant fails, move transaction to `OPERATIONS_HOLD`, page on-call + finance, and block payout release until compensating journals are approved.
-- Runbooks must include: replay commands, manual override approvals (dual control), and incident-close reconciliation attestation.
+- ratio of client timeouts followed by successful idempotent replays
+- repeated console submissions from the same operator in a short window
+- projection freshness lag above SLO for balance or dispute views
+- mismatch between payment success webhooks and merchant console refresh counts
 
+## 6. Containment and Recovery
+
+- If stale read models are detected, switch the affected UI panel to read-only mode and direct users to the canonical detail endpoint.
+- If a client reports duplicate UI actions, inspect operation timeline by `correlation_id` before issuing any manual fix.
+- If projection lag causes payout or refund confusion, halt the affected action path with a feature flag until the lag is cleared.

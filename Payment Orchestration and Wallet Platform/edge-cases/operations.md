@@ -1,63 +1,79 @@
-# Operations
+# Operations Edge Cases — Payment Orchestration and Wallet Platform
 
-## Day-2 Readiness
-- SLO dashboard for availability, latency, and data freshness.
-- Runbooks for incident triage, rollback, replay, and backfill.
-- Capacity planning based on peak traffic and queue depth trends.
+This document defines day-2 operational procedures for payment, wallet, ledger, settlement, payout, and compliance incidents. It focuses on preserving financial correctness first and customer convenience second.
 
-## Incident Lifecycle
-1. Detect and classify severity with ownership routing.
-2. Contain blast radius and communicate stakeholder impact.
-3. Recover service and data consistency.
-4. Publish postmortem with corrective actions and deadlines.
+## 1. Incident Classes
 
-## Artifact-Specific Deep Dive: Lifecycle, Reconciliation, Disputes, Fraud, and Ledger Safety
+| Class | Examples | First Response |
+|---|---|---|
+| Availability incident | Gateway outage, Kafka outage, provider connectivity loss | Shift traffic, preserve idempotency state, pause risky retries |
+| Financial correctness incident | Ledger imbalance, duplicate payout, settlement batch mismatch | Freeze affected aggregates and block payouts |
+| Compliance incident | PAN outside PCI zone, sanctions bypass, audit log gap | Invoke security and compliance response plan |
+| Data freshness incident | Stale balance projections, delayed reconciliation files | Switch UI to degraded mode and surface freshness warning |
 
-### Why this artifact matters
-This document now defines **ops-runbooks** behavior and explicitly maps architecture intent to API contracts, diagrammed flows, and day-2 operations owned by **SRE, Finance Ops**.
+## 2. Minimum Operational Dashboards
 
-### Transaction state transitions required in this artifact
-- `INITIATED -> AUTHORIZING -> AUTHORIZED -> CAPTURE_PENDING -> CAPTURED` for card and wallet charges.
-- `CAPTURED -> SETTLEMENT_PENDING -> SETTLED` after provider clearing confirmation.
-- `CAPTURED|SETTLED -> REFUND_PENDING -> PARTIALLY_REFUNDED|REFUNDED` for merchant-initiated refunds.
-- `SETTLED -> CHARGEBACK_OPEN -> CHARGEBACK_WON|CHARGEBACK_LOST` for issuer disputes.
-- Each transition MUST include: actor, triggering API/event, timeout, retry policy, and compensating action.
+- payment authorization rate, timeout rate, and fallback rate by provider
+- ledger posting latency and invariant failure count
+- wallet reserve and payout hold aging
+- settlement batch progress and rerun count
+- reconciliation break count by severity and aging bucket
+- webhook retry queue depth and dead-letter count
 
-### API contracts this artifact must keep consistent
-- `POST /reconciliation/runs`: documented here with required request ids, idempotency keys, and failure reason codes for **ops-runbooks**.
-- `GET /reconciliation/discrepancies`: documented here with required request ids, idempotency keys, and failure reason codes for **ops-runbooks**.
-- `POST /ledger/reversals`: documented here with required request ids, idempotency keys, and failure reason codes for **ops-runbooks**.
-- `GET /risk/cases/{id}`: documented here with required request ids, idempotency keys, and failure reason codes for **ops-runbooks**.
-- All mutating calls MUST return `correlation_id`, `idempotency_key`, `previous_state`, `new_state`, and `transition_reason`.
+## 3. Immediate Safety Switches
 
-### In-depth flow diagram for operations
+| Switch | Use |
+|---|---|
+| Disable PSP route | Remove a degraded provider from routing without redeploy |
+| Disable payout release | Stop new bank dispatch while preserving payout creation |
+| Pause refund dispatch | Stop outbound refund calls while allowing request intake |
+| Freeze repair tooling | Prevent manual ledger adjustments during an active investigation |
+| Read-only operator console | Avoid conflicting manual actions during incident response |
+
+## 4. Incident Triage Flow
+
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant Client
-    participant API as Payment API
-    participant Risk as Risk Service
-    participant Ledger
-    participant Recon as Reconciliation
-    participant Ops as Operations
-
-    Client->>API: create/capture request (ops-runbooks)
-    API->>Risk: score transaction
-    Risk-->>API: ALLOW/REVIEW/DECLINE
-    API->>Ledger: post provisional journal
-    Ledger-->>API: journal_id + invariant check
-    API-->>Client: state update + correlation_id
-    API->>Recon: publish settlement candidate
-    Recon-->>Ops: discrepancy or success signal
+flowchart TD
+    Alert[Alert or operator report] --> Classify[Classify incident]
+    Classify --> Correctness{Financial correctness risk}
+    Correctness -- Yes --> Hold[Place affected flows on hold]
+    Hold --> Verify[Verify ledger and provider state]
+    Verify --> Repair[Run replay or supervised repair]
+    Repair --> Attest[Record finance attestation]
+    Correctness -- No --> Restore[Restore service path]
+    Restore --> Review[Post incident review]
+    Attest --> Review
 ```
 
-### Reconciliation, dispute/refund, and fraud controls
-- Reconciliation: three-way match (ledger vs PSP file vs bank statement) with tolerance thresholds and auto-classification into `timing`, `amount`, `missing`, `duplicate` breaks.
-- Disputes/Refunds: evidence chain-of-custody, SLA timers, and automatic ledger reversals when disputes are lost.
-- Fraud: pre-auth risk decisioning, post-auth anomaly detection, and payout velocity controls tied to case management.
+## 5. Replay and Backfill Rules
 
-### Ledger invariants and operational hooks
-- Invariants enforced here: double-entry balance, append-only journal, exactly-once posting per business event, and currency-safe postings.
-- Operational process: if any invariant fails, move transaction to `OPERATIONS_HOLD`, page on-call + finance, and block payout release until compensating journals are approved.
-- Runbooks must include: replay commands, manual override approvals (dual control), and incident-close reconciliation attestation.
+- Event replay uses original event IDs and writes a replay audit trail.
+- Reconciliation reruns operate on versioned file snapshots; never overwrite old imported files.
+- Ledger repair tools may create new journals only. They may not edit balances directly.
+- If provider callbacks were missed during downtime, perform provider API backfill before reopening fallback routing.
 
+## 6. Operator Approval Matrix
+
+| Action | Single Approver | Dual Approval |
+|---|---|---|
+| Replay non-financial webhook | Yes | No |
+| Re-open payment in `PSP_RESULT_UNKNOWN` | Yes | No |
+| Post ledger adjustment below threshold | Yes | No |
+| Post ledger adjustment above threshold | No | Yes |
+| Release payout under compliance hold | No | Yes |
+| Clear high-severity reconciliation break | No | Yes |
+
+## 7. Edge Cases to Simulate Regularly
+
+- provider returns success after client timeout
+- Redis idempotency store failover during online traffic
+- Kafka lag delays settlement candidate consumption
+- bank return file arrives after payout marked paid
+- stale KYC result blocks scheduled payout window
+- audit sink unavailable while security-sensitive admin action occurs
+
+## 8. Operational Acceptance Criteria
+
+- Every critical flow has a documented hold, replay, and recovery path.
+- Finance on-call can reconcile any payment, refund, chargeback, or payout using correlation and provider references.
+- No incident runbook requires direct database updates to mutable financial state.

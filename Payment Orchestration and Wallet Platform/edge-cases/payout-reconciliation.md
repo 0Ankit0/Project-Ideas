@@ -1,75 +1,74 @@
-# Payout Reconciliation
+# Payout Reconciliation Edge Cases — Payment Orchestration and Wallet Platform
 
-## Scenario
-Payout mismatch and bank return handling.
+This document covers payout mismatches, bank returns, duplicate release prevention, and the reconciliation logic that ties payout journals to bank rail outcomes.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## 1. Reconciliation Sources for Payouts
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+| Source | Required Identifiers |
+|---|---|
+| Payout aggregate | `payout_id`, merchant, destination fingerprint, amount, currency, payout state |
+| Ledger journals | `business_event_id`, reserve journal, dispatch journal, return journal |
+| Bank or rail file | bank reference, amount, currency, value date, return code |
+| Provider webhook or status API | provider payout reference, final rail status |
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
+## 2. High-Risk Edge Cases
 
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+| Scenario | Failure Mode | Required Response |
+|---|---|---|
+| Scheduler reruns same payout window | Duplicate bank dispatch | Use payout schedule key and wallet reserve lock; replay existing payout objects |
+| Bank dispatch times out | Unknown rail outcome | Mark `RAIL_RESULT_UNKNOWN`; poll bank before retry |
+| Bank marks payout as paid, later sends return | Merchant was already marked paid | Create payout return journal and reopen reconciliation break |
+| Merchant KYC becomes restricted after scheduling | Scheduled payout should not leave platform | Keep funds in reserved state and move payout to `PENDING_REVIEW` |
+| Bank deducts unexpected fee | Net amount differs from expected | Classify as `UNMAPPED_FEE` break and require finance review |
+| Currency conversion for payout uses stale rate | Wrong merchant debit | Reverse payout quote, refresh rate, and require re-approval |
 
-## Artifact-Specific Deep Dive: Lifecycle, Reconciliation, Disputes, Fraud, and Ledger Safety
+## 3. Recommended Payout State Model
 
-### Why this artifact matters
-This document now defines **reconciliation-ops** behavior and explicitly maps architecture intent to API contracts, diagrammed flows, and day-2 operations owned by **Finance Ops, Treasury**.
+`CREATED -> RESERVED -> PENDING_REVIEW? -> DISPATCHING -> IN_TRANSIT -> PAID | RETURNED | FAILED | CANCELLED`
 
-### Transaction state transitions required in this artifact
-- `INITIATED -> AUTHORIZING -> AUTHORIZED -> CAPTURE_PENDING -> CAPTURED` for card and wallet charges.
-- `CAPTURED -> SETTLEMENT_PENDING -> SETTLED` after provider clearing confirmation.
-- `CAPTURED|SETTLED -> REFUND_PENDING -> PARTIALLY_REFUNDED|REFUNDED` for merchant-initiated refunds.
-- `SETTLED -> CHARGEBACK_OPEN -> CHARGEBACK_WON|CHARGEBACK_LOST` for issuer disputes.
-- `SETTLEMENT_PENDING -> RECON_BREAK` when matching tolerance is exceeded, then `RECON_BREAK -> RECON_RESOLVED` after journal correction.
-- Each transition MUST include: actor, triggering API/event, timeout, retry policy, and compensating action.
+Additional rules:
 
-### API contracts this artifact must keep consistent
-- `POST /reconciliation/runs`: documented here with required request ids, idempotency keys, and failure reason codes for **reconciliation-ops**.
-- `GET /reconciliation/runs/{runId}`: documented here with required request ids, idempotency keys, and failure reason codes for **reconciliation-ops**.
-- `GET /reconciliation/discrepancies`: documented here with required request ids, idempotency keys, and failure reason codes for **reconciliation-ops**.
-- `POST /ledger/reversals`: documented here with required request ids, idempotency keys, and failure reason codes for **reconciliation-ops**.
-- All mutating calls MUST return `correlation_id`, `idempotency_key`, `previous_state`, `new_state`, and `transition_reason`.
+- `RESERVED` means funds already left merchant `available` balance.
+- `PENDING_REVIEW` preserves the reserve but forbids bank dispatch.
+- `RETURNED` must always have a linked compensating journal.
 
-### In-depth flow diagram for payout-reconciliation
+## 4. Dispatch and Reconciliation Sequence
+
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client
-    participant API as Payment API
-    participant Risk as Risk Service
+    participant Payout
+    participant Wallet
+    participant Bank
     participant Ledger
-    participant Recon as Reconciliation
-    participant Ops as Operations
+    participant Recon
+    participant Ops
 
-    Client->>API: create/capture request (reconciliation-ops)
-    API->>Risk: score transaction
-    Risk-->>API: ALLOW/REVIEW/DECLINE
-    API->>Ledger: post provisional journal
-    Ledger-->>API: journal_id + invariant check
-    API-->>Client: state update + correlation_id
-    API->>Recon: publish settlement candidate
-    Recon-->>Ops: discrepancy or success signal
+    Payout->>Wallet: Reserve funds
+    Wallet-->>Payout: Return reserved
+    Payout->>Bank: Dispatch payout
+    Bank-->>Payout: Return accepted
+    Payout->>Ledger: Post dispatch journal
+    Bank-->>Recon: Deliver payout file
+    Recon->>Ledger: Load payout journals
+    Recon->>Recon: Match payout lines
+    Recon-->>Ops: Publish break result
 ```
 
-### Reconciliation, dispute/refund, and fraud controls
-- Reconciliation: three-way match (ledger vs PSP file vs bank statement) with tolerance thresholds and auto-classification into `timing`, `amount`, `missing`, `duplicate` breaks.
-- Disputes/Refunds: evidence chain-of-custody, SLA timers, and automatic ledger reversals when disputes are lost.
-- Fraud: pre-auth risk decisioning, post-auth anomaly detection, and payout velocity controls tied to case management.
+## 5. Break Categories
 
-### Ledger invariants and operational hooks
-- Invariants enforced here: double-entry balance, append-only journal, exactly-once posting per business event, and currency-safe postings.
-- Operational process: if any invariant fails, move transaction to `OPERATIONS_HOLD`, page on-call + finance, and block payout release until compensating journals are approved.
-- Runbooks must include: replay commands, manual override approvals (dual control), and incident-close reconciliation attestation.
+| Category | Example | Default Handling |
+|---|---|---|
+| `TIMING` | Bank file delayed while payout is already `IN_TRANSIT` | Wait inside aging threshold |
+| `MISSING_FROM_BANK` | Dispatch journal exists but bank line missing | Query bank status and keep reserve watch |
+| `MISSING_FROM_LEDGER` | Bank file shows payout or return with no journal | Create incident and supervised repair |
+| `AMOUNT_MISMATCH` | Bank amount differs from reserved amount | Block merchant from instant payouts until resolved |
+| `DUPLICATE_PAYOUT` | Two bank lines match one payout key | Freeze merchant payout release and escalate |
+| `UNMAPPED_FEE` | Bank deducted fee not represented internally | Post separate fee adjustment after approval |
 
+## 6. Recovery Playbooks
+
+- For `RAIL_RESULT_UNKNOWN`, poll the bank or provider API before any resubmission.
+- For payout return, post return journal, release or re-reserve funds based on compliance status, and notify merchant.
+- For duplicate payout suspicion, stop all scheduled payouts for the merchant until the bank confirms the true dispatch count.
+- For missing ledger journal, reconstruct from payout aggregate and bank evidence using supervised repair tooling.

@@ -1,74 +1,109 @@
-# Idempotency Double Charge Protection
+# Idempotency and Double-Charge Protection — Payment Orchestration and Wallet Platform
 
-## Scenario
-Safe retries and duplicate authorization prevention.
+This document defines the controls that prevent duplicate charges, duplicate captures, duplicate refunds, and duplicate payouts across API retries, background retries, provider callbacks, and operator actions.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## 1. Threat Model
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+Duplicate financial effects can originate from:
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
+- merchant client retry after socket timeout
+- API gateway retry or load balancer reconnect
+- provider timeout with unknown result
+- provider webhook redelivery or event replay
+- operator repeating capture, refund, or payout actions from the console
+- scheduler rerunning payout or settlement jobs
 
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+## 2. Idempotency Key Model
 
-## Artifact-Specific Deep Dive: Lifecycle, Reconciliation, Disputes, Fraud, and Ledger Safety
+| Scope | Key Components | TTL | Result |
+|---|---|---|---|
+| Public API write | tenant, route template, HTTP method, idempotency key | 24 hours minimum | Cached HTTP response plus resource ID |
+| Provider callback | provider, provider event ID | 90 days or provider retention window | Single internal event emission |
+| Ledger posting | business event type, business event ID, posting version | Permanent | Single effective journal version |
+| Batch jobs | job type, merchant, business date, provider, currency | Permanent for closed periods | Deterministic rerun without duplicates |
 
-### Why this artifact matters
-This document now defines **general-orchestration** behavior and explicitly maps architecture intent to API contracts, diagrammed flows, and day-2 operations owned by **Payments Eng, Finance Ops**.
+Recommended idempotency record fields:
 
-### Transaction state transitions required in this artifact
-- `INITIATED -> AUTHORIZING -> AUTHORIZED -> CAPTURE_PENDING -> CAPTURED` for card and wallet charges.
-- `CAPTURED -> SETTLEMENT_PENDING -> SETTLED` after provider clearing confirmation.
-- `CAPTURED|SETTLED -> REFUND_PENDING -> PARTIALLY_REFUNDED|REFUNDED` for merchant-initiated refunds.
-- `SETTLED -> CHARGEBACK_OPEN -> CHARGEBACK_WON|CHARGEBACK_LOST` for issuer disputes.
-- Each transition MUST include: actor, triggering API/event, timeout, retry policy, and compensating action.
+- `scope_hash`
+- `request_hash`
+- `status` with values `IN_PROGRESS`, `SUCCEEDED`, `FAILED_REPLAYABLE`, `FAILED_FINAL`
+- `resource_type` and `resource_id`
+- `provider_reference`
+- `response_code` and serialized response body
+- `expires_at`
 
-### API contracts this artifact must keep consistent
-- `POST /payments`: documented here with required request ids, idempotency keys, and failure reason codes for **general-orchestration**.
-- `GET /payments/{id}`: documented here with required request ids, idempotency keys, and failure reason codes for **general-orchestration**.
-- `POST /payments/{id}/refunds`: documented here with required request ids, idempotency keys, and failure reason codes for **general-orchestration**.
-- `POST /ledger/journals`: documented here with required request ids, idempotency keys, and failure reason codes for **general-orchestration**.
-- All mutating calls MUST return `correlation_id`, `idempotency_key`, `previous_state`, `new_state`, and `transition_reason`.
+## 3. Request Handling Algorithm
 
-### In-depth flow diagram for idempotency-double-charge-protection
+1. Compute the scope key before any side effect.
+2. Attempt transactional insert of `IN_PROGRESS` record.
+3. If insert succeeds, continue processing.
+4. If a matching scope exists with the same request hash and terminal status, return the stored response.
+5. If a matching scope exists with a different request hash, return `409` conflict.
+6. If a matching scope exists in `IN_PROGRESS`, return operation status and do not launch a second execution.
+7. Persist final response only after business write and outbox write succeed.
+
+## 4. Ambiguous PSP Outcome Rule
+
+The most dangerous duplicate-charge scenario is a timeout after the PSP may already have authorized or captured the payment.
+
+**Mandatory rule:** never fallback to a second PSP while the first PSP could still have produced a successful authorization for the same payment intent.
+
+Required handling:
+
+- mark attempt `PSP_RESULT_UNKNOWN`
+- query provider status using idempotency key or merchant reference
+- if provider confirms no authorization exists, fallback may proceed
+- if provider confirms authorization exists, persist that reference and continue with the original attempt
+- if provider status remains unknown, put payment into `PROCESSING` or `OPERATIONS_HOLD` and notify merchant via status API
+
+## 5. Duplicate Capture and Refund Controls
+
+| Operation | Protection |
+|---|---|
+| Capture | Lock on payment intent plus remaining capturable amount check. Provider capture request reuses a capture-specific idempotency key. |
+| Refund | Lock on payment intent plus remaining refundable amount check. Refund ID is created before the provider call. |
+| Payout | Lock on merchant wallet and payout schedule key. Bank status is queried before dispatch retry. |
+| Chargeback intake | Deduplicate on provider case ID and webhook event ID. |
+
+## 6. Sequence for Timeout and Safe Retry
+
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client
-    participant API as Payment API
-    participant Risk as Risk Service
-    participant Ledger
-    participant Recon as Reconciliation
-    participant Ops as Operations
+    actor Merchant
+    participant Gateway
+    participant Orchestrator
+    participant PSP
+    participant Status
 
-    Client->>API: create/capture request (general-orchestration)
-    API->>Risk: score transaction
-    Risk-->>API: ALLOW/REVIEW/DECLINE
-    API->>Ledger: post provisional journal
-    Ledger-->>API: journal_id + invariant check
-    API-->>Client: state update + correlation_id
-    API->>Recon: publish settlement candidate
-    Recon-->>Ops: discrepancy or success signal
+    Merchant->>Gateway: POST confirm payment
+    Gateway->>Orchestrator: Create attempt
+    Orchestrator->>PSP: Submit authorization
+    PSP-->>Orchestrator: Return timeout
+    Orchestrator->>PSP: Query status
+    PSP-->>Orchestrator: Return auth success
+    Merchant->>Status: Retry same idempotency key
+    Status-->>Merchant: Return cached AUTHORIZED
 ```
 
-### Reconciliation, dispute/refund, and fraud controls
-- Reconciliation: three-way match (ledger vs PSP file vs bank statement) with tolerance thresholds and auto-classification into `timing`, `amount`, `missing`, `duplicate` breaks.
-- Disputes/Refunds: evidence chain-of-custody, SLA timers, and automatic ledger reversals when disputes are lost.
-- Fraud: pre-auth risk decisioning, post-auth anomaly detection, and payout velocity controls tied to case management.
+## 7. Webhook and Callback Deduplication
 
-### Ledger invariants and operational hooks
-- Invariants enforced here: double-entry balance, append-only journal, exactly-once posting per business event, and currency-safe postings.
-- Operational process: if any invariant fails, move transaction to `OPERATIONS_HOLD`, page on-call + finance, and block payout release until compensating journals are approved.
-- Runbooks must include: replay commands, manual override approvals (dual control), and incident-close reconciliation attestation.
+- Store raw callback payload before parsing.
+- Reject invalid signature without mutating payment state.
+- Use provider event ID as the primary dedupe key and provider reference as the secondary dedupe key.
+- Downstream consumers must still dedupe on business event ID because providers may reissue different callback IDs for the same real-world event.
 
+## 8. Detection Signals
+
+- same merchant reference seen across multiple provider authorizations
+- payment intents with more than one successful auth attempt
+- multiple payouts with same merchant, date, amount, and destination fingerprint
+- repeated `IN_PROGRESS` idempotency records exceeding timeout threshold
+
+## 9. Incident Response
+
+1. Freeze further retries for the affected aggregate.
+2. Query provider and ledger authoritative state.
+3. Determine whether duplicate external movement occurred or only duplicate internal requests were attempted.
+4. If duplicate external charge happened, issue supervised refund and create incident-linked compensating journals.
+5. Add the provider reference to the duplicate-prevention watchlist for reconciliation and chargeback monitoring.

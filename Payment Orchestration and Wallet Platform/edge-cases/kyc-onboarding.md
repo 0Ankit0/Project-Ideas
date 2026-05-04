@@ -1,75 +1,67 @@
-# Kyc Onboarding
+# KYC Onboarding Edge Cases — Payment Orchestration and Wallet Platform
 
-## Scenario
-Merchant verification stalls and manual review queues.
+Full KYB document review is out of scope for the platform, but merchant onboarding, payout activation, wallet enablement, and AML gating depend on external KYC and sanctions outcomes. This document covers the edge cases that must be handled so merchants can onboard safely without blocking unrelated platform functions.
 
-## Detection Signals
-- Error-rate and latency anomalies on affected services.
-- Data integrity checks (duplicate keys, missing transitions, imbalance alerts).
-- Queue lag or webhook retry saturation above SLO thresholds.
+## 1. Merchant Onboarding States
 
-## Immediate Containment
-- Pause risky automation path via feature flag/runbook switch.
-- Route affected records into review queue with owner assignment.
-- Notify operations channel with incident context and blast radius.
+| State | Meaning | Allowed Capabilities |
+|---|---|---|
+| `DRAFT` | Merchant has not submitted required profile data | Read-only config |
+| `SUBMITTED` | Initial package received | No payouts, no wallet debits |
+| `PROVIDER_PENDING` | External KYC provider has not returned a result | Continue profile edits only |
+| `ACTION_REQUIRED` | Missing or inconsistent data | Continue edits, no payouts |
+| `VERIFIED` | Required KYC and AML checks passed | Full payout and wallet debit access |
+| `RESTRICTED` | Sanctions hit, high-risk review, or legal hold | Credits allowed, payouts blocked |
+| `REJECTED` | Merchant cannot be activated | No financial outflows |
 
-## Recovery Steps
-- Reconcile canonical state from source-of-truth events and logs.
-- Apply deterministic compensating updates with audit annotations.
-- Backfill downstream projections and verify invariant checks pass.
+## 2. Edge Cases and Required Behavior
 
-## Prevention
-- Add contract tests and chaos scenarios for this edge condition.
-- Instrument specific leading indicators and alert tuning.
+| Scenario | Detection | Required Action |
+|---|---|---|
+| Business legal name mismatch | Provider returns low-confidence match | Move to `ACTION_REQUIRED`; capture provider response details for operator review |
+| Beneficial owner threshold changes | Merchant updates ownership structure | Re-open KYC review; keep payouts blocked until refreshed approval |
+| Expired identity document | Document expiry falls inside preconfigured window | Notify merchant and set payout release hold while leaving inbound payments enabled |
+| Duplicate merchant or bank account | Same registration or bank fingerprint appears on another account | Create compliance case; allow no payouts until resolved |
+| Provider outage | KYC provider unavailable beyond SLA | Keep merchant in `PROVIDER_PENDING`; queue retry and alert onboarding ops |
+| Sanctions or PEP match | AML provider returns positive match | Move to `RESTRICTED`; require compliance officer decision and rationale |
 
-## Artifact-Specific Deep Dive: Lifecycle, Reconciliation, Disputes, Fraud, and Ledger Safety
+## 3. Gating Rules
 
-### Why this artifact matters
-This document now defines **identity-onboarding** behavior and explicitly maps architecture intent to API contracts, diagrammed flows, and day-2 operations owned by **Compliance Ops, Risk Ops**.
+- New wallets may be provisioned before full verification if product policy allows inbound-only accounts.
+- Payouts require `VERIFIED` status and a non-blocking AML result at release time, not just at onboarding time.
+- Merchant routing configuration may be edited while onboarding is pending, but PSP credential activation must not happen until compliance approval exists.
+- Existing merchants with stale KYC keep receiving settlements but cannot initiate payouts or wallet debits that move funds off-platform.
 
-### Transaction state transitions required in this artifact
-- `INITIATED -> AUTHORIZING -> AUTHORIZED -> CAPTURE_PENDING -> CAPTURED` for card and wallet charges.
-- `CAPTURED -> SETTLEMENT_PENDING -> SETTLED` after provider clearing confirmation.
-- `CAPTURED|SETTLED -> REFUND_PENDING -> PARTIALLY_REFUNDED|REFUNDED` for merchant-initiated refunds.
-- `SETTLED -> CHARGEBACK_OPEN -> CHARGEBACK_WON|CHARGEBACK_LOST` for issuer disputes.
-- `INITIATED -> KYC_PENDING -> KYC_VERIFIED` before enabling payouts.
-- Each transition MUST include: actor, triggering API/event, timeout, retry policy, and compensating action.
+## 4. Onboarding and Payout Hold Sequence
 
-### API contracts this artifact must keep consistent
-- `POST /customers`: documented here with required request ids, idempotency keys, and failure reason codes for **identity-onboarding**.
-- `POST /customers/{id}/verify`: documented here with required request ids, idempotency keys, and failure reason codes for **identity-onboarding**.
-- `POST /risk/screen`: documented here with required request ids, idempotency keys, and failure reason codes for **identity-onboarding**.
-- `POST /payouts`: documented here with required request ids, idempotency keys, and failure reason codes for **identity-onboarding**.
-- All mutating calls MUST return `correlation_id`, `idempotency_key`, `previous_state`, `new_state`, and `transition_reason`.
-
-### In-depth flow diagram for kyc-onboarding
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client
-    participant API as Payment API
-    participant Risk as Risk Service
-    participant Ledger
-    participant Recon as Reconciliation
-    participant Ops as Operations
+    actor Merchant
+    participant Onboarding
+    participant KYC
+    participant AML
+    participant Compliance
+    participant Payout
 
-    Client->>API: create/capture request (identity-onboarding)
-    API->>Risk: score transaction
-    Risk-->>API: ALLOW/REVIEW/DECLINE
-    API->>Ledger: post provisional journal
-    Ledger-->>API: journal_id + invariant check
-    API-->>Client: state update + correlation_id
-    API->>Recon: publish settlement candidate
-    Recon-->>Ops: discrepancy or success signal
+    Merchant->>Onboarding: Submit profile
+    Onboarding->>KYC: Screen identity
+    KYC-->>Onboarding: Return review needed
+    Onboarding->>Compliance: Create task
+    Compliance->>AML: Screen owners
+    AML-->>Compliance: Return clear
+    Compliance->>Onboarding: Approve merchant
+    Onboarding->>Payout: Enable payouts
 ```
 
-### Reconciliation, dispute/refund, and fraud controls
-- Reconciliation: three-way match (ledger vs PSP file vs bank statement) with tolerance thresholds and auto-classification into `timing`, `amount`, `missing`, `duplicate` breaks.
-- Disputes/Refunds: evidence chain-of-custody, SLA timers, and automatic ledger reversals when disputes are lost.
-- Fraud: pre-auth risk decisioning, post-auth anomaly detection, and payout velocity controls tied to case management.
+## 5. Recovery Procedures
 
-### Ledger invariants and operational hooks
-- Invariants enforced here: double-entry balance, append-only journal, exactly-once posting per business event, and currency-safe postings.
-- Operational process: if any invariant fails, move transaction to `OPERATIONS_HOLD`, page on-call + finance, and block payout release until compensating journals are approved.
-- Runbooks must include: replay commands, manual override approvals (dual control), and incident-close reconciliation attestation.
+- Replaying onboarding jobs must preserve previous provider payloads for audit comparison.
+- Manual overrides must record the provider case, approver identity, and override expiry.
+- If a merchant is downgraded from `VERIFIED` to `RESTRICTED`, all scheduled payouts for that merchant move to `PENDING_REVIEW` and their wallet `available` balance is rechecked.
 
+## 6. Prevention and Monitoring
+
+- Alert on merchants stuck in `PROVIDER_PENDING` or `ACTION_REQUIRED` beyond SLA.
+- Run duplicate-bank-account and duplicate-owner fingerprint checks nightly.
+- Test onboarding webhooks from providers in sandbox and staging to ensure mapping changes do not silently unblock payouts.

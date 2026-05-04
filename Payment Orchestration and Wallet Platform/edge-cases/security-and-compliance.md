@@ -1,65 +1,59 @@
-# Security And Compliance
+# Security and Compliance Edge Cases — Payment Orchestration and Wallet Platform
 
-## Sensitive Data Controls
-- Classify data by sensitivity and apply masking/tokenization where needed.
-- Enforce least privilege for users, services, and break-glass access.
+This document covers the edge conditions that can compromise PCI scope, secrets management, auditability, sanctions controls, or regulatory reporting. These are not optional controls; they are production gate requirements.
 
-## Compliance Requirements
-- Immutable audit logs for admin and policy-changing operations.
-- Evidence collection for periodic internal/external audits.
-- Regional retention/deletion workflows with legal-hold exceptions.
+## 1. Sensitive Data Boundaries
 
-## Verification
-- Quarterly access reviews and key rotation checks.
-- Automated policy tests in CI for critical authorization paths.
+| Data Class | Allowed Locations | Never Allowed |
+|---|---|---|
+| PAN and CVV | Vault or PSP-hosted collection only | Core service logs, analytics stores, support tickets |
+| Bank account full details | Bank rail adapter secrets store and tokenized payout profile | General-purpose logs or chat exports |
+| PII | Region-pinned transactional stores and compliance exports | Cross-region debug dumps without residency approval |
+| Audit evidence | Immutable object storage with retention policy | Editable wiki or ad hoc local files |
 
-## Artifact-Specific Deep Dive: Lifecycle, Reconciliation, Disputes, Fraud, and Ledger Safety
+## 2. High-Risk Edge Cases
 
-### Why this artifact matters
-This document now defines **security-compliance** behavior and explicitly maps architecture intent to API contracts, diagrammed flows, and day-2 operations owned by **Security, Compliance**.
+| Scenario | Detection | Required Response |
+|---|---|---|
+| Raw PAN appears in non-PCI log | DLP alert or log scrubber finding | Treat as Sev-1, rotate affected credentials, quarantine logs, notify compliance |
+| API key leak | Unusual source IPs, sudden error spike, leaked credential report | Revoke key, require new key issuance, review impacted requests |
+| Webhook secret rotation overlap fails | Merchants start rejecting valid events | Support dual-secret validation window and expose current secret version |
+| Audit log sink unavailable | Missing audit trail for admin actions | Fail closed for high-risk admin mutations until audit path is restored |
+| Region residency misrouting | Data copied to wrong region | Stop replication, quarantine artifacts, open compliance incident |
+| KMS or HSM key rotation mismatch | Old ciphertext can no longer decrypt | Keep decrypt-old and encrypt-new overlap until validation completes |
 
-### Transaction state transitions required in this artifact
-- `INITIATED -> AUTHORIZING -> AUTHORIZED -> CAPTURE_PENDING -> CAPTURED` for card and wallet charges.
-- `CAPTURED -> SETTLEMENT_PENDING -> SETTLED` after provider clearing confirmation.
-- `CAPTURED|SETTLED -> REFUND_PENDING -> PARTIALLY_REFUNDED|REFUNDED` for merchant-initiated refunds.
-- `SETTLED -> CHARGEBACK_OPEN -> CHARGEBACK_WON|CHARGEBACK_LOST` for issuer disputes.
-- Each transition MUST include: actor, triggering API/event, timeout, retry policy, and compensating action.
+## 3. PCI and Compliance Boundary Diagram
 
-### API contracts this artifact must keep consistent
-- `POST /disputes/webhooks`: documented here with required request ids, idempotency keys, and failure reason codes for **security-compliance**.
-- `POST /risk/screen`: documented here with required request ids, idempotency keys, and failure reason codes for **security-compliance**.
-- `POST /ledger/journals`: documented here with required request ids, idempotency keys, and failure reason codes for **security-compliance**.
-- `GET /reconciliation/runs/{runId}`: documented here with required request ids, idempotency keys, and failure reason codes for **security-compliance**.
-- All mutating calls MUST return `correlation_id`, `idempotency_key`, `previous_state`, `new_state`, and `transition_reason`.
-
-### In-depth flow diagram for security-and-compliance
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant Client
-    participant API as Payment API
-    participant Risk as Risk Service
-    participant Ledger
-    participant Recon as Reconciliation
-    participant Ops as Operations
-
-    Client->>API: create/capture request (security-compliance)
-    API->>Risk: score transaction
-    Risk-->>API: ALLOW/REVIEW/DECLINE
-    API->>Ledger: post provisional journal
-    Ledger-->>API: journal_id + invariant check
-    API-->>Client: state update + correlation_id
-    API->>Recon: publish settlement candidate
-    Recon-->>Ops: discrepancy or success signal
+flowchart LR
+    Merchant[Merchant client] --> Hosted[Hosted fields or vault SDK]
+    Hosted --> PCI[PCI zone]
+    PCI --> Token[Token service]
+    Token --> Core[Core services]
+    Core --> Audit[Immutable audit trail]
+    Core --> Compliance[Compliance exports]
 ```
 
-### Reconciliation, dispute/refund, and fraud controls
-- Reconciliation: three-way match (ledger vs PSP file vs bank statement) with tolerance thresholds and auto-classification into `timing`, `amount`, `missing`, `duplicate` breaks.
-- Disputes/Refunds: evidence chain-of-custody, SLA timers, and automatic ledger reversals when disputes are lost.
-- Fraud: pre-auth risk decisioning, post-auth anomaly detection, and payout velocity controls tied to case management.
+## 4. Mandatory Control Rules
 
-### Ledger invariants and operational hooks
-- Invariants enforced here: double-entry balance, append-only journal, exactly-once posting per business event, and currency-safe postings.
-- Operational process: if any invariant fails, move transaction to `OPERATIONS_HOLD`, page on-call + finance, and block payout release until compensating journals are approved.
-- Runbooks must include: replay commands, manual override approvals (dual control), and incident-close reconciliation attestation.
+- Administrative actions affecting payouts, routing, or ledger repairs require strong authentication and immutable audit records.
+- Break-glass access must use short-lived credentials, ticket reference, and session recording.
+- Secret rotation must be automated and tested in staging with the same mechanism used in production.
+- Compliance exports must pseudonymize data not required by the receiving regulator or auditor.
+- Audit retention is at least seven years for financial and security events.
 
+## 5. Verification Checklist
+
+| Control Area | Verification |
+|---|---|
+| Secrets | Quarterly rotation rehearsal and secret age report |
+| PCI | Quarterly network segmentation check and annual QSA evidence pack |
+| AML and sanctions | Test blocked payout path and override workflow |
+| Audit logs | Daily completeness check against admin and financial event counts |
+| Data residency | Automated policy test on storage bucket and database placement |
+
+## 6. Recovery and Reporting
+
+- Security incidents touching financial flows require joint ownership from security, payments engineering, and compliance.
+- Any manual data repair arising from a security incident must still use the supervised journal or configuration workflow.
+- Post-incident reports must record affected merchants, time window, control failure, remediation, and evidence of restored compliance.
